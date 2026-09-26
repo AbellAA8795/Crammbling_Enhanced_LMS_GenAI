@@ -12,6 +12,8 @@ app.use(express.json());
 
 import loginRoutes from "./routes/login.route.js";
 import userRoutes from "./routes/user.route.js";
+import passport from "./config/passport.js";
+import googleAuthRoutes from "./routes/googleAuth.route.js";
 
 app.get("/", (req, res) => {
     res.send("Crammbling backend is running!");
@@ -20,9 +22,9 @@ app.get("/", (req, res) => {
 // middleware
 app.use("/api/login", loginRoutes);
 app.use("/api/users", userRoutes);
-
-
-
+app.use(passport.initialize());
+app.use("/api/users", userRoutes);
+app.use("/api/auth", googleAuthRoutes);
 
 
 

@@ -1,6 +1,6 @@
 import crypto from "crypto";
-import transporter from "../config/mailer.js";
-import { insertOtp } from "../models/otp.model.js";
+import transporter from "../../config/mailer.js";
+import { insertOtp } from "../../models/Authentication/otp.model.js";
 
 export async function generateAndSendOtp(email) {
     const otpCode = crypto.randomInt(100000, 999999).toString(); // 6-digit code

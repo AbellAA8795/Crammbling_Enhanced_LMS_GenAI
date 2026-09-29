@@ -1,4 +1,4 @@
-import pool from "../config/database.js";
+import pool from "../../config/database.js";
 
 export async function findOrCreateGoogleUser(googleId, email, name, avatarUrl) {
     const query = `SELECT * FROM find_or_create_google_user($1, $2, $3, $4)`;

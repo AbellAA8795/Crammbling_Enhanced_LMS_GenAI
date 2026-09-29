@@ -1,12 +1,12 @@
 import {
-  createChat,
-  insertMessage,
-  getUserChats,
-  getChatMessages,
-  chatBelongsToUser,
-} from "../models/chat.model.js";
-import { getOllamaReply } from "../services/ollama.service.js";
-import { MAX_HISTORY_MESSAGES } from "../middleware/chatMiddleware.js";
+    createChat,
+    insertMessage,
+    getUserChats,
+    getChatMessages,
+    chatBelongsToUser,
+} from "../../models/Chatbot_services/chat.model.js";
+import { getOllamaReply } from "../../services/Chatbot_services/ollama.service.js";
+import { MAX_HISTORY_MESSAGES } from "../../middleware/Chatbot_services/chatMiddleware.js";
 import fs from "fs/promises";
 
 // Helper: turn the first message into a short title

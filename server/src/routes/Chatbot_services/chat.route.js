@@ -5,11 +5,11 @@ import {
     listChatsController,
     getChatController,
     uploadToChatController,
-} from "../controllers/chat.controller.js";
-import { validateNewChatMessage } from "../middleware/chatMiddleware.js";
-import { chatRateLimiter, uploadRateLimiter } from "../middleware/rateLimiter.js";
-import { upload } from "../config/upload.js";
-import verifyToken from "../middleware/verifyToken.js";
+} from "../../controllers/Chatbot_services/chat.controller.js";
+import { validateNewChatMessage } from "../../middleware/Chatbot_services/chatMiddleware.js";
+import { chatRateLimiter, uploadRateLimiter } from "../../middleware/shared/rateLimiter.js";
+import { upload } from "../../config/upload.js";
+import verifyToken from "../../middleware/shared/verifyToken.js";
 
 const router = express.Router();
 

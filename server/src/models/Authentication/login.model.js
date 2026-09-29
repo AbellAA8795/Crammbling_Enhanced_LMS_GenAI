@@ -1,4 +1,4 @@
-import pool from "../config/database.js";
+import pool from "../../config/database.js";
 
 export async function verifyLogin(email, password) {
     const query = `CALL verify_login_procedure($1, $2, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)`;

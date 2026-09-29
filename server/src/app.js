@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import passport from "./config/passport.js";
-import googleAuthRoutes from "./routes/googleAuth.route.js";
+import googleAuthRoutes from "./routes/Authentication/googleAuth.route.js";
 
 const app = express();
 app.use(cors());
@@ -11,10 +11,10 @@ app.use(passport.initialize());
 
 // routes import
 
-import loginRoutes from "./routes/login.route.js";
-import userRoutes from "./routes/user.route.js";
-import otpRoutes from "./routes/otp.route.js";
-import chatRoutes from "./routes/chat.route.js";
+import loginRoutes from "./routes/Authentication/login.route.js";
+import userRoutes from "./routes/Authentication/user.route.js";
+import otpRoutes from "./routes/Authentication/otp.route.js";
+import chatRoutes from "./routes/Chatbot_services/chat.route.js";
 
 
 app.get("/", (req, res) => {

@@ -1,4 +1,4 @@
-import pool from "../config/database.js";
+import pool from "../../config/database.js";
 
 export async function createChat(userId, title) {
     const query = `CALL create_chat_procedure($1, $2, NULL)`;

@@ -1,4 +1,4 @@
-import pool from "../config/database.js";
+import pool from "../../config/database.js";
 
 export async function insertOtp(email, otpCode, expiresMinutes) {
     const query = `CALL insert_otp_procedure($1, $2, $3)`;

@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -52,10 +54,12 @@
 
 body {
   margin: 0;
+  min-width: 320px;
+  background: #130d0b;
 }
 
 #root {
-  width: 1126px;
+  width: 100%;
   max-width: 100%;
   margin: 0 auto;
   text-align: center;
@@ -64,6 +68,228 @@ body {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+}
+
+button {
+  font: inherit;
+}
+
+.personalized-shell {
+  min-height: 100vh;
+  width: 100%;
+}
+
+.personalized-layout {
+  min-width: 0;
+  align-items: stretch !important;
+}
+
+.personalized-content,
+.personalized-body,
+.personalized-columns,
+.personalized-main-card,
+.personalized-side-card {
+  min-width: 0;
+}
+
+.personalized-body {
+  overflow: hidden;
+}
+
+.personalized-hero > div:first-child {
+  min-width: 0;
+}
+
+.personalized-columns {
+  align-items: flex-start !important;
+}
+
+.difficulty-tabs > div {
+  cursor: pointer;
+  min-width: 0;
+  text-align: center;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.forge-button,
+.browse-files-button {
+  border: 1px solid #58f1f6;
+  border-radius: 4px;
+  transition: transform 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.forge-button {
+  background: #58f1f6;
+  box-shadow: 0 0 0 rgba(88, 241, 246, 0);
+  padding: 10px 16px;
+}
+
+.forge-button:hover,
+.forge-button:focus-visible {
+  background: #feda44;
+  box-shadow: 0 0 18px rgba(88, 241, 246, 0.45);
+  transform: translateY(-2px);
+  animation: forge-pulse 900ms ease-in-out infinite alternate;
+}
+
+.forge-button:active,
+.browse-files-button:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+.forge-button:focus-visible,
+.browse-files-button:focus-visible {
+  outline: 2px solid #feda44;
+  outline-offset: 3px;
+}
+
+.browse-files-button {
+  color: #ede0dc;
+  background: #251e1c;
+  border-color: #58f1f6;
+  cursor: pointer;
+}
+
+.browse-files-button:hover {
+  background: #302826;
+  box-shadow: 0 0 12px rgba(88, 241, 246, 0.28);
+  transform: translateY(-1px);
+}
+
+@keyframes forge-pulse {
+  from {
+    box-shadow: 0 0 10px rgba(88, 241, 246, 0.25);
+  }
+  to {
+    box-shadow: 0 0 24px rgba(254, 218, 68, 0.55);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .forge-button,
+  .browse-files-button {
+    animation: none;
+    transition: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .personalized-sidebar {
+    display: none !important;
+  }
+
+  .personalized-topbar {
+    align-items: stretch !important;
+    gap: 12px;
+    padding: 12px 16px !important;
+  }
+
+  .personalized-topbar > div {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .personalized-topbar > div:last-child {
+    justify-content: flex-end;
+  }
+
+  .personalized-topbar > div:first-child > div:first-child {
+    max-width: 100%;
+    overflow: hidden;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+
+  .personalized-topbar > div:first-child > div:first-child span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .personalized-topbar > div:last-child > div {
+    margin-right: 0 !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+
+  .personalized-body {
+    gap: 24px !important;
+    padding: 16px !important;
+  }
+
+  .personalized-hero {
+    align-items: flex-start !important;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px !important;
+  }
+
+  .personalized-hero > div:first-child {
+    width: 100% !important;
+  }
+
+  .personalized-hero > div:first-child span:first-child {
+    font-size: 24px !important;
+    line-height: 1.15;
+  }
+
+  .personalized-columns {
+    flex-direction: column;
+    gap: 24px !important;
+  }
+
+  .personalized-main-card,
+  .personalized-side-card {
+    width: 100% !important;
+  }
+
+  .personalized-main-card,
+  .personalized-side-card > div {
+    padding: 16px !important;
+  }
+
+  .personalized-main-card div[style*="width: 305px"],
+  .personalized-main-card div[style*="width: 281px"],
+  .personalized-side-card div[style*="width: 182px"],
+  .personalized-side-card div[style*="width: 206px"] {
+    width: 100% !important;
+    min-width: 0;
+  }
+
+  .personalized-main-card div[style*="width: 305px"] span,
+  .personalized-main-card div[style*="width: 281px"] span {
+    overflow-wrap: anywhere;
+  }
+
+  .difficulty-tabs {
+    flex-wrap: wrap;
+  }
+
+  .difficulty-tabs > div {
+    flex: 1 1 30%;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1100px) {
+  .personalized-sidebar {
+    width: 220px !important;
+  }
+
+  .personalized-topbar,
+  .personalized-body {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+
+  .personalized-columns {
+    gap: 20px !important;
+  }
+
+  .personalized-side-card {
+    width: min(34vw, 320px) !important;
+  }
 }
 
 h1,

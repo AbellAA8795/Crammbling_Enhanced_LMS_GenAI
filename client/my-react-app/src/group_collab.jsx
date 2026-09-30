@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Chatbot from "./chatbot";
 import Personalized from "./personalized";
+import { ThemePicker, useTheme, withAlpha, CloseIcon, MenuIcon } from "./Theme";
 
 /* ---------------------------------------------------------
    GROUP COLLAB
@@ -54,11 +55,11 @@ function ToggleRow({ label, defaultOn = false }) {
     return (
         <button
             onClick={() => setOn((v) => !v)}
-            className="flex justify-between items-center py-2 border-b border-solid border-[#3F3735]"
+            className="flex justify-between items-center py-2 border-b border-solid border-[color:var(--t-bd0)]"
         >
-            <span className="text-[#BBC9C9] text-xs">{label}</span>
-            <div className={`w-9 h-5 flex items-center px-0.5 ${on ? "bg-[#2CD4D9] justify-end" : "bg-[#251E1C] justify-start"}`}>
-                <div className="w-3.5 h-3.5 bg-[#EDE0DC]" />
+            <span className="text-[color:var(--t-tx1)] text-xs">{label}</span>
+            <div className={`w-9 h-5 flex items-center px-0.5 ${on ? "bg-[var(--t-ac)] justify-end" : "bg-[var(--t-bg3)] justify-start"}`}>
+                <div className="w-3.5 h-3.5 bg-[var(--t-tx0)]" />
             </div>
         </button>
     );
@@ -66,7 +67,7 @@ function ToggleRow({ label, defaultOn = false }) {
 
 const CURRENT_USER = { id: "you", name: "You" };
 
-const BADGE_COLORS = ["#2CD4D9", "#FEDA44", "#A0D673", "#82F040", "#FF6B6B", "#58F1F6"];
+const BADGE_COLORS = ["var(--t-ac)", "var(--t-warn)", "var(--t-ok2)", "var(--t-ok)", "var(--t-err)", "var(--t-ac2)"];
 function colorForString(s) {
     let h = 0;
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
@@ -105,7 +106,7 @@ const INITIAL_GROUPS = [
         id: "g1",
         name: "Algorithm Study Squad",
         type: "normal",
-        color: "#2CD4D9",
+        color: "var(--t-ac)",
         members: [
             { id: "you", name: "You", role: "admin" },
             { id: "m2", name: "Jess R.", role: "member" },
@@ -124,7 +125,7 @@ const INITIAL_GROUPS = [
         id: "g2",
         name: "CS240 — Prof. Santos",
         type: "classroom",
-        color: "#82F040",
+        color: "var(--t-ok)",
         teacherId: "you",
         members: [
             { id: "you", name: "You", role: "teacher" },
@@ -155,7 +156,7 @@ const INITIAL_GROUPS = [
         id: "g3",
         name: "Discrete Math Circle",
         type: "normal",
-        color: "#FEDA44",
+        color: "var(--t-warn)",
         members: [
             { id: "m4", name: "Priya N.", role: "admin" },
             { id: "you", name: "You", role: "member" },
@@ -176,7 +177,7 @@ const INITIAL_GROUPS = [
         id: "g4",
         name: "MATH210 — Prof. Alvarez",
         type: "classroom",
-        color: "#58F1F6",
+        color: "var(--t-ac2)",
         teacherId: "t1",
         members: [
             { id: "t1", name: "Dr. Alvarez", role: "teacher" },
@@ -206,8 +207,8 @@ function Panel({ title, count, children, action }) {
     return (
         <div className="flex flex-col self-stretch gap-3">
             <div className="flex justify-between items-center">
-                <span className="text-[#EDE0DC] text-xs font-bold tracking-wide">
-                    {title} {typeof count === "number" && <span className="text-[#859394] font-normal">({count})</span>}
+                <span className="text-[color:var(--t-tx0)] text-xs font-bold tracking-wide">
+                    {title} {typeof count === "number" && <span className="text-[color:var(--t-tx2)] font-normal">({count})</span>}
                 </span>
                 {action}
             </div>
@@ -220,7 +221,7 @@ function Badge({ color, children }) {
     return (
         <span
             className="text-[10px] font-bold py-0.5 px-2 border border-solid shrink-0"
-            style={{ backgroundColor: `${color}33`, borderColor: `${color}4D`, color }}
+            style={{ backgroundColor: withAlpha(color, "33"), borderColor: withAlpha(color, "4D"), color }}
         >
             {children}
         </span>
@@ -310,12 +311,12 @@ function AddMemberModal({ onClose, onAdd }) {
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
             <form
                 onSubmit={submit}
-                className="relative bg-[#0B1220E6] backdrop-blur-md border border-solid border-[#2E3B5C] p-5 w-full max-w-sm flex flex-col gap-3"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px #1E3A5F4D" }}
+                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_90%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-5 w-full max-w-sm flex flex-col gap-3"
+                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
             >
                 <div className="flex justify-between items-center mb-1">
-                    <span className="text-[#EDE0DC] text-sm font-bold">ADD MEMBER</span>
-                    <button type="button" onClick={onClose} className="text-[#8A93B8] text-lg leading-none hover:text-[#58F1F6] transition-colors">
+                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">ADD MEMBER</span>
+                    <button type="button" onClick={onClose} className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors">
                         ×
                     </button>
                 </div>
@@ -331,8 +332,8 @@ function AddMemberModal({ onClose, onAdd }) {
                             key={m.id}
                             onClick={() => setMethod(m.id)}
                             className={`flex-1 text-[10px] font-bold py-1.5 border border-solid transition-all duration-150 active:scale-95 ${method === m.id
-                                ? "bg-[#132038] border-[#2CD4D9] text-[#2CD4D9] shadow-[0_0_10px_#2CD4D94D]"
-                                : "bg-[#101A2E] border-[#2E3B5C] text-[#8A93B8] hover:border-[#58F1F6] hover:text-[#BBC9C9]"
+                                ? "bg-[var(--t-in1)] border-[color:var(--t-ac)] text-[color:var(--t-ac)] shadow-[0_0_10px_color-mix(in_srgb,_var(--t-ac)_30%,_transparent)]"
+                                : "bg-[var(--t-in0)] border-[color:var(--t-mbd)] text-[color:var(--t-mtx)] hover:border-[color:var(--t-ac2)] hover:text-[color:var(--t-tx1)]"
                                 }`}
                         >
                             {m.label}
@@ -345,12 +346,12 @@ function AddMemberModal({ onClose, onAdd }) {
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
                     placeholder={placeholders[method]}
-                    className="bg-[#101A2E] border border-solid border-[#2E3B5C] text-[#EDE0DC] text-xs py-2 px-3 outline-none focus:border-[#2CD4D9] transition-colors"
+                    className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac)] transition-colors"
                 />
 
                 <button
                     type="submit"
-                    className="mt-1 bg-[#2CD4D9] text-[#003738] text-xs font-bold py-2 hover:opacity-90 hover:shadow-[0_0_16px_#2CD4D966] transition-all duration-150 active:scale-[0.98]"
+                    className="mt-1 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2 hover:opacity-90 hover:shadow-[0_0_16px_color-mix(in_srgb,_var(--t-ac)_40%,_transparent)] transition-all duration-150 active:scale-[0.98]"
                 >
                     ADD TO GROUP
                 </button>
@@ -374,48 +375,48 @@ function CreateGroupModal({ onClose, onCreate }) {
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
             <form
                 onSubmit={submit}
-                className="relative bg-[#0B1220E6] backdrop-blur-md border border-solid border-[#2E3B5C] p-5 w-full max-w-sm flex flex-col gap-3"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px #1E3A5F4D" }}
+                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_90%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-5 w-full max-w-sm flex flex-col gap-3"
+                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
             >
                 <div className="flex justify-between items-center mb-1">
-                    <span className="text-[#EDE0DC] text-sm font-bold">NEW GROUP CHAT</span>
-                    <button type="button" onClick={onClose} className="text-[#8A93B8] text-lg leading-none hover:text-[#58F1F6] transition-colors">
+                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">NEW GROUP CHAT</span>
+                    <button type="button" onClick={onClose} className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors">
                         ×
                     </button>
                 </div>
 
                 <label className="flex flex-col gap-1">
-                    <span className="text-[#8A93B8] text-[11px]">Group name</span>
+                    <span className="text-[color:var(--t-mtx)] text-[11px]">Group name</span>
                     <input
                         autoFocus
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="e.g. Discrete Math Warband"
-                        className="bg-[#101A2E] border border-solid border-[#2E3B5C] text-[#EDE0DC] text-xs py-2 px-3 outline-none focus:border-[#2CD4D9] transition-colors"
+                        className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac)] transition-colors"
                     />
                 </label>
 
                 <div className="flex flex-col gap-1.5">
-                    <span className="text-[#8A93B8] text-[11px]">Type</span>
+                    <span className="text-[color:var(--t-mtx)] text-[11px]">Type</span>
                     <button
                         type="button"
                         onClick={() => setType("normal")}
-                        className={`flex flex-col items-start p-3 border border-solid text-left transition-all duration-150 ${type === "normal" ? "border-[#2CD4D9] bg-[#132038] shadow-[0_0_14px_#2CD4D933]" : "border-[#2E3B5C] bg-[#101A2E] hover:border-[#58F1F6]"
+                        className={`flex flex-col items-start p-3 border border-solid text-left transition-all duration-150 ${type === "normal" ? "border-[color:var(--t-ac)] bg-[var(--t-in1)] shadow-[0_0_14px_color-mix(in_srgb,_var(--t-ac)_20%,_transparent)]" : "border-[color:var(--t-mbd)] bg-[var(--t-in0)] hover:border-[color:var(--t-ac2)]"
                             }`}
                     >
-                        <span className="text-[#2CD4D9] text-xs font-bold">NORMAL SQUAD</span>
-                        <span className="text-[#8A93B8] text-[11px] mt-0.5">
+                        <span className="text-[color:var(--t-ac)] text-xs font-bold">NORMAL SQUAD</span>
+                        <span className="text-[color:var(--t-mtx)] text-[11px] mt-0.5">
                             You become admin. Anyone can add members, share files, and create tasks.
                         </span>
                     </button>
                     <button
                         type="button"
                         onClick={() => setType("classroom")}
-                        className={`flex flex-col items-start p-3 border border-solid text-left transition-all duration-150 ${type === "classroom" ? "border-[#82F040] bg-[#132038] shadow-[0_0_14px_#82F04033]" : "border-[#2E3B5C] bg-[#101A2E] hover:border-[#58F1F6]"
+                        className={`flex flex-col items-start p-3 border border-solid text-left transition-all duration-150 ${type === "classroom" ? "border-[color:var(--t-ok)] bg-[var(--t-in1)] shadow-[0_0_14px_color-mix(in_srgb,_var(--t-ok)_20%,_transparent)]" : "border-[color:var(--t-mbd)] bg-[var(--t-in0)] hover:border-[color:var(--t-ac2)]"
                             }`}
                     >
-                        <span className="text-[#82F040] text-xs font-bold">CLASSROOM</span>
-                        <span className="text-[#8A93B8] text-[11px] mt-0.5">
+                        <span className="text-[color:var(--t-ok)] text-xs font-bold">CLASSROOM</span>
+                        <span className="text-[color:var(--t-mtx)] text-[11px] mt-0.5">
                             You become the teacher. You add members, post materials, and grade tasks.
                         </span>
                     </button>
@@ -423,7 +424,7 @@ function CreateGroupModal({ onClose, onCreate }) {
 
                 <button
                     type="submit"
-                    className="mt-1 bg-[#2CD4D9] text-[#003738] text-xs font-bold py-2 hover:opacity-90 hover:shadow-[0_0_16px_#2CD4D966] transition-all duration-150 active:scale-[0.98]"
+                    className="mt-1 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2 hover:opacity-90 hover:shadow-[0_0_16px_color-mix(in_srgb,_var(--t-ac)_40%,_transparent)] transition-all duration-150 active:scale-[0.98]"
                 >
                     CREATE GROUP CHAT
                 </button>
@@ -468,7 +469,7 @@ function NewTaskModal({ isClassroom, onClose, onCreate }) {
     const done = checks.filter(Boolean).length;
     const pct = (done / checks.length) * 100;
     const complete = done === checks.length;
-    const barColor = pct < 50 ? "#FEDA44" : pct < 100 ? "#58F1F6" : "#82F040";
+    const barColor = pct < 50 ? "var(--t-warn)" : pct < 100 ? "var(--t-ac2)" : "var(--t-ok)";
 
     const left = daysUntil(due);
     const dueHint =
@@ -495,18 +496,18 @@ function NewTaskModal({ isClassroom, onClose, onCreate }) {
         }, 450);
     }
 
-    const accent = isClassroom ? "#82F040" : "#2CD4D9";
+    const accent = isClassroom ? "var(--t-ok)" : "var(--t-ac)";
     const field =
-        "w-full bg-[#101A2E] border border-solid border-[#2E3B5C] text-[#EDE0DC] text-xs py-2.5 px-3 text-left outline-none transition-all duration-200 placeholder:text-[#4A5578] focus:border-[#2CD4D9] focus:shadow-[0_0_14px_#2CD4D933] focus:bg-[#132038]";
+        "w-full bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2.5 px-3 text-left outline-none transition-all duration-200 placeholder:text-[color:var(--t-ph)] focus:border-[color:var(--t-ac)] focus:shadow-[0_0_14px_color-mix(in_srgb,_var(--t-ac)_20%,_transparent)] focus:bg-[var(--t-in1)]";
 
     const Label = ({ children, ok }) => (
-        <span className="flex items-center gap-1.5 text-[#8A93B8] text-[10px] font-bold tracking-wider text-left uppercase">
+        <span className="flex items-center gap-1.5 text-[color:var(--t-mtx)] text-[10px] font-bold tracking-wider text-left uppercase">
             <span
                 className="inline-flex items-center justify-center w-3 h-3 rounded-full text-[8px] leading-none transition-all duration-300"
                 style={{
-                    backgroundColor: ok ? "#82F040" : "transparent",
-                    border: `1px solid ${ok ? "#82F040" : "#3A4E78"}`,
-                    color: "#0B1220",
+                    backgroundColor: ok ? "var(--t-ok)" : "transparent",
+                    border: `1px solid ${ok ? "var(--t-ok)" : "var(--t-mbd2)"}`,
+                    color: "var(--t-mbg)",
                     transform: ok ? "scale(1.15)" : "scale(1)",
                 }}
             >
@@ -523,7 +524,7 @@ function NewTaskModal({ isClassroom, onClose, onCreate }) {
                 @keyframes ntShimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
                 @keyframes ntPulse { 0%,100% { box-shadow: 0 0 0 0 var(--nt-glow); } 50% { box-shadow: 0 0 22px 2px var(--nt-glow); } }
                 @keyframes ntLaunch { to { transform: translateY(-40px) scale(.9); opacity: 0; } }
-                .nt-date { color-scheme: dark; }
+                .nt-date { color-scheme: inherit; }
                 .nt-date::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .7; transition: opacity .15s; }
                 .nt-date::-webkit-calendar-picker-indicator:hover { opacity: 1; }
                 .nt-num::-webkit-inner-spin-button { opacity: .4; }
@@ -531,42 +532,42 @@ function NewTaskModal({ isClassroom, onClose, onCreate }) {
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
             <form
                 onSubmit={submit}
-                className="relative bg-[#0B1220F2] backdrop-blur-md border border-solid border-[#2E3B5C] w-full max-w-md overflow-hidden"
+                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_95%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] w-full max-w-md overflow-hidden"
                 style={{
-                    boxShadow: `0 20px 60px rgba(0,0,0,0.65), 0 0 40px ${accent}22`,
+                    boxShadow: `0 20px 60px rgba(0,0,0,0.65), 0 0 40px ${withAlpha(accent, "22")}`,
                     animation: launching ? "ntLaunch .45s ease-in forwards" : "ntPop .28s cubic-bezier(.2,.9,.3,1.2)",
                 }}
             >
                 {/* accent strip */}
-                <div className="h-0.5 w-full" style={{ background: `linear-gradient(90deg, ${accent}, #FEDA44, ${accent})` }} />
+                <div className="h-0.5 w-full" style={{ background: `linear-gradient(90deg, ${accent}, var(--t-warn), ${accent})` }} />
 
                 {/* header */}
                 <div className="flex justify-between items-start px-5 pt-4 pb-3">
                     <div className="flex items-center gap-3">
                         <div
                             className="w-9 h-9 flex items-center justify-center text-base border border-solid"
-                            style={{ backgroundColor: `${accent}22`, borderColor: `${accent}55`, color: accent }}
+                            style={{ backgroundColor: withAlpha(accent, "22"), borderColor: withAlpha(accent, "55"), color: accent }}
                         >
                             {isClassroom ? "🎓" : "✦"}
                         </div>
                         <div className="flex flex-col text-left">
-                            <span className="text-[#EDE0DC] text-sm font-bold tracking-wide">{isClassroom ? "NEW ASSIGNMENT" : "NEW TASK"}</span>
-                            <span className="text-[#8A93B8] text-[11px]">
+                            <span className="text-[color:var(--t-tx0)] text-sm font-bold tracking-wide">{isClassroom ? "NEW ASSIGNMENT" : "NEW TASK"}</span>
+                            <span className="text-[color:var(--t-mtx)] text-[11px]">
                                 {complete ? "All set — ready to launch!" : `${done} of ${checks.length} details filled in`}
                             </span>
                         </div>
                     </div>
-                    <button type="button" onClick={onClose} className="text-[#8A93B8] text-xl leading-none hover:text-[#58F1F6] hover:rotate-90 transition-all duration-200" aria-label="Close">
+                    <button type="button" onClick={onClose} className="text-[color:var(--t-mtx)] text-xl leading-none hover:text-[color:var(--t-ac2)] hover:rotate-90 transition-all duration-200" aria-label="Close">
                         ×
                     </button>
                 </div>
 
                 {/* progress bar */}
                 <div className="px-5 pb-4">
-                    <div className="relative h-1.5 bg-[#101A2E] border border-solid border-[#2E3B5C] overflow-hidden">
+                    <div className="relative h-1.5 bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] overflow-hidden">
                         <div
                             className="absolute inset-y-0 left-0 transition-all duration-500 ease-out overflow-hidden"
-                            style={{ width: `${pct}%`, backgroundColor: barColor, boxShadow: `0 0 10px ${barColor}99` }}
+                            style={{ width: `${pct}%`, backgroundColor: barColor, boxShadow: `0 0 10px ${withAlpha(barColor, "99")}` }}
                         >
                             {pct > 0 && (
                                 <div
@@ -576,7 +577,7 @@ function NewTaskModal({ isClassroom, onClose, onCreate }) {
                             )}
                         </div>
                     </div>
-                    <div className="flex justify-between mt-1.5 text-[10px] text-[#4A5578]">
+                    <div className="flex justify-between mt-1.5 text-[10px] text-[color:var(--t-ph)]">
                         <span>Progress</span>
                         <span className="font-bold transition-colors duration-500" style={{ color: barColor }}>
                             {Math.round(pct)}%
@@ -626,8 +627,8 @@ function NewTaskModal({ isClassroom, onClose, onCreate }) {
                                         type="button"
                                         onClick={() => quickDue(off)}
                                         className={`text-[10px] font-bold py-0.5 px-2 border border-solid transition-all duration-150 active:scale-95 ${active
-                                            ? "bg-[#2CD4D933] border-[#2CD4D9] text-[#2CD4D9]"
-                                            : "bg-[#101A2E] border-[#2E3B5C] text-[#8A93B8] hover:border-[#58F1F6] hover:text-[#58F1F6]"
+                                            ? "bg-[color-mix(in_srgb,_var(--t-ac)_20%,_transparent)] border-[color:var(--t-ac)] text-[color:var(--t-ac)]"
+                                            : "bg-[var(--t-in0)] border-[color:var(--t-mbd)] text-[color:var(--t-mtx)] hover:border-[color:var(--t-ac2)] hover:text-[color:var(--t-ac2)]"
                                             }`}
                                     >
                                         {label}
@@ -637,7 +638,7 @@ function NewTaskModal({ isClassroom, onClose, onCreate }) {
                             {dueHint && (
                                 <span
                                     className="ml-auto text-[10px] font-bold"
-                                    style={{ color: left < 0 ? "#FF6B6B" : left <= 1 ? "#FEDA44" : "#A0D673" }}
+                                    style={{ color: left < 0 ? "var(--t-err)" : left <= 1 ? "var(--t-warn)" : "var(--t-ok2)" }}
                                 >
                                     ⏳ {dueHint}
                                 </span>
@@ -656,8 +657,8 @@ function NewTaskModal({ isClassroom, onClose, onCreate }) {
                                         type="button"
                                         onClick={() => setPoints(p)}
                                         className={`flex-1 text-xs font-bold py-2 border border-solid transition-all duration-150 active:scale-95 ${Number(points) === p
-                                            ? "bg-[#FEDA4433] border-[#FEDA44] text-[#FEDA44] shadow-[0_0_12px_#FEDA4444]"
-                                            : "bg-[#101A2E] border-[#2E3B5C] text-[#8A93B8] hover:border-[#FEDA44] hover:text-[#FEDA44]"
+                                            ? "bg-[color-mix(in_srgb,_var(--t-warn)_20%,_transparent)] border-[color:var(--t-warn)] text-[color:var(--t-warn)] shadow-[0_0_12px_color-mix(in_srgb,_var(--t-warn)_27%,_transparent)]"
+                                            : "bg-[var(--t-in0)] border-[color:var(--t-mbd)] text-[color:var(--t-mtx)] hover:border-[color:var(--t-warn)] hover:text-[color:var(--t-warn)]"
                                             }`}
                                     >
                                         {p}
@@ -685,16 +686,16 @@ function NewTaskModal({ isClassroom, onClose, onCreate }) {
                         </label>
                     )}
 
-                    {!isClassroom && <span className="text-[#8A93B8] text-[10px] text-left">✓ This will also sync to your Study Sprint Board backlog.</span>}
+                    {!isClassroom && <span className="text-[color:var(--t-mtx)] text-[10px] text-left">✓ This will also sync to your Study Sprint Board backlog.</span>}
 
                     <button
                         type="submit"
                         disabled={!title.trim() || launching}
                         className="relative overflow-hidden text-xs font-bold py-3 tracking-wider transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:brightness-110"
                         style={{
-                            backgroundColor: complete ? "#82F040" : "#2CD4D9",
-                            color: complete ? "#0F2A00" : "#003738",
-                            "--nt-glow": complete ? "#82F04099" : "#2CD4D900",
+                            backgroundColor: complete ? "var(--t-ok)" : "var(--t-ac)",
+                            color: complete ? "var(--t-onok2)" : "var(--t-onac)",
+                            "--nt-glow": complete ? "color-mix(in srgb, var(--t-ok) 60%, transparent)" : "color-mix(in srgb, var(--t-ac) 0%, transparent)",
                             animation: complete && !launching ? "ntPulse 1.8s ease-in-out infinite" : "none",
                         }}
                     >
@@ -722,30 +723,30 @@ function NewMaterialModal({ onClose, onCreate }) {
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
             <form
                 onSubmit={submit}
-                className="relative bg-[#0B1220E6] backdrop-blur-md border border-solid border-[#2E3B5C] p-5 w-full max-w-sm flex flex-col gap-3"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px #1E3A5F4D" }}
+                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_90%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-5 w-full max-w-sm flex flex-col gap-3"
+                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
             >
                 <div className="flex justify-between items-center mb-1">
-                    <span className="text-[#EDE0DC] text-sm font-bold">ADD LESSON MATERIAL</span>
-                    <button type="button" onClick={onClose} className="text-[#8A93B8] text-lg leading-none hover:text-[#58F1F6] transition-colors">
+                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">ADD LESSON MATERIAL</span>
+                    <button type="button" onClick={onClose} className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors">
                         ×
                     </button>
                 </div>
                 <label className="flex flex-col gap-1">
-                    <span className="text-[#8A93B8] text-[11px]">Title</span>
+                    <span className="text-[color:var(--t-mtx)] text-[11px]">Title</span>
                     <input
                         autoFocus
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        className="bg-[#101A2E] border border-solid border-[#2E3B5C] text-[#EDE0DC] text-xs py-2 px-3 outline-none focus:border-[#82F040] transition-colors"
+                        className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ok)] transition-colors"
                     />
                 </label>
                 <label className="flex flex-col gap-1">
-                    <span className="text-[#8A93B8] text-[11px]">Type</span>
+                    <span className="text-[color:var(--t-mtx)] text-[11px]">Type</span>
                     <select
                         value={kind}
                         onChange={(e) => setKind(e.target.value)}
-                        className="bg-[#101A2E] border border-solid border-[#2E3B5C] text-[#EDE0DC] text-xs py-2 px-3 outline-none focus:border-[#82F040] transition-colors"
+                        className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ok)] transition-colors"
                     >
                         <option>PDF</option>
                         <option>Slides</option>
@@ -754,17 +755,17 @@ function NewMaterialModal({ onClose, onCreate }) {
                     </select>
                 </label>
                 <label className="flex flex-col gap-1">
-                    <span className="text-[#8A93B8] text-[11px]">Link / filename</span>
+                    <span className="text-[color:var(--t-mtx)] text-[11px]">Link / filename</span>
                     <input
                         value={link}
                         onChange={(e) => setLink(e.target.value)}
                         placeholder="e.g. Chapter6_Slides.pdf"
-                        className="bg-[#101A2E] border border-solid border-[#2E3B5C] text-[#EDE0DC] text-xs py-2 px-3 outline-none focus:border-[#82F040] transition-colors"
+                        className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ok)] transition-colors"
                     />
                 </label>
                 <button
                     type="submit"
-                    className="mt-1 bg-[#82F040] text-[#153A00] text-xs font-bold py-2 hover:opacity-90 hover:shadow-[0_0_16px_#82F04066] transition-all duration-150 active:scale-[0.98]"
+                    className="mt-1 bg-[var(--t-ok)] text-[color:var(--t-onok)] text-xs font-bold py-2 hover:opacity-90 hover:shadow-[0_0_16px_color-mix(in_srgb,_var(--t-ok)_40%,_transparent)] transition-all duration-150 active:scale-[0.98]"
                 >
                     ADD MATERIAL
                 </button>
@@ -802,20 +803,20 @@ function GroupDetailModal({
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
             <div
-                className="relative bg-[#0B1220E6] backdrop-blur-md border border-solid border-[#2E3B5C] w-full max-w-lg max-h-[85vh] flex flex-col"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 50px #1E3A5F4D" }}
+                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_90%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] w-full max-w-lg max-h-[85vh] flex flex-col"
+                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 50px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
             >
-                <div className="flex justify-between items-center p-4 border-b border-solid border-[#2E3B5C] shrink-0">
+                <div className="flex justify-between items-center p-4 border-b border-solid border-[color:var(--t-mbd)] shrink-0">
                     <div className="min-w-0">
-                        <span className="text-[#EDE0DC] text-sm font-bold block truncate">{group.name}</span>
-                        <span className="text-[#8A93B8] text-[11px]">{isClassroom ? "Classroom details" : "Squad details"}</span>
+                        <span className="text-[color:var(--t-tx0)] text-sm font-bold block truncate">{group.name}</span>
+                        <span className="text-[color:var(--t-mtx)] text-[11px]">{isClassroom ? "Classroom details" : "Squad details"}</span>
                     </div>
-                    <button onClick={onClose} className="text-[#8A93B8] text-lg leading-none hover:text-[#58F1F6] transition-colors" aria-label="Close">
+                    <button onClick={onClose} className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors" aria-label="Close">
                         ×
                     </button>
                 </div>
 
-                <div className="flex flex items-center gap-2 px-4 pt-3 border-b border-solid border-[#2E3B5C] shrink-0 ">
+                <div className="flex flex items-center gap-2 px-4 pt-3 border-b border-solid border-[color:var(--t-mbd)] shrink-0 ">
                     {tabDefs.map((t) => {
                         const active = tab === t.key;
                         return (
@@ -823,8 +824,8 @@ function GroupDetailModal({
                                 key={t.key}
                                 onClick={() => onTabChange(t.key)}
                                 className={`flex items-center gap-1.2 pb-2.5 -mb-px border-b-2 text-[5px] font-bold whitespace-nowrap flex-1 min-w-0 justify-center transition-all duration-150 active:scale-95 ${active
-                                    ? "border-[#2CD4D9] text-[#2CD4D9]"
-                                    : "border-transparent text-[#8A93B8] hover:text-[#BBC9C9] hover:border-[#3A4E78]"
+                                    ? "border-[color:var(--t-ac)] text-[color:var(--t-ac)]"
+                                    : "border-transparent text-[color:var(--t-mtx)] hover:text-[color:var(--t-tx1)] hover:border-[color:var(--t-mbd2)]"
                                     }`}
                             >
                                 <TabIcon type={t.key} />
@@ -842,36 +843,36 @@ function GroupDetailModal({
                             count={group.tasks?.length || 0}
                             action={
                                 canCreateTask && (
-                                    <button onClick={onNewTask} className="text-[#2CD4D9] text-[10px] font-bold hover:text-[#58F1F6] hover:underline underline-offset-2 transition-colors">
+                                    <button onClick={onNewTask} className="text-[color:var(--t-ac)] text-[10px] font-bold hover:text-[color:var(--t-ac2)] hover:underline underline-offset-2 transition-colors">
                                         + {isClassroom ? "New Assignment" : "New Task"}
                                     </button>
                                 )
                             }
                         >
-                            {(group.tasks || []).length === 0 && <p className="text-[#8A93B8] text-xs py-2">Nothing here yet.</p>}
+                            {(group.tasks || []).length === 0 && <p className="text-[color:var(--t-mtx)] text-xs py-2">Nothing here yet.</p>}
                             {(group.tasks || []).map((t) => {
                                 const mySubmission = isClassroom && t.submissions?.find((s) => s.studentId === "you");
                                 return (
                                     <div
                                         key={t.id}
-                                        className="flex flex-col gap-1.5 bg-[#101A2E] p-3 border border-solid border-[#2E3B5C] mb-2 transition-colors hover:border-[#3A4E78]"
+                                        className="flex flex-col gap-1.5 bg-[var(--t-in0)] p-3 border border-solid border-[color:var(--t-mbd)] mb-2 transition-colors hover:border-[color:var(--t-mbd2)]"
                                     >
                                         <div className="flex justify-between items-start gap-2">
-                                            <span className="text-[#EDE0DC] text-sm font-bold">{t.title}</span>
+                                            <span className="text-[color:var(--t-tx0)] text-sm font-bold">{t.title}</span>
                                             {isClassroom ? (
-                                                <Badge color="#FEDA44">{t.points} PTS</Badge>
+                                                <Badge color="var(--t-warn)">{t.points} PTS</Badge>
                                             ) : (
                                                 <Badge color={colorForString(t.badge)}>{t.badge}</Badge>
                                             )}
                                         </div>
-                                        {t.desc && <span className="text-[#BBC9C9] text-xs">{t.desc}</span>}
-                                        <span className="text-[#8A93B8] text-[11px]">Due {t.due || "—"}</span>
+                                        {t.desc && <span className="text-[color:var(--t-tx1)] text-xs">{t.desc}</span>}
+                                        <span className="text-[color:var(--t-mtx)] text-[11px]">Due {t.due || "—"}</span>
 
                                         {isClassroom && !isTeacher && (
                                             <button
                                                 onClick={() => onSubmitTask(t.id)}
                                                 disabled={!!mySubmission}
-                                                className={`self-start text-[10px] font-bold py-1.5 px-3 mt-1 transition-all duration-150 active:scale-95 ${mySubmission ? "bg-[#1E2A44] text-[#8A93B8] cursor-not-allowed" : "bg-[#58F1F6] text-[#003738] hover:opacity-90 hover:shadow-[0_0_14px_#58F1F666]"
+                                                className={`self-start text-[10px] font-bold py-1.5 px-3 mt-1 transition-all duration-150 active:scale-95 ${mySubmission ? "bg-[var(--t-in2)] text-[color:var(--t-mtx)] cursor-not-allowed" : "bg-[var(--t-ac2)] text-[color:var(--t-onac)] hover:opacity-90 hover:shadow-[0_0_14px_color-mix(in_srgb,_var(--t-ac2)_40%,_transparent)]"
                                                     }`}
                                             >
                                                 {mySubmission ? "✓ Submitted" : "Submit Task"}
@@ -880,17 +881,17 @@ function GroupDetailModal({
 
                                         {isClassroom && isTeacher && (
                                             <div className="flex flex-col gap-1.5 mt-1">
-                                                <span className="text-[#8A93B8] text-[10px] font-bold">
+                                                <span className="text-[color:var(--t-mtx)] text-[10px] font-bold">
                                                     {t.submissions.length} submission{t.submissions.length === 1 ? "" : "s"}
                                                 </span>
                                                 {t.submissions.map((s) => {
                                                     const key = `${t.id}:${s.studentId}`;
                                                     const draft = gradeDrafts[key] || { grade: s.grade ?? "", feedback: s.feedback || "" };
                                                     return (
-                                                        <div key={s.studentId} className="flex flex-wrap items-center gap-2 bg-[#0B1220] p-2 border border-solid border-[#2E3B5C]">
-                                                            <span className="text-[#BBC9C9] text-xs flex-1 min-w-[80px]">{s.studentName}</span>
+                                                        <div key={s.studentId} className="flex flex-wrap items-center gap-2 bg-[var(--t-mbg)] p-2 border border-solid border-[color:var(--t-mbd)]">
+                                                            <span className="text-[color:var(--t-tx1)] text-xs flex-1 min-w-[80px]">{s.studentName}</span>
                                                             {s.grade != null ? (
-                                                                <Badge color="#A0D673">
+                                                                <Badge color="var(--t-ok2)">
                                                                     {s.grade}/{t.points}
                                                                 </Badge>
                                                             ) : (
@@ -900,11 +901,11 @@ function GroupDetailModal({
                                                                         value={draft.grade}
                                                                         onChange={(e) => setGradeDrafts((prev) => ({ ...prev, [key]: { ...draft, grade: e.target.value } }))}
                                                                         placeholder="Grade"
-                                                                        className="w-16 bg-[#101A2E] border border-solid border-[#2E3B5C] text-[#EDE0DC] text-xs py-1 px-2 outline-none focus:border-[#A0D673] transition-colors"
+                                                                        className="w-16 bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-1 px-2 outline-none focus:border-[color:var(--t-ok2)] transition-colors"
                                                                     />
                                                                     <button
                                                                         onClick={() => onSaveGrade(t.id, s.studentId)}
-                                                                        className="text-[#A0D673] text-[10px] font-bold py-1 px-2 hover:text-[#BBF38C] hover:underline underline-offset-2 transition-colors"
+                                                                        className="text-[color:var(--t-ok2)] text-[10px] font-bold py-1 px-2 hover:text-[color:var(--t-ok3)] hover:underline underline-offset-2 transition-colors"
                                                                     >
                                                                         Save
                                                                     </button>
@@ -913,7 +914,7 @@ function GroupDetailModal({
                                                         </div>
                                                     );
                                                 })}
-                                                {t.submissions.length === 0 && <span className="text-[#8A93B8] text-[11px]">No submissions yet.</span>}
+                                                {t.submissions.length === 0 && <span className="text-[color:var(--t-mtx)] text-[11px]">No submissions yet.</span>}
                                             </div>
                                         )}
                                     </div>
@@ -925,15 +926,15 @@ function GroupDetailModal({
                     {tab === "files" && !isClassroom && (
                         <Panel title="SHARED FILES" count={group.files?.length || 0}>
                             {(group.files || []).length === 0 && (
-                                <p className="text-[#8A93B8] text-xs py-2">No files shared yet — attach one from the composer below.</p>
+                                <p className="text-[color:var(--t-mtx)] text-xs py-2">No files shared yet — attach one from the composer below.</p>
                             )}
                             {(group.files || []).map((f) => (
                                 <div
                                     key={f.id}
-                                    className="flex justify-between items-center bg-[#101A2E] p-2.5 border border-solid border-[#2E3B5C] mb-1.5 transition-colors hover:border-[#3A4E78]"
+                                    className="flex justify-between items-center bg-[var(--t-in0)] p-2.5 border border-solid border-[color:var(--t-mbd)] mb-1.5 transition-colors hover:border-[color:var(--t-mbd2)]"
                                 >
-                                    <span className="text-[#BBC9C9] text-xs truncate">{f.name}</span>
-                                    <span className="text-[#8A93B8] text-[10px] shrink-0">
+                                    <span className="text-[color:var(--t-tx1)] text-xs truncate">{f.name}</span>
+                                    <span className="text-[color:var(--t-mtx)] text-[10px] shrink-0">
                                         {f.uploadedBy} • {f.size}
                                     </span>
                                 </div>
@@ -947,23 +948,23 @@ function GroupDetailModal({
                             count={group.materials?.length || 0}
                             action={
                                 isTeacher && (
-                                    <button onClick={onNewMaterial} className="text-[#82F040] text-[10px] font-bold hover:text-[#BBF38C] hover:underline underline-offset-2 transition-colors">
+                                    <button onClick={onNewMaterial} className="text-[color:var(--t-ok)] text-[10px] font-bold hover:text-[color:var(--t-ok3)] hover:underline underline-offset-2 transition-colors">
                                         + Add Material
                                     </button>
                                 )
                             }
                         >
-                            {(group.materials || []).length === 0 && <p className="text-[#8A93B8] text-xs py-2">No materials posted yet.</p>}
+                            {(group.materials || []).length === 0 && <p className="text-[color:var(--t-mtx)] text-xs py-2">No materials posted yet.</p>}
                             {(group.materials || []).map((m) => (
                                 <div
                                     key={m.id}
-                                    className="flex justify-between items-center bg-[#101A2E] p-2.5 border border-solid border-[#2E3B5C] mb-1.5 transition-colors hover:border-[#3A4E78]"
+                                    className="flex justify-between items-center bg-[var(--t-in0)] p-2.5 border border-solid border-[color:var(--t-mbd)] mb-1.5 transition-colors hover:border-[color:var(--t-mbd2)]"
                                 >
                                     <div className="flex items-center gap-2 min-w-0">
-                                        <Badge color="#82F040">{m.kind}</Badge>
-                                        <span className="text-[#BBC9C9] text-xs truncate">{m.title}</span>
+                                        <Badge color="var(--t-ok)">{m.kind}</Badge>
+                                        <span className="text-[color:var(--t-tx1)] text-xs truncate">{m.title}</span>
                                     </div>
-                                    <span className="text-[#8A93B8] text-[10px] shrink-0">{m.addedBy}</span>
+                                    <span className="text-[color:var(--t-mtx)] text-[10px] shrink-0">{m.addedBy}</span>
                                 </div>
                             ))}
                         </Panel>
@@ -971,7 +972,7 @@ function GroupDetailModal({
 
                     {tab === "grades" && isClassroom && (
                         <Panel title="GRADES">
-                            {(group.tasks || []).length === 0 && <p className="text-[#8A93B8] text-xs py-2">No graded work yet.</p>}
+                            {(group.tasks || []).length === 0 && <p className="text-[color:var(--t-mtx)] text-xs py-2">No graded work yet.</p>}
                             <div className="flex flex-col gap-1.5">
                                 {(group.tasks || []).flatMap((t) =>
                                     t.submissions
@@ -979,18 +980,18 @@ function GroupDetailModal({
                                         .map((s) => (
                                             <div
                                                 key={`${t.id}-${s.studentId}`}
-                                                className="flex justify-between items-center bg-[#101A2E] p-2.5 border border-solid border-[#2E3B5C] transition-colors hover:border-[#3A4E78]"
+                                                className="flex justify-between items-center bg-[var(--t-in0)] p-2.5 border border-solid border-[color:var(--t-mbd)] transition-colors hover:border-[color:var(--t-mbd2)]"
                                             >
                                                 <div className="min-w-0">
-                                                    <span className="text-[#BBC9C9] text-xs block truncate">{t.title}</span>
-                                                    {isTeacher && <span className="text-[#8A93B8] text-[10px]">{s.studentName}</span>}
+                                                    <span className="text-[color:var(--t-tx1)] text-xs block truncate">{t.title}</span>
+                                                    {isTeacher && <span className="text-[color:var(--t-mtx)] text-[10px]">{s.studentName}</span>}
                                                 </div>
                                                 {s.grade != null ? (
-                                                    <Badge color="#A0D673">
+                                                    <Badge color="var(--t-ok2)">
                                                         {s.grade}/{t.points}
                                                     </Badge>
                                                 ) : (
-                                                    <Badge color="#FEDA44">PENDING</Badge>
+                                                    <Badge color="var(--t-warn)">PENDING</Badge>
                                                 )}
                                             </div>
                                         ))
@@ -1005,7 +1006,7 @@ function GroupDetailModal({
                             count={group.members.length}
                             action={
                                 canAddMembers && (
-                                    <button onClick={onAddMember} className="text-[#2CD4D9] text-[10px] font-bold hover:text-[#58F1F6] hover:underline underline-offset-2 transition-colors">
+                                    <button onClick={onAddMember} className="text-[color:var(--t-ac)] text-[10px] font-bold hover:text-[color:var(--t-ac2)] hover:underline underline-offset-2 transition-colors">
                                         + Add Member
                                     </button>
                                 )
@@ -1014,15 +1015,15 @@ function GroupDetailModal({
                             {group.members.map((m) => (
                                 <div
                                     key={m.id}
-                                    className="flex justify-between items-center bg-[#101A2E] p-2.5 border border-solid border-[#2E3B5C] mb-1.5 transition-colors hover:border-[#3A4E78]"
+                                    className="flex justify-between items-center bg-[var(--t-in0)] p-2.5 border border-solid border-[color:var(--t-mbd)] mb-1.5 transition-colors hover:border-[color:var(--t-mbd2)]"
                                 >
-                                    <span className="text-[#EDE0DC] text-xs">{m.name}</span>
+                                    <span className="text-[color:var(--t-tx0)] text-xs">{m.name}</span>
                                     <div className="flex items-center gap-2">
-                                        <Badge color={m.role === "admin" || m.role === "teacher" ? "#2CD4D9" : "#8A93B8"}>{m.role.toUpperCase()}</Badge>
+                                        <Badge color={m.role === "admin" || m.role === "teacher" ? "var(--t-ac)" : "var(--t-mtx)"}>{m.role.toUpperCase()}</Badge>
                                         {!isClassroom && isAdmin && m.role !== "admin" && (
                                             <button
                                                 onClick={() => onPromote(m.id)}
-                                                className="group/adm flex items-center gap-1 text-[10px] font-bold py-0.5 px-2 border border-solid shrink-0 bg-[#FEDA4433] border-[#FEDA444D] text-[#FEDA44] hover:bg-[#FEDA44] hover:text-[#3A2E00] hover:border-[#FEDA44] hover:shadow-[0_0_12px_#FEDA4466] active:scale-95 transition-all duration-150"
+                                                className="group/adm flex items-center gap-1 text-[10px] font-bold py-0.5 px-2 border border-solid shrink-0 bg-[color-mix(in_srgb,_var(--t-warn)_20%,_transparent)] border-[color:color-mix(in_srgb,_var(--t-warn)_30%,_transparent)] text-[color:var(--t-warn)] hover:bg-[var(--t-warn)] hover:text-[color:var(--t-onwarn)] hover:border-[color:var(--t-warn)] hover:shadow-[0_0_12px_color-mix(in_srgb,_var(--t-warn)_40%,_transparent)] active:scale-95 transition-all duration-150"
                                             >
                                                 <span className="text-[11px] leading-none transition-transform duration-150 group-hover/adm:rotate-90">+</span>
                                                 MAKE ADMIN
@@ -1048,15 +1049,15 @@ function GroupContextMenu({ x, y, group, onClose, onOpenMessages, onOpenTab }) {
         <>
             <div className="fixed inset-0 z-[70]" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
             <div
-                className="fixed z-[80] bg-[#0B1220E6] backdrop-blur-md border border-solid border-[#2E3B5C] py-1 min-w-[172px]"
-                style={{ top: Math.max(8, clampedY), left: Math.max(8, clampedX), boxShadow: "0 12px 32px rgba(0,0,0,0.6), 0 0 24px #1E3A5F40" }}
+                className="fixed z-[80] bg-[color-mix(in_srgb,_var(--t-mbg)_90%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] py-1 min-w-[172px]"
+                style={{ top: Math.max(8, clampedY), left: Math.max(8, clampedX), boxShadow: "0 12px 32px rgba(0,0,0,0.6), 0 0 24px color-mix(in srgb, var(--t-glow) 25%, transparent)" }}
             >
-                <div className="px-3 py-1.5 border-b border-solid border-[#2E3B5C]">
-                    <span className="text-[#8A93B8] text-[10px] font-bold truncate block">{group.name}</span>
+                <div className="px-3 py-1.5 border-b border-solid border-[color:var(--t-mbd)]">
+                    <span className="text-[color:var(--t-mtx)] text-[10px] font-bold truncate block">{group.name}</span>
                 </div>
                 <button
                     onClick={onOpenMessages}
-                    className="flex items-center w-full text-left px-3 py-1.5 text-[#EDE0DC] text-[11px] border-l-2 border-l-transparent hover:border-l-[#58F1F6] hover:bg-[#132038] hover:text-[#58F1F6] transition-all duration-150"
+                    className="flex items-center w-full text-left px-3 py-1.5 text-[color:var(--t-tx0)] text-[11px] border-l-2 border-l-transparent hover:border-l-[color:var(--t-ac2)] hover:bg-[var(--t-in1)] hover:text-[color:var(--t-ac2)] transition-all duration-150"
                 >
                     Open Messages
                 </button>
@@ -1064,7 +1065,7 @@ function GroupContextMenu({ x, y, group, onClose, onOpenMessages, onOpenTab }) {
                     <button
                         key={o.key}
                         onClick={() => onOpenTab(o.key)}
-                        className="flex items-center w-full text-left px-3 py-1.5 text-[#BBC9C9] text-[11px] border-l-2 border-l-transparent hover:border-l-[#58F1F6] hover:bg-[#132038] hover:text-[#EDE0DC] transition-all duration-150"
+                        className="flex items-center w-full text-left px-3 py-1.5 text-[color:var(--t-tx1)] text-[11px] border-l-2 border-l-transparent hover:border-l-[color:var(--t-ac2)] hover:bg-[var(--t-in1)] hover:text-[color:var(--t-tx0)] transition-all duration-150"
                     >
                         {o.label}
                     </button>
@@ -1093,6 +1094,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
     const [searchQuery, setSearchQuery] = useState("");
     const [searchFocused, setSearchFocused] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [theme, setTheme, rootThemeStyle] = useTheme(); // shared with chatbot + personalized
     const [loggedOut, setLoggedOut] = useState(false);
     const [notifOpen, setNotifOpen] = useState(false);
     const searchRef = useRef(null);
@@ -1286,13 +1288,13 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
 
     if (loggedOut) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-[#130D0B] px-6 text-center">
+            <div style={rootThemeStyle} className="flex flex-col items-center justify-center min-h-screen bg-[var(--t-bg0)] px-6 text-center">
                 <img src={IMG.logo} className="w-12 h-12 mb-4 object-fill" />
-                <span className="text-[#2CD4D9] text-lg font-bold mb-2">CRAMMBLING</span>
-                <p className="text-[#859394] text-sm mb-6">You've been logged out.</p>
+                <span className="text-[color:var(--t-ac)] text-lg font-bold mb-2">CRAMMBLING</span>
+                <p className="text-[color:var(--t-tx2)] text-sm mb-6">You've been logged out.</p>
                 <button
                     onClick={() => setLoggedOut(false)}
-                    className="bg-[#2CD4D9] text-[#003738] text-sm font-bold py-2 px-6 border border-solid border-[#3F3735] hover:opacity-90 transition-all duration-150 active:scale-95"
+                    className="bg-[var(--t-ac)] text-[color:var(--t-onac)] text-sm font-bold py-2 px-6 border border-solid border-[color:var(--t-bd0)] hover:opacity-90 transition-all duration-150 active:scale-95"
                 >
                     LOG BACK IN
                 </button>
@@ -1313,39 +1315,40 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
     }
 
     return (
-        <div className="flex flex-col bg-white min-h-screen">
-            <div className="self-stretch bg-[#130D0B] min-h-screen relative">
+        <div style={rootThemeStyle} className="flex flex-col bg-[var(--t-bg0)] min-h-screen">
+            <div className="self-stretch bg-[var(--t-bg0)] min-h-screen relative">
                 <div className="flex items-start self-stretch relative">
                     {mobileNavOpen && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setMobileNavOpen(false)} />}
 
                     {/* ---------------- SIDEBAR (scrollable, fits any device) ---------------- */}
                     <div
-                        className={`bg-[#130D0B] w-64 shrink-0 z-50 flex flex-col h-screen
+                        style={{ backgroundImage: "var(--t-grad-side)" }}
+                        className={`bg-[var(--t-bg0)] w-64 shrink-0 z-50 flex flex-col h-screen
               fixed inset-y-0 left-0 transition-transform duration-300 ease-out
               ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}
               ${navCollapsed ? "lg:-translate-x-full" : "lg:translate-x-0"}`}
                     >
                         <div className="flex justify-end lg:hidden px-3 pt-3">
                             <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu">
-                                <img src={IMG.close} className="w-4 h-4" />
+                                <CloseIcon className="w-4 h-4" />
                             </button>
                         </div>
                         <div className="self-stretch flex-1 overflow-y-auto">
-                            <div className="flex items-center self-stretch bg-[#1D1715] py-[13px]">
+                            <div className="flex items-center self-stretch bg-[color-mix(in_srgb,_var(--t-bg2)_45%,_transparent)] py-[13px]">
                                 <img src={IMG.logo} className="w-9 h-9 ml-4 mr-3 object-fill" />
                                 <div className="w-[127px]">
-                                    <div className="flex flex-col items-start self-stretch" style={{ boxShadow: "0px 2px 4px #2CD4D94D" }}>
-                                        <span className="text-[#2CD4D9] text-[17px] font-bold">CRAMMBLING</span>
+                                    <div className="flex flex-col items-start self-stretch" style={{ boxShadow: "0px 2px 4px color-mix(in srgb, var(--t-ac) 30%, transparent)" }}>
+                                        <span className="text-[color:var(--t-ac)] text-[17px] font-bold">CRAMMBLING</span>
                                     </div>
                                     <div className="flex items-center self-stretch pt-1 gap-1">
-                                        <div className="bg-[#82F040] w-1.5 h-1.5" />
-                                        <span className="text-[#FEDA44] text-[10px] font-bold">VOXEL QUEST Lv.18</span>
+                                        <div className="bg-[var(--t-ok)] w-1.5 h-1.5" />
+                                        <span className="text-[color:var(--t-warn)] text-[10px] font-bold">VOXEL QUEST Lv.18</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="flex flex-col items-start self-stretch pt-[21px] pl-5">
-                                <span className="text-[#859394] text-[11px] font-bold mb-[9px]">NAVIGATION BAR</span>
+                                <span className="text-[color:var(--t-tx2)] text-[11px] font-bold mb-[9px]">NAVIGATION BAR</span>
                             </div>
 
                             <nav className="flex flex-col self-stretch px-3 gap-1">
@@ -1356,14 +1359,14 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                             key={item.key}
                                             onClick={() => handleNavClick(item.key)}
                                             className={`flex items-center self-stretch py-[9px] text-left border border-solid transition-all duration-150 active:scale-[0.98]
-                        ${active ? "bg-[#251E1C] border-[#00000000]" : "border-[#00000000] hover:bg-[#1D1715]"}`}
-                                            style={active ? { boxShadow: "0px 0px 15px #2CD4D926" } : undefined}
+                        ${active ? "bg-[var(--t-bg3)] border-[#00000000]" : "border-[#00000000] hover:bg-[var(--t-bg2)]"}`}
+                                            style={active ? { boxShadow: "0px 0px 15px color-mix(in srgb, var(--t-ac) 15%, transparent)" } : undefined}
                                         >
                                             <img src={item.icon} className={`${item.iconClass} ml-[13px] mr-3 object-fill`} />
-                                            <span className={`text-xs font-bold ${active ? "text-[#2CD4D9]" : "text-[#BBC9C9]"}`}>{item.label}</span>
+                                            <span className={`text-xs font-bold ${active ? "text-[color:var(--t-ac)]" : "text-[color:var(--t-tx1)]"}`}>{item.label}</span>
                                             {active && (
                                                 <div className="flex-1 flex justify-end pr-4">
-                                                    <div className="bg-[#2CD4D9] w-1.5 h-1.5 rounded-full" style={{ boxShadow: "0px 0px 6px #2CD4D9" }} />
+                                                    <div className="bg-[var(--t-ac)] w-1.5 h-1.5 rounded-full" style={{ boxShadow: "0px 0px 6px var(--t-ac)" }} />
                                                 </div>
                                             )}
                                         </button>
@@ -1372,20 +1375,20 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                             </nav>
                         </div>
 
-                        <div className="flex flex-col self-stretch bg-[#1D1715] p-3 gap-1">
+                        <div className="flex flex-col self-stretch bg-[color-mix(in_srgb,_var(--t-bg2)_45%,_transparent)] p-3 gap-1">
                             <button
                                 onClick={() => setSettingsOpen(true)}
-                                className="flex items-center self-stretch py-2 text-left hover:bg-[#251E1C] transition-all duration-150 active:scale-[0.98]"
+                                className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]"
                             >
                                 <img src={IMG.settings} className="w-[15px] h-[15px] mx-3 object-fill" />
-                                <span className="text-[#BBC9C9] text-[11px]">SETTINGS</span>
+                                <span className="text-[color:var(--t-tx1)] text-[11px]">SETTINGS</span>
                             </button>
                             <button
                                 onClick={() => setLoggedOut(true)}
-                                className="flex items-center self-stretch py-2 text-left hover:bg-[#251E1C] transition-all duration-150 active:scale-[0.98]"
+                                className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]"
                             >
                                 <img src={IMG.logout} className="w-3.5 h-3.5 mx-3 object-fill" />
-                                <span className="text-[#BBC9C9] text-[11px]">LOGOUT</span>
+                                <span className="text-[color:var(--t-tx1)] text-[11px]">LOGOUT</span>
                             </button>
                         </div>
                     </div>
@@ -1395,7 +1398,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                         onClick={() => setNavCollapsed((v) => !v)}
                         aria-label={navCollapsed ? "Open navigation bar" : "Push navigation bar aside"}
                         title={navCollapsed ? "Open navigation" : "Push navigation aside"}
-                        className="hidden lg:flex fixed top-1/2 -translate-y-1/2 z-[55] w-5 h-16 items-center justify-center bg-[#251E1C] border border-solid border-[#3F3735] border-l-0 text-[#2CD4D9] hover:bg-[#2CD4D9] hover:text-[#003738] hover:shadow-[0_0_14px_#2CD4D966] transition-all duration-300 active:scale-95"
+                        className="hidden lg:flex fixed top-1/2 -translate-y-1/2 z-[55] w-5 h-16 items-center justify-center bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] border-l-0 text-[color:var(--t-ac)] hover:bg-[var(--t-ac)] hover:text-[color:var(--t-onac)] hover:shadow-[0_0_14px_color-mix(in_srgb,_var(--t-ac)_40%,_transparent)] transition-all duration-300 active:scale-95"
                         style={{ left: navCollapsed ? 0 : 256 }}
                     >
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: navCollapsed ? "rotate(0deg)" : "rotate(180deg)", transition: "transform .3s" }}>
@@ -1404,9 +1407,9 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                     </button>
 
                     {/* ---------------- MAIN ---------------- */}
-                    <div className={`flex-1 bg-[#181210] pb-16 min-w-0 transition-[margin] duration-300 ease-out ${navCollapsed ? "lg:ml-0" : "lg:ml-64"}`}>
+                    <div style={{ backgroundImage: "var(--t-grad-main)" }} className={`flex-1 bg-[var(--t-bg1)] pb-16 min-w-0 transition-[margin] duration-300 ease-out ${navCollapsed ? "lg:ml-0" : "lg:ml-64"}`}>
                         {/* Top bar — same search, streak/XP, notifications and profile/settings as the other pages */}
-                        <div className="sticky top-0 z-30 backdrop-blur flex flex-wrap justify-between items-center gap-3 self-stretch bg-[#130D0BF0] py-3 px-4 sm:px-6">
+                        <div className="sticky top-0 z-30 backdrop-blur flex flex-wrap justify-between items-center gap-3 self-stretch bg-[color-mix(in_srgb,_var(--t-bg0)_40%,_transparent)] py-3 px-4 sm:px-6">
                             <div className="flex flex-1 min-w-0 items-center gap-3 sm:gap-4">
                                 <button
                                     onClick={() => {
@@ -1416,11 +1419,11 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                     className={`shrink-0 ${navCollapsed ? "" : "lg:hidden"}`}
                                     aria-label="Open menu"
                                 >
-                                    <img src={IMG.menu} className="w-6 h-6" />
+                                    <MenuIcon className="w-6 h-6" />
                                 </button>
 
                                 <div className="relative flex-1 min-w-[40px] sm:min-w-[220px] sm:flex-none">
-                                    <div className="flex items-center bg-[#251E1C] py-[7px] px-[15px] gap-2.5 border border-solid border-[#3F3735]">
+                                    <div className="flex items-center bg-[var(--t-bg3)] py-[7px] px-[15px] gap-2.5 border border-solid border-[color:var(--t-bd0)]">
                                         <img src={IMG.search} className="w-[13px] h-[13px] object-fill shrink-0" />
                                         <input
                                             ref={searchRef}
@@ -1429,42 +1432,42 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                             onFocus={() => setSearchFocused(true)}
                                             onBlur={() => setSearchFocused(false)}
                                             placeholder={searchFocused ? "Search group chats..." : "[ / ] Search group chats..."}
-                                            className="bg-transparent outline-none text-[#EDE0DC] placeholder-[#859394] text-xs w-full min-w-0"
+                                            className="bg-transparent outline-none text-[color:var(--t-tx0)] placeholder-[color:var(--t-tx2)] text-xs w-full min-w-0"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="hidden sm:flex flex-col shrink-0 items-start bg-[#251E1C] py-[3px] px-[9px] border border-solid border-[#3F3735]">
-                                    <span className="text-[#2CD4D9] text-[10px]">VOXEL ENGINE V2.4</span>
+                                <div className="hidden sm:flex flex-col shrink-0 items-start bg-[var(--t-bg3)] py-[3px] px-[9px] border border-solid border-[color:var(--t-bd0)]">
+                                    <span className="text-[color:var(--t-ac)] text-[10px]">VOXEL ENGINE V2.4</span>
                                 </div>
                             </div>
 
                             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                                <div className="flex shrink-0 items-center bg-[#251E1C] py-[5px] px-[13px] gap-[5px] border border-solid border-[#3F3735]">
+                                <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:var(--t-bd0)]">
                                     <img src={IMG.streak} className="w-3 h-3.5 object-fill" />
-                                    <span className="text-[#FEDA44] text-[11px] font-bold hidden xs:inline">14 STREAK</span>
+                                    <span className="text-[color:var(--t-warn)] text-[11px] font-bold hidden xs:inline">14 STREAK</span>
                                 </div>
-                                <div className="flex shrink-0 items-center bg-[#251E1C] py-[5px] px-[13px] gap-[5px] border border-solid border-[#3F3735]">
+                                <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:var(--t-bd0)]">
                                     <img src={IMG.xp} className="w-[15px] h-[13px] object-fill" />
-                                    <span className="text-[#2CD4D9] text-[11px] font-bold hidden xs:inline">3,420 XP</span>
+                                    <span className="text-[color:var(--t-ac)] text-[11px] font-bold hidden xs:inline">3,420 XP</span>
                                 </div>
 
                                 <button className="relative shrink-0" onClick={() => setNotifOpen((v) => !v)} aria-label="Notifications">
                                     <img src={IMG.avatar} className="w-8 h-8 object-fill" />
                                     {notifOpen && (
-                                        <div className="absolute right-0 top-10 z-50 w-56 bg-[#1D1715] border border-solid border-[#3F3735] p-3 text-left shadow-lg">
-                                            <span className="text-[#EDE0DC] text-xs font-bold block mb-2">Notifications</span>
-                                            <span className="text-[#859394] text-[11px] block">Jess R. sent a new message in Algorithm Study Squad.</span>
+                                        <div className="absolute right-0 top-10 z-50 w-56 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-3 text-left shadow-lg">
+                                            <span className="text-[color:var(--t-tx0)] text-xs font-bold block mb-2">Notifications</span>
+                                            <span className="text-[color:var(--t-tx2)] text-[11px] block">Jess R. sent a new message in Algorithm Study Squad.</span>
                                         </div>
                                     )}
                                 </button>
 
                                 <button onClick={() => setSettingsOpen(true)} className="flex flex-col shrink-0 items-start px-1 sm:px-2" aria-label="Profile / Settings">
                                     <div
-                                        className="flex flex-col items-center bg-[#2CD4D9] py-[5px] px-[7px] border border-solid border-[#3F3735]"
+                                        className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"
                                         style={{ boxShadow: "0px 1px 2px #0000000D" }}
                                     >
-                                        <span className="text-[#003738] text-sm font-bold">CP</span>
+                                        <span className="text-[color:var(--t-onac)] text-sm font-bold">CP</span>
                                     </div>
                                 </button>
                             </div>
@@ -1475,26 +1478,26 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                             <div className="flex flex-col sm:flex-row items-start self-stretch gap-4">
                                 {/* Group list */}
                                 <div
-                                    className="flex flex-col w-full sm:w-64 shrink-0 bg-[#181210] border border-solid border-[#3F3735] p-3 gap-2"
-                                    style={{ boxShadow: "2px 2px 0px #0A0706" }}
+                                    className="flex flex-col w-full sm:w-64 shrink-0 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-3 gap-2"
+                                    style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
                                 >
                                     <div className="flex justify-between items-center pb-1">
-                                        <span className="text-[#EDE0DC] text-xs font-bold">MY GROUP CHATS</span>
-                                        <span className="text-[#859394] text-[10px]">{groups.length}</span>
+                                        <span className="text-[color:var(--t-tx0)] text-xs font-bold">MY GROUP CHATS</span>
+                                        <span className="text-[color:var(--t-tx2)] text-[10px]">{groups.length}</span>
                                     </div>
                                     <button
                                         onClick={() => setShowCreateGroup(true)}
-                                        className="flex justify-center items-center bg-[#251E1C] py-2 gap-1.5 border border-solid border-[#3F3735] hover:border-[#2CD4D9] transition-all duration-150 active:scale-[0.98]"
+                                        className="flex justify-center items-center bg-[var(--t-bg3)] py-2 gap-1.5 border border-solid border-[color:var(--t-bd0)] hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-[0.98]"
                                     >
-                                        <span className="text-[#2CD4D9] text-xs font-bold">+ NEW GROUP CHAT</span>
+                                        <span className="text-[color:var(--t-ac)] text-xs font-bold">+ NEW GROUP CHAT</span>
                                     </button>
 
-                                    <p className="text-[#524542] text-[10px] italic px-0.5">Right-click a chat for quick access.</p>
+                                    <p className="text-[color:var(--t-bd1)] text-[10px] italic px-0.5">Right-click a chat for quick access.</p>
 
                                     <div className="flex flex-col gap-2 max-h-[420px] overflow-y-auto pr-0.5">
                                         {[
-                                            { key: "classroom", label: "CLASSROOMS", color: "#82F040" },
-                                            { key: "normal", label: "SQUADS", color: "#2CD4D9" },
+                                            { key: "classroom", label: "CLASSROOMS", color: "var(--t-ok)" },
+                                            { key: "normal", label: "SQUADS", color: "var(--t-ac)" },
                                         ].map((section) => {
                                             const items = groups.filter((g) => (section.key === "classroom" ? g.type === "classroom" : g.type !== "classroom"));
                                             const open = openSections[section.key];
@@ -1503,7 +1506,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                                     <button
                                                         onClick={() => setOpenSections((s) => ({ ...s, [section.key]: !s[section.key] }))}
                                                         aria-expanded={open}
-                                                        className="flex items-center gap-2 py-1.5 px-2 border border-solid bg-[#1D1715] border-[#3F3735] hover:border-[#524542] transition-all duration-150 active:scale-[0.99]"
+                                                        className="flex items-center gap-2 py-1.5 px-2 border border-solid bg-[var(--t-bg2)] border-[color:var(--t-bd0)] hover:border-[color:var(--t-bd1)] transition-all duration-150 active:scale-[0.99]"
                                                         style={{ borderLeft: `3px solid ${section.color}` }}
                                                     >
                                                         <svg
@@ -1523,19 +1526,19 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                                         <span className="text-xs font-bold flex-1 text-left" style={{ color: section.color }}>
                                                             {section.label}
                                                         </span>
-                                                        <span className="text-[10px] font-bold px-1.5 py-px" style={{ backgroundColor: `${section.color}22`, color: section.color }}>
+                                                        <span className="text-[10px] font-bold px-1.5 py-px" style={{ backgroundColor: withAlpha(section.color, "22"), color: section.color }}>
                                                             {items.length}
                                                         </span>
                                                     </button>
 
                                                     {open && (
                                                         <div className="flex flex-col gap-1.5 pl-1.5">
-                                                            {items.length === 0 && <p className="text-[#524542] text-[10px] italic py-1.5 px-2">Nothing here yet.</p>}
+                                                            {items.length === 0 && <p className="text-[color:var(--t-bd1)] text-[10px] italic py-1.5 px-2">Nothing here yet.</p>}
                                                             {items.map((g) => {
                                                                 const active = g.id === activeGroupId;
                                                                 const lastMsg = g.messages[g.messages.length - 1];
                                                                 const myRole = g.members.find((m) => m.id === "you")?.role;
-                                                                const myRoleColor = myRole === "admin" || myRole === "teacher" ? "#2CD4D9" : "#859394";
+                                                                const myRoleColor = myRole === "admin" || myRole === "teacher" ? "var(--t-ac)" : "var(--t-tx2)";
                                                                 return (
                                                                     <button
                                                                         key={g.id}
@@ -1547,25 +1550,25 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                                                             e.preventDefault();
                                                                             setContextMenu({ x: e.clientX, y: e.clientY, groupId: g.id });
                                                                         }}
-                                                                        className={`flex items-center gap-2.5 p-2 text-left border border-solid transition-all duration-150 ${active ? "bg-[#251E1C] border-[#00000000]" : "border-[#00000000] hover:bg-[#1D1715]"}`}
-                                                                        style={active ? { boxShadow: `0px 0px 12px ${g.color}33` } : undefined}
+                                                                        className={`flex items-center gap-2.5 p-2 text-left border border-solid transition-all duration-150 ${active ? "bg-[var(--t-bg3)] border-[#00000000]" : "border-[#00000000] hover:bg-[var(--t-bg2)]"}`}
+                                                                        style={active ? { boxShadow: `0px 0px 12px ${withAlpha(g.color, "33")}` } : undefined}
                                                                     >
                                                                         <div
                                                                             className="w-8 h-8 shrink-0 flex items-center justify-center text-[10px] font-bold"
-                                                                            style={{ backgroundColor: `${g.color}33`, color: g.color, border: `1px solid ${g.color}4D` }}
+                                                                            style={{ backgroundColor: withAlpha(g.color, "33"), color: g.color, border: `1px solid ${withAlpha(g.color, "4D")}` }}
                                                                         >
                                                                             {initialsFor(g.name)}
                                                                         </div>
                                                                         <div className="flex-1 min-w-0">
                                                                             <div className="flex items-center gap-1.5">
-                                                                                <span className="text-[#EDE0DC] text-xs font-bold truncate">{g.name}</span>
+                                                                                <span className="text-[color:var(--t-tx0)] text-xs font-bold truncate">{g.name}</span>
                                                                                 {myRole && (
                                                                                     <span className="text-[9px] font-bold shrink-0" style={{ color: myRoleColor }}>
                                                                                         · {myRole.toUpperCase()}
                                                                                     </span>
                                                                                 )}
                                                                             </div>
-                                                                            <span className="text-[#859394] text-[10px] truncate block">{lastMsg ? lastMsg.text : "No messages yet"}</span>
+                                                                            <span className="text-[color:var(--t-tx2)] text-[10px] truncate block">{lastMsg ? lastMsg.text : "No messages yet"}</span>
                                                                         </div>
                                                                     </button>
                                                                 );
@@ -1575,7 +1578,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                                 </div>
                                             );
                                         })}
-                                        {groups.length === 0 && <p className="text-[#859394] text-xs py-4 text-center">No group chats yet — create one above.</p>}
+                                        {groups.length === 0 && <p className="text-[color:var(--t-tx2)] text-xs py-4 text-center">No group chats yet — create one above.</p>}
                                     </div>
                                 </div>
 
@@ -1583,31 +1586,31 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                 <div className="flex-1 min-w-0 flex flex-col gap-3">
                                     {!activeGroup ? (
                                         <div
-                                            className="flex flex-col items-center justify-center self-stretch bg-[#181210] border border-solid border-[#3F3735] p-10 gap-2"
-                                            style={{ boxShadow: "2px 2px 0px #0A0706" }}
+                                            className="flex flex-col items-center justify-center self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-10 gap-2"
+                                            style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
                                         >
-                                            <span className="text-[#EDE0DC] text-sm font-bold">No group chat selected</span>
-                                            <p className="text-[#859394] text-xs">Create or pick a group chat from the list on the left.</p>
+                                            <span className="text-[color:var(--t-tx0)] text-sm font-bold">No group chat selected</span>
+                                            <p className="text-[color:var(--t-tx2)] text-xs">Create or pick a group chat from the list on the left.</p>
                                         </div>
                                     ) : (
                                         <>
                                             {/* Header */}
                                             <div
-                                                className="flex flex-wrap justify-between items-center gap-3 bg-[#181210] border border-solid border-[#3F3735] p-3 sm:p-4"
-                                                style={{ boxShadow: "2px 2px 0px #0A0706" }}
+                                                className="flex flex-wrap justify-between items-center gap-3 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-3 sm:p-4"
+                                                style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
                                             >
                                                 <div className="flex items-center gap-3 min-w-0">
                                                     <div
                                                         className="w-10 h-10 shrink-0 flex items-center justify-center text-xs font-bold"
-                                                        style={{ backgroundColor: `${activeGroup.color}33`, color: activeGroup.color, border: `1px solid ${activeGroup.color}4D` }}
+                                                        style={{ backgroundColor: withAlpha(activeGroup.color, "33"), color: activeGroup.color, border: `1px solid ${withAlpha(activeGroup.color, "4D")}` }}
                                                     >
                                                         {initialsFor(activeGroup.name)}
                                                     </div>
                                                     <div className="min-w-0">
-                                                        <span className="text-[#EDE0DC] text-base font-bold truncate block">{activeGroup.name}</span>
+                                                        <span className="text-[color:var(--t-tx0)] text-base font-bold truncate block">{activeGroup.name}</span>
                                                         <div className="flex items-center gap-1.5">
-                                                            <Badge color={isClassroom ? "#82F040" : "#2CD4D9"}>{isClassroom ? "CLASSROOM" : "SQUAD"}</Badge>
-                                                            <span className="text-[#859394] text-[11px]">
+                                                            <Badge color={isClassroom ? "var(--t-ok)" : "var(--t-ac)"}>{isClassroom ? "CLASSROOM" : "SQUAD"}</Badge>
+                                                            <span className="text-[color:var(--t-tx2)] text-[11px]">
                                                                 {activeGroup.members.length} member{activeGroup.members.length === 1 ? "" : "s"}
                                                             </span>
                                                         </div>
@@ -1617,7 +1620,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                                 {/* Single entry point into the tabbed pop-up card */}
                                                 <button
                                                     onClick={() => setOpenPanel(tabDefs[0]?.key || "members")}
-                                                    className="flex items-center gap-1.5 py-1.5 px-3 border border-solid border-[#3F3735] bg-[#130D0B] text-[#BBC9C9] text-[10px] font-bold hover:border-[#2CD4D9] hover:text-[#2CD4D9] transition-all duration-150 active:scale-95"
+                                                    className="flex items-center gap-1.5 py-1.5 px-3 border border-solid border-[color:var(--t-bd0)] bg-[var(--t-bg0)] text-[color:var(--t-tx1)] text-[10px] font-bold hover:border-[color:var(--t-ac)] hover:text-[color:var(--t-ac)] transition-all duration-150 active:scale-95"
                                                 >
                                                     <span>☰</span>
                                                 </button>
@@ -1625,21 +1628,21 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
 
                                             {/* Chat stream */}
                                             <div
-                                                className="flex flex-col self-stretch bg-[#181210] border border-solid border-[#3F3735] p-3 sm:p-4 gap-3 h-[600px]"
-                                                style={{ boxShadow: "2px 2px 0px #0A0706" }}
+                                                className="flex flex-col self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-3 sm:p-4 gap-3 h-[600px]"
+                                                style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
                                             >
                                                 <div className="flex-1 flex flex-col gap-3 max-h-[380px] overflow-y-auto pr-1">
-                                                    {activeGroup.messages.length === 0 && <p className="text-[#859394] text-xs py-6 text-center">No messages yet — say hi!</p>}
+                                                    {activeGroup.messages.length === 0 && <p className="text-[color:var(--t-tx2)] text-xs py-6 text-center">No messages yet — say hi!</p>}
                                                     {activeGroup.messages.map((m) => {
                                                         const mine = m.senderId === "you";
                                                         return (
                                                             <div key={m.id} className={`flex flex-col gap-0.5 ${mine ? "items-end" : "items-start"}`}>
                                                                 <div className="flex items-center gap-1.5">
-                                                                    <span className="text-[#859394] text-[10px] font-bold">{m.senderName}</span>
-                                                                    <span className="text-[#524542] text-[10px]">{m.time}</span>
+                                                                    <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">{m.senderName}</span>
+                                                                    <span className="text-[color:var(--t-bd1)] text-[10px]">{m.time}</span>
                                                                 </div>
                                                                 <div
-                                                                    className={`max-w-[80%] py-2 px-3 text-xs ${mine ? "bg-[#2CD4D9] text-[#003738]" : "bg-[#251E1C] text-[#EDE0DC] border border-solid border-[#3F3735]"
+                                                                    className={`max-w-[80%] py-2 px-3 text-xs ${mine ? "bg-[var(--t-ac)] text-[color:var(--t-onac)]" : "bg-[var(--t-bg3)] text-[color:var(--t-tx0)] border border-solid border-[color:var(--t-bd0)]"
                                                                         }`}
                                                                 >
                                                                     {m.text}
@@ -1649,12 +1652,12 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                                     })}
                                                 </div>
 
-                                                <form onSubmit={sendMessage} className="flex items-center gap-2 pt-2 border-t border-solid border-[#3F3735]">
+                                                <form onSubmit={sendMessage} className="flex items-center gap-2 pt-2 border-t border-solid border-[color:var(--t-bd0)]">
                                                     <input
                                                         value={messageText}
                                                         onChange={(e) => setMessageText(e.target.value)}
                                                         placeholder={`Message ${activeGroup.name}...`}
-                                                        className="flex-1 min-w-0 bg-[#251E1C] border border-solid border-[#3F3735] text-[#EDE0DC] text-xs py-2 px-3 outline-none focus:border-[#2CD4D9]"
+                                                        className="flex-1 min-w-0 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac)]"
                                                     />
                                                     {!isClassroom && (
                                                         <button
@@ -1665,13 +1668,13 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                                                     files: [...(g.files || []), { id: `f${Date.now()}`, name: "Shared_File.pdf", uploadedBy: "You", size: "0.9 MB" }],
                                                                 }))
                                                             }
-                                                            className="shrink-0 bg-[#251E1C] border border-solid border-[#3F3735] text-[#BBC9C9] text-xs py-2 px-3 hover:border-[#2CD4D9] transition-all duration-150 active:scale-95"
+                                                            className="shrink-0 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx1)] text-xs py-2 px-3 hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-95"
                                                             aria-label="Attach a file"
                                                         >
                                                             📎
                                                         </button>
                                                     )}
-                                                    <button type="submit" className="shrink-0 bg-[#2CD4D9] text-[#003738] text-xs font-bold py-2 px-4 hover:opacity-90 transition-all duration-150 active:scale-95">
+                                                    <button type="submit" className="shrink-0 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2 px-4 hover:opacity-90 transition-all duration-150 active:scale-95">
                                                         SEND
                                                     </button>
                                                 </form>
@@ -1688,13 +1691,14 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                 {settingsOpen && (
                     <div className="fixed inset-0 z-50 flex justify-end">
                         <div className="flex-1 bg-black/60" onClick={() => setSettingsOpen(false)} />
-                        <div className="w-full max-w-xs bg-[#1D1715] border-l border-solid border-[#3F3735] p-5 flex flex-col gap-4">
+                        <div className="w-full max-w-xs overflow-y-auto bg-[var(--t-bg2)] border-l border-solid border-[color:var(--t-bd0)] p-5 flex flex-col gap-4">
                             <div className="flex justify-between items-center">
-                                <span className="text-[#EDE0DC] text-sm font-bold">SETTINGS</span>
+                                <span className="text-[color:var(--t-tx0)] text-sm font-bold">SETTINGS</span>
                                 <button onClick={() => setSettingsOpen(false)}>
-                                    <img src={IMG.close} className="w-4 h-4" />
+                                    <CloseIcon className="w-4 h-4" />
                                 </button>
                             </div>
+                            <ThemePicker theme={theme} onChange={setTheme} />
                             <ToggleRow label="Group message notifications" defaultOn />
                             <ToggleRow label="Grade posted alerts" defaultOn />
                             <ToggleRow label="Sync tasks to Sprint Board" defaultOn />

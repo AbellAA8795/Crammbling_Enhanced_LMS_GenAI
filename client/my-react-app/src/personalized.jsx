@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import Chatbot from "./chatbot";
 import GroupCollab from "./group_collab";
+import { ThemePicker, useTheme, withAlpha, CloseIcon, MenuIcon } from "./Theme";
 /* ---------------------------------------------------------
    Static assets (kept identical to the original design)
 --------------------------------------------------------- */
@@ -72,18 +73,18 @@ const TODAY = new Date(2027, 2, 19); // March 19, 2027
 const keyFor = (y, m, d) => `${y}-${m}-${d}`;
 
 const TYPE_STYLES = {
-  review: { dot: "#2CD4D9", bg: "#2CD4D9", text: "#003738" },
-  exam: { dot: "#FF6B6B", bg: "#FF6B6B", text: "#EDE0DC" },
-  group: { dot: "#82F040", bg: "#82F040", text: "#153A00" },
+  review: { dot: "var(--t-ac)", bg: "var(--t-ac)", text: "var(--t-onac)" },
+  exam: { dot: "var(--t-err)", bg: "var(--t-err)", text: "var(--t-onerr)" },
+  group: { dot: "var(--t-ok)", bg: "var(--t-ok)", text: "var(--t-onok)" },
 };
 
 // Badge color is driven by the column/status a quest sits in, so a quest's
 // badge automatically re-colors itself as it's moved through the sprint.
 const BADGE_COLOR_BY_COLUMN = {
-  backlog: "#FF6B6B", // red
-  active: "#58F1F6", // cyan (unchanged)
-  review: "#FEDA44", // yellow
-  done: "#A0D673", // green
+  backlog: "var(--t-err)", // red
+  active: "var(--t-ac2)", // cyan (unchanged)
+  review: "var(--t-warn)", // yellow
+  done: "var(--t-ok2)", // green
 };
 
 const SPRINT_STATUS_OPTIONS = [
@@ -113,10 +114,10 @@ const INITIAL_UPCOMING = [
     chk: IMG.ev1chk,
     title: "Algorithm Bounds Review",
     subject: "CS240",
-    subjectColor: "#2CD4D9",
+    subjectColor: "var(--t-ac)",
     meta: "Tomorrow • 14:00 (45 mins) • Big-O Analysis",
     status: "SCHEDULED",
-    statusColor: "#2CD4D9",
+    statusColor: "var(--t-ac)",
   },
   {
     id: "u2",
@@ -124,10 +125,10 @@ const INITIAL_UPCOMING = [
     chk: IMG.ev2chk,
     title: "Discrete Math Midterm",
     subject: "MATH210",
-    subjectColor: "#FF6B6B",
+    subjectColor: "var(--t-err)",
     meta: "Fri, Mar 20 • 10:00 • Hall B (80 min instance)",
     status: "URGENT",
-    statusColor: "#FF6B6B",
+    statusColor: "var(--t-err)",
   },
   {
     id: "u3",
@@ -135,10 +136,10 @@ const INITIAL_UPCOMING = [
     chk: IMG.ev3chk,
     title: "Graph Traversal Group Sprint",
     subject: "CS240",
-    subjectColor: "#82F040",
+    subjectColor: "var(--t-ok)",
     meta: "Mon, Mar 23 • 16:30 • Voice Room #4",
     status: "GROUP",
-    statusColor: "#82F040",
+    statusColor: "var(--t-ok)",
   },
 ];
 
@@ -162,30 +163,30 @@ const QUIZ_FORGE_STATS = [
   {
     icon: IMG.qfStatus,
     label: "STATUS",
-    dot: "#A0D673",
+    dot: "var(--t-ok2)",
     title: "Active Semester",
-    titleColor: "#EDE0DC",
+    titleColor: "var(--t-tx0)",
     badge: "SP-2025",
-    badgeColor: "#A0D673",
-    badgeBg: "#2B580080",
+    badgeColor: "var(--t-ok2)",
+    badgeBg: "color-mix(in srgb, var(--t-ok) 22%, transparent)",
     sub: "Week 9 of 16 Complete",
     explain: "Which term you're in and how far through it you are. Updates automatically as the weeks pass — nothing to click here.",
   },
   {
     icon: IMG.qfFocus,
     label: "CURRENT FOCUS",
-    dot: "#2CD4D9",
+    dot: "var(--t-ac)",
     title: "Syllabus Parsing",
-    titleColor: "#2CD4D9",
+    titleColor: "var(--t-ac)",
     sub: "CS240 • Algorithms & Heaps",
     explain: "The topic Quiz Forge is actively pulling from right now, based on your most recently ingested syllabus/document.",
   },
   {
     icon: IMG.qfDeadline,
     label: "NEXT DEADLINE",
-    dot: "#FEDA44",
+    dot: "var(--t-warn)",
     title: "2d Remainder",
-    titleColor: "#FEDA44",
+    titleColor: "var(--t-warn)",
     note: "(CS240 Midterm)",
     sub: "Boss Encounter: Thurs 09:00",
     explain: "A countdown to your nearest exam/checkpoint, pulled straight from the Study Calendar — add or edit events there to change it.",
@@ -193,12 +194,12 @@ const QUIZ_FORGE_STATS = [
   {
     icon: IMG.qfTomes,
     label: "INGESTED TOMES",
-    dot: "#BBF38C",
+    dot: "var(--t-ok3)",
     title: "3 Shards",
-    titleColor: "#EDE0DC",
+    titleColor: "var(--t-tx0)",
     badge: "84 Chunks",
-    badgeColor: "#BBF38C",
-    badgeBg: "#2B580099",
+    badgeColor: "var(--t-ok3)",
+    badgeBg: "color-mix(in srgb, var(--t-ok) 30%, transparent)",
     sub: "Ready for Crafting Bench",
     explain: "How many documents you've uploaded ('Shards') and how many text chunks were extracted from them ('Chunks') — these are what get turned into quiz questions when you hit 'Forge Quiz' below.",
   },
@@ -235,36 +236,36 @@ const INITIAL_SPRINT_COLUMNS = [
   {
     id: "backlog",
     title: "BACKLOG / QUEST LOG",
-    dot: "#FF6B6B",
+    dot: "var(--t-err)",
     cards: [
-      { id: "c1", subject: "CS240", subjectColor: "#58F1F6", meta: "45m", title: "Review Red-Black Tree Rotation Rules", desc: "Double rotations and recoloring edge cases." },
-      { id: "c2", subject: "DISCRETE MATH", subjectColor: "#FEDA44", meta: "60m", title: "Proof by Induction Practice Set #4", desc: "Strong induction formulations for recurrences." },
-      { id: "c3", subject: "ALGORITHMS", subjectColor: "#A0D673", meta: "30m", title: "Dijkstra Shortest Path Time Complexity", desc: "Min-Heap vs Fibonacci Heap bounds." },
+      { id: "c1", subject: "CS240", subjectColor: "var(--t-ac2)", meta: "45m", title: "Review Red-Black Tree Rotation Rules", desc: "Double rotations and recoloring edge cases." },
+      { id: "c2", subject: "DISCRETE MATH", subjectColor: "var(--t-warn)", meta: "60m", title: "Proof by Induction Practice Set #4", desc: "Strong induction formulations for recurrences." },
+      { id: "c3", subject: "ALGORITHMS", subjectColor: "var(--t-ok2)", meta: "30m", title: "Dijkstra Shortest Path Time Complexity", desc: "Min-Heap vs Fibonacci Heap bounds." },
     ],
   },
   {
     id: "active",
     title: "IN SPRINT / ACTIVE RAIDS",
-    dot: "#58F1F6",
+    dot: "var(--t-ac2)",
     cards: [
-      { id: "c4", subject: "CS240", subjectColor: "#58F1F6", progress: 75, title: "CS240 Algorithm Bounds Review", due: "Due tomorrow", xp: 250 },
-      { id: "c5", subject: "QUIZ PREP", subjectColor: "#FEDA44", meta: "Target 90%", title: "Tree Rebalance 10-Question Drill", desc: "AVL factor recalculation & zig-zag cases." },
-      { id: "c6", subject: "PVP SPARRING", subjectColor: "#A0D673", meta: "Fri 16:30", title: "Clan Match with @EnderKnight", desc: "Graph Coloring Duel (Live session)." },
+      { id: "c4", subject: "CS240", subjectColor: "var(--t-ac2)", progress: 75, title: "CS240 Algorithm Bounds Review", due: "Due tomorrow", xp: 250 },
+      { id: "c5", subject: "QUIZ PREP", subjectColor: "var(--t-warn)", meta: "Target 90%", title: "Tree Rebalance 10-Question Drill", desc: "AVL factor recalculation & zig-zag cases." },
+      { id: "c6", subject: "PVP SPARRING", subjectColor: "var(--t-ok2)", meta: "Fri 16:30", title: "Clan Match with @EnderKnight", desc: "Graph Coloring Duel (Live session)." },
     ],
   },
   {
     id: "review",
     title: "BOSS CHECKPOINT / IN REVIEW",
-    dot: "#FEDA44",
+    dot: "var(--t-warn)",
     cards: [
-      { id: "c7", subject: "BOSS EXAM", subjectColor: "#FFDAD6", subjectBg: "#93000A", meta: "Fri Mar 20", metaColor: "#FEDA44", title: "Discrete Math Midterm Simulation", desc: "Combinatorics & recurrence simulation." },
-      { id: "c8", subject: "CLAN SPRINT", subjectColor: "#58F1F6", meta: "Ready", metaColor: "#A0D673", title: "Graph Traversal Debrief", desc: "DFS/BFS peer solutions review." },
+      { id: "c7", subject: "BOSS EXAM", subjectColor: "var(--t-onerrc)", subjectBg: "var(--t-errc)", meta: "Fri Mar 20", metaColor: "var(--t-warn)", title: "Discrete Math Midterm Simulation", desc: "Combinatorics & recurrence simulation." },
+      { id: "c8", subject: "CLAN SPRINT", subjectColor: "var(--t-ac2)", meta: "Ready", metaColor: "var(--t-ok2)", title: "Graph Traversal Debrief", desc: "DFS/BFS peer solutions review." },
     ],
   },
   {
     id: "done",
     title: "COMPLETED / CONQUERED",
-    dot: "#A0D673",
+    dot: "var(--t-ok2)",
     cards: [
       { id: "c9", title: "Extract CS240 Chapter 4 Slides", xp: 100 },
       { id: "c10", title: "Stack & Queue Array Implementation", xp: 90 },
@@ -326,6 +327,7 @@ function formatDateLabel(d) {
    Main component
 --------------------------------------------------------- */
 export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToGroup } = {}) {
+  const [theme, setTheme, rootThemeStyle] = useTheme(); // shared with chatbot + group collab
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [navCollapsed, setNavCollapsed] = useState(false); // desktop drawer: pushed to the side
   const [activeNav, setActiveNav] = useState("personalized");
@@ -627,7 +629,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     e.preventDefault();
     if (!newEvent.label.trim()) return;
     const id = `u${Date.now()}`;
-    const colorMap = { review: "#2CD4D9", exam: "#FF6B6B", group: "#82F040" };
+    const colorMap = { review: "var(--t-ac)", exam: "var(--t-err)", group: "var(--t-ok)" };
     const statusMap = { review: "SCHEDULED", exam: "URGENT", group: "GROUP" };
     // Fall back to the calendar's selected day, then to TODAY, if the
     // date field was ever left empty.
@@ -673,13 +675,13 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 
   if (loggedOut) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#130D0B] px-6 text-center">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--t-bg0)] px-6 text-center">
         <img src={IMG.logo} className="w-12 h-12 mb-4 object-fill" />
-        <span className="text-[#2CD4D9] text-lg font-bold mb-2">CRAMMBLING</span>
-        <p className="text-[#859394] text-sm mb-6">You've been logged out.</p>
+        <span className="text-[color:var(--t-ac)] text-lg font-bold mb-2">CRAMMBLING</span>
+        <p className="text-[color:var(--t-tx2)] text-sm mb-6">You've been logged out.</p>
         <button
           onClick={() => setLoggedOut(false)}
-          className="bg-[#2CD4D9] text-[#003738] text-sm font-bold py-2 px-6 border border-solid border-[#3F3735] hover:opacity-90 transition-all duration-150 active:scale-95"
+          className="bg-[var(--t-ac)] text-[color:var(--t-onac)] text-sm font-bold py-2 px-6 border border-solid border-[color:var(--t-bd0)] hover:opacity-90 transition-all duration-150 active:scale-95"
         >
           LOG BACK IN
         </button>
@@ -699,19 +701,19 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
   }
 
   return (
-    <div className="flex flex-col bg-white min-h-screen">
+    <div style={rootThemeStyle} className="flex flex-col bg-[var(--t-bg0)] min-h-screen">
       <style>{`
         @keyframes pzPop { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
         @keyframes pzMenu { from { opacity: 0; transform: translateY(-6px) scale(.97); } to { opacity: 1; transform: none; } }
         @keyframes pzShimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
         @keyframes pzPulse { 0%,100% { box-shadow: 0 0 0 0 var(--pz-glow); } 50% { box-shadow: 0 0 22px 2px var(--pz-glow); } }
         @keyframes pzLaunch { to { transform: translateY(-40px) scale(.9); opacity: 0; } }
-        .pz-date { color-scheme: dark; }
+        .pz-date { color-scheme: inherit; }
         .pz-date::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .7; transition: opacity .15s; }
         .pz-date::-webkit-calendar-picker-indicator:hover { opacity: 1; }
         @media (prefers-reduced-motion: reduce) { .pz-anim { animation: none !important; } }
       `}</style>
-      <div className="self-stretch bg-[#130D0B] min-h-screen relative">
+      <div className="self-stretch bg-[var(--t-bg0)] min-h-screen relative">
         <div className="flex items-start self-stretch relative">
           {/* Mobile sidebar backdrop */}
           {mobileNavOpen && (
@@ -723,35 +725,36 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 
           {/* ---------------- SIDEBAR ---------------- */}
           <div
-            className={`bg-[#130D0B] w-64 shrink-0 z-50 flex flex-col h-screen
+            style={{ backgroundImage: "var(--t-grad-side)" }}
+            className={`bg-[var(--t-bg0)] w-64 shrink-0 z-50 flex flex-col h-screen
               fixed inset-y-0 left-0 transition-transform duration-300 ease-out
               ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}
               ${navCollapsed ? "lg:-translate-x-full" : "lg:translate-x-0"}`}
           >
             <div className="flex justify-end lg:hidden px-3 pt-3">
               <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu">
-                <img src={IMG.close} className="w-4 h-4" />
+                <CloseIcon className="w-4 h-4" />
               </button>
             </div>
             <div className="self-stretch flex-1 overflow-y-auto">
-              <div className="flex items-center self-stretch bg-[#1D1715] py-[13px]">
+              <div className="flex items-center self-stretch bg-[color-mix(in_srgb,_var(--t-bg2)_45%,_transparent)] py-[13px]">
                 <img src={IMG.logo} className="w-9 h-9 ml-4 mr-3 object-fill" />
                 <div className="w-[127px]">
                   <div
                     className="flex flex-col items-start self-stretch"
-                    style={{ boxShadow: "0px 2px 4px #2CD4D94D" }}
+                    style={{ boxShadow: "0px 2px 4px color-mix(in srgb, var(--t-ac) 30%, transparent)" }}
                   >
-                    <span className="text-[#2CD4D9] text-[17px] font-bold">CRAMMBLING</span>
+                    <span className="text-[color:var(--t-ac)] text-[17px] font-bold">CRAMMBLING</span>
                   </div>
                   <div className="flex items-center self-stretch pt-1 gap-1">
-                    <div className="bg-[#82F040] w-1.5 h-1.5" />
-                    <span className="text-[#FEDA44] text-[10px] font-bold">VOXEL QUEST Lv.18</span>
+                    <div className="bg-[var(--t-ok)] w-1.5 h-1.5" />
+                    <span className="text-[color:var(--t-warn)] text-[10px] font-bold">VOXEL QUEST Lv.18</span>
                   </div>
                 </div>
               </div>
 
               <div className="flex flex-col items-start self-stretch pt-[21px] pl-5">
-                <span className="text-[#859394] text-[11px] font-bold mb-[9px]">NAVIGATION BAR</span>
+                <span className="text-[color:var(--t-tx2)] text-[11px] font-bold mb-[9px]">NAVIGATION BAR</span>
               </div>
 
               <nav className="flex flex-col self-stretch px-3 gap-1">
@@ -771,18 +774,18 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                         setMobileNavOpen(false);
                       }}
                       className={`flex items-center self-stretch py-[9px] text-left border border-solid transition-all duration-150 active:scale-[0.98]
-                        ${active ? "bg-[#251E1C] border-[#00000000]" : "border-[#00000000] hover:bg-[#1D1715]"}`}
-                      style={active ? { boxShadow: "0px 0px 15px #2CD4D926" } : undefined}
+                        ${active ? "bg-[var(--t-bg3)] border-[#00000000]" : "border-[#00000000] hover:bg-[var(--t-bg2)]"}`}
+                      style={active ? { boxShadow: "0px 0px 15px color-mix(in srgb, var(--t-ac) 15%, transparent)" } : undefined}
                     >
                       <img src={item.icon} className={`${item.iconClass} ml-[13px] mr-3 object-fill`} />
-                      <span className={`text-xs font-bold ${active ? "text-[#2CD4D9]" : "text-[#BBC9C9]"}`}>
+                      <span className={`text-xs font-bold ${active ? "text-[color:var(--t-ac)]" : "text-[color:var(--t-tx1)]"}`}>
                         {item.label}
                       </span>
                       {active && (
                         <div className="flex-1 flex justify-end pr-4">
                           <div
-                            className="bg-[#2CD4D9] w-1.5 h-1.5 rounded-full"
-                            style={{ boxShadow: "0px 0px 6px #2CD4D9" }}
+                            className="bg-[var(--t-ac)] w-1.5 h-1.5 rounded-full"
+                            style={{ boxShadow: "0px 0px 6px var(--t-ac)" }}
                           />
                         </div>
                       )}
@@ -792,20 +795,20 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
               </nav>
             </div>
 
-            <div className="flex flex-col self-stretch bg-[#1D1715] p-3 gap-1">
+            <div className="flex flex-col self-stretch bg-[color-mix(in_srgb,_var(--t-bg2)_45%,_transparent)] p-3 gap-1">
               <button
                 onClick={() => setSettingsOpen(true)}
-                className="flex items-center self-stretch py-2 text-left hover:bg-[#251E1C] transition-all duration-150 active:scale-[0.98]"
+                className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]"
               >
                 <img src={IMG.settings} className="w-[15px] h-[15px] mx-3 object-fill" />
-                <span className="text-[#BBC9C9] text-[11px]">SETTINGS</span>
+                <span className="text-[color:var(--t-tx1)] text-[11px]">SETTINGS</span>
               </button>
               <button
                 onClick={() => setLoggedOut(true)}
-                className="flex items-center self-stretch py-2 text-left hover:bg-[#251E1C] transition-all duration-150 active:scale-[0.98]"
+                className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]"
               >
                 <img src={IMG.logout} className="w-3.5 h-3.5 mx-3 object-fill" />
-                <span className="text-[#BBC9C9] text-[11px]">LOGOUT</span>
+                <span className="text-[color:var(--t-tx1)] text-[11px]">LOGOUT</span>
               </button>
             </div>
           </div>
@@ -815,7 +818,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
             onClick={() => setNavCollapsed((v) => !v)}
             aria-label={navCollapsed ? "Open navigation bar" : "Push navigation bar aside"}
             title={navCollapsed ? "Open navigation" : "Push navigation aside"}
-            className="hidden lg:flex fixed top-1/2 -translate-y-1/2 z-[55] w-5 h-16 items-center justify-center bg-[#251E1C] border border-solid border-[#3F3735] border-l-0 text-[#2CD4D9] hover:bg-[#2CD4D9] hover:text-[#003738] hover:shadow-[0_0_14px_#2CD4D966] transition-all duration-300 active:scale-95"
+            className="hidden lg:flex fixed top-1/2 -translate-y-1/2 z-[55] w-5 h-16 items-center justify-center bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] border-l-0 text-[color:var(--t-ac)] hover:bg-[var(--t-ac)] hover:text-[color:var(--t-onac)] hover:shadow-[0_0_14px_color-mix(in srgb, var(--t-ac) 40%, transparent)] transition-all duration-300 active:scale-95"
             style={{ left: navCollapsed ? 0 : 256 }}
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: navCollapsed ? "rotate(0deg)" : "rotate(180deg)", transition: "transform .3s" }}>
@@ -824,9 +827,9 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
           </button>
 
           {/* ---------------- MAIN ---------------- */}
-          <div className={`flex-1 bg-[#181210] pb-16 min-w-0 transition-[margin] duration-300 ease-out ${navCollapsed ? "lg:ml-0" : "lg:ml-64"}`}>
+          <div style={{ backgroundImage: "var(--t-grad-main)" }} className={`flex-1 bg-[var(--t-bg1)] pb-16 min-w-0 transition-[margin] duration-300 ease-out ${navCollapsed ? "lg:ml-0" : "lg:ml-64"}`}>
             {/* Top bar */}
-            <div className="sticky top-0 z-30 backdrop-blur flex flex-wrap justify-between items-center gap-3 self-stretch bg-[#130D0BF0] py-3 px-4 sm:px-6 mb-8 lg:mb-[72px]">
+            <div className="sticky top-0 z-30 backdrop-blur flex flex-wrap justify-between items-center gap-3 self-stretch bg-[color-mix(in_srgb,_var(--t-bg0)_40%,_transparent)] py-3 px-4 sm:px-6 mb-8 lg:mb-[72px]">
               <div className="flex flex-1 min-w-0 items-center gap-3 sm:gap-4">
                 <button
                   onClick={() => {
@@ -836,30 +839,30 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                   className={`shrink-0 ${navCollapsed ? "" : "lg:hidden"}`}
                   aria-label="Open menu"
                 >
-                  <img src={IMG.menu} className="w-6 h-6" />
+                  <MenuIcon className="w-6 h-6" />
                 </button>
 
-                <div className="hidden sm:flex flex-col shrink-0 items-start bg-[#251E1C] py-[3px] px-[9px] border border-solid border-[#3F3735]">
-                  <span className="text-[#2CD4D9] text-[10px]">VOXEL ENGINE V2.4</span>
+                <div className="hidden sm:flex flex-col shrink-0 items-start bg-[var(--t-bg3)] py-[3px] px-[9px] border border-solid border-[color:var(--t-bd0)]">
+                  <span className="text-[color:var(--t-ac)] text-[10px]">VOXEL ENGINE V2.4</span>
                 </div>
               </div>
 
               <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                <div className="flex shrink-0 items-center bg-[#251E1C] py-[5px] px-[13px] gap-[5px] border border-solid border-[#3F3735]">
+                <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:var(--t-bd0)]">
                   <img src={IMG.streak} className="w-3 h-3.5 object-fill" />
-                  <span className="text-[#FEDA44] text-[11px] font-bold hidden xs:inline">14 STREAK</span>
+                  <span className="text-[color:var(--t-warn)] text-[11px] font-bold hidden xs:inline">14 STREAK</span>
                 </div>
-                <div className="flex shrink-0 items-center bg-[#251E1C] py-[5px] px-[13px] gap-[5px] border border-solid border-[#3F3735]">
+                <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:var(--t-bd0)]">
                   <img src={IMG.xp} className="w-[15px] h-[13px] object-fill" />
-                  <span className="text-[#2CD4D9] text-[11px] font-bold hidden xs:inline">3,420 XP</span>
+                  <span className="text-[color:var(--t-ac)] text-[11px] font-bold hidden xs:inline">3,420 XP</span>
                 </div>
 
                 <button className="relative shrink-0" onClick={() => setNotifOpen((v) => !v)} aria-label="Notifications">
                   <img src={IMG.avatar} className="w-8 h-8 object-fill" />
                   {notifOpen && (
-                    <div className="absolute right-0 top-10 z-50 w-56 bg-[#1D1715] border border-solid border-[#3F3735] p-3 text-left shadow-lg">
-                      <span className="text-[#EDE0DC] text-xs font-bold block mb-2">Notifications</span>
-                      <span className="text-[#859394] text-[11px] block">
+                    <div className="absolute right-0 top-10 z-50 w-56 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-3 text-left shadow-lg">
+                      <span className="text-[color:var(--t-tx0)] text-xs font-bold block mb-2">Notifications</span>
+                      <span className="text-[color:var(--t-tx2)] text-[11px] block">
                         CS240 Midterm is coming up on Mar 20.
                       </span>
                     </div>
@@ -872,10 +875,10 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                   aria-label="Profile / Settings"
                 >
                   <div
-                    className="flex flex-col items-center bg-[#2CD4D9] py-[5px] px-[7px] border border-solid border-[#3F3735]"
+                    className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"
                     style={{ boxShadow: "0px 1px 2px #0000000D" }}
                   >
-                    <span className="text-[#003738] text-sm font-bold">CP</span>
+                    <span className="text-[color:var(--t-onac)] text-sm font-bold">CP</span>
                   </div>
                 </button>
               </div>
@@ -885,9 +888,9 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
             <div className="self-stretch relative">
               <div
                 className="self-stretch absolute top-[-56px] lg:top-[-72px] right-0 left-0 pb-[1px]"
-                style={{ background: "linear-gradient(180deg, #1D1715, #2D221E, #1A1412)" }}
+                style={{ background: "linear-gradient(180deg, var(--t-bg2), color-mix(in srgb, var(--t-bg3) 55%, var(--t-bg2)), var(--t-bg1))" }}
               >
-                <div className="self-stretch bg-[#00000000] h-[90px] lg:h-[111px]" />
+               
               </div>
 
               <div className="flex flex-col self-stretch px-4 sm:px-6 lg:px-10 gap-6">
@@ -902,15 +905,15 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                     >
                       <div className="flex flex-wrap justify-between items-center gap-2 self-stretch">
                         <div className="flex flex-wrap shrink-0 items-center gap-x-2.5">
-                          <span className="text-[#859394] text-[11px]">CRAMMBLING</span>
-                          <span className="text-[#859394] text-[11px]">/</span>
-                          <span className="text-[#859394] text-[11px]">PERSONAL</span>
-                          <span className="text-[#859394] text-[11px]">/</span>
-                          <span className="text-[#EDE0DC] text-[11px] font-bold">STUDY HUB</span>
+                          <span className="text-[color:var(--t-tx2)] text-[11px]">CRAMMBLING</span>
+                          <span className="text-[color:var(--t-tx2)] text-[11px]">/</span>
+                          <span className="text-[color:var(--t-tx2)] text-[11px]">PERSONAL</span>
+                          <span className="text-[color:var(--t-tx2)] text-[11px]">/</span>
+                          <span className="text-[color:var(--t-tx0)] text-[11px] font-bold">STUDY HUB</span>
                         </div>
-                        <div className="flex shrink-0 items-center bg-[#251E1C] py-[5px] px-[13px] gap-2 border border-solid border-[#3F3735]">
-                          <div className="bg-[#82F040] w-1.5 h-1.5" />
-                          <span className="text-[#82F040] text-[11px]">SYNC ACTIVE</span>
+                        <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-2 border border-solid border-[color:var(--t-bd0)]">
+                          <div className="bg-[var(--t-ok)] w-1.5 h-1.5" />
+                          <span className="text-[color:var(--t-ok)] text-[11px]">SYNC ACTIVE</span>
                         </div>
                       </div>
 
@@ -918,12 +921,12 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                         <img src={IMG.hubIcon} className="w-12 h-12 object-fill shrink-0" />
                         <div className="flex-1 min-w-[220px]">
                           <div className="flex flex-col items-start self-stretch">
-                            <span className="text-[#EDE0DC] text-2xl sm:text-3xl font-bold">
+                            <span className="text-[color:var(--t-tx0)] text-2xl sm:text-3xl font-bold">
                               PERSONAL STUDY WORKSPACE
                             </span>
                           </div>
                           <div className="flex flex-col self-stretch pt-1">
-                            <span className="text-[#859394] text-sm">
+                            <span className="text-[color:var(--t-tx2)] text-sm">
                               Synchronized academic revisions, exam checkpoints, and active syllabus ingestion.
                             </span>
                           </div>
@@ -932,18 +935,18 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 
                       <div className="flex flex-wrap items-start self-stretch pt-[17px] gap-x-3 gap-y-2">
                         <div className="flex shrink-0 items-center gap-1.5">
-                          <div className="bg-[#2CD4D9] w-1.5 h-1.5" />
-                          <span className="text-[#2CD4D9] text-[11px]">Active Semester</span>
+                          <div className="bg-[var(--t-ac)] w-1.5 h-1.5" />
+                          <span className="text-[color:var(--t-ac)] text-[11px]">Active Semester</span>
                         </div>
-                        <span className="text-[#3F3735] text-[11px] hidden sm:inline">•</span>
+                        <span className="text-[color:var(--t-bd0)] text-[11px] hidden sm:inline">•</span>
                         <div className="flex shrink-0 items-center gap-1.5">
                           <img src={IMG.clock} className="w-3 h-[11px] object-fill" />
-                          <span className="text-[#BBC9C9] text-[11px]">Next: CS240 Midterm (2d)</span>
+                          <span className="text-[color:var(--t-tx1)] text-[11px]">Next: CS240 Midterm (2d)</span>
                         </div>
-                        <span className="text-[#3F3735] text-[11px] hidden sm:inline">•</span>
+                        <span className="text-[color:var(--t-bd0)] text-[11px] hidden sm:inline">•</span>
                         <div className="flex shrink-0 items-center gap-1.5">
                           <img src={IMG.check} className="w-2.5 h-2.5 object-fill" />
-                          <span className="text-[#82F040] text-[11px]">2 Syllabi Ingested</span>
+                          <span className="text-[color:var(--t-ok)] text-[11px]">2 Syllabi Ingested</span>
                         </div>
                       </div>
                     </div>
@@ -958,10 +961,10 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                               key={tab.key}
                               onClick={() => setActiveSubTab(tab.key)}
                               className={`flex shrink-0 items-center py-2 px-3 sm:px-4 gap-2 border-b-2 transition-all duration-150 active:scale-95
-                                ${active ? "border-[#2CD4D9]" : "border-transparent hover:border-[#3F3735]"}`}
+                                ${active ? "border-[color:var(--t-ac)]" : "border-transparent hover:border-[color:var(--t-bd0)]"}`}
                             >
                               <img src={tab.icon} className={`${tab.iconClass} object-fill`} />
-                              <span className={`text-xs font-bold whitespace-nowrap ${active ? "text-[#2CD4D9]" : "text-[#BBC9C9]"}`}>
+                              <span className={`text-xs font-bold whitespace-nowrap ${active ? "text-[color:var(--t-ac)]" : "text-[color:var(--t-tx1)]"}`}>
                                 {tab.label}
                               </span>
                             </button>
@@ -972,12 +975,12 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                       <div className="relative shrink-0">
                         <button
                           onClick={() => setFilterOpen((v) => !v)}
-                          className="flex flex-col items-start bg-[#251E1C] py-[5px] px-[11px] border border-solid border-[#3F3735] hover:border-[#2CD4D9] transition-all duration-150 active:scale-95"
+                          className="flex flex-col items-start bg-[var(--t-bg3)] py-[5px] px-[11px] border border-solid border-[color:var(--t-bd0)] hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-95"
                         >
-                          <span className="text-[#859394] text-xs">Filter: {subjectFilter}</span>
+                          <span className="text-[color:var(--t-tx2)] text-xs">Filter: {subjectFilter}</span>
                         </button>
                         {filterOpen && (
-                          <div className="absolute right-0 mt-1 z-40 bg-[#1D1715] border border-solid border-[#3F3735] min-w-[160px]">
+                          <div className="absolute right-0 mt-1 z-40 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] min-w-[160px]">
                             {SUBJECT_FILTERS.map((s) => (
                               <button
                                 key={s}
@@ -985,7 +988,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                   setSubjectFilter(s);
                                   setFilterOpen(false);
                                 }}
-                                className={`block w-full text-left px-3 py-2 text-xs hover:bg-[#251E1C] ${subjectFilter === s ? "text-[#2CD4D9]" : "text-[#BBC9C9]"
+                                className={`block w-full text-left px-3 py-2 text-xs hover:bg-[var(--t-bg3)] ${subjectFilter === s ? "text-[color:var(--t-ac)]" : "text-[color:var(--t-tx1)]"
                                   }`}
                               >
                                 {s}
@@ -1000,20 +1003,20 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                       <div className="flex flex-col self-stretch gap-6">
                         {/* Calendar card */}
                         <div
-                          className="flex flex-col self-stretch bg-[#181210] p-4 sm:p-[21px] gap-4 border border-solid border-[#3F3735]"
-                          style={{ boxShadow: "2px 2px 0px #0A0706" }}
+                          className="flex flex-col self-stretch bg-[var(--t-bg1)] p-4 sm:p-[21px] gap-4 border border-solid border-[color:var(--t-bd0)]"
+                          style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
                         >
                           <div className="flex flex-wrap justify-between items-start gap-3 self-stretch pb-[13px]">
                             <div className="flex items-center gap-3">
                               <img src={IMG.calendarIcon} className="w-8 h-8 object-fill" />
                               <div>
                                 <div className="flex flex-col items-start self-stretch">
-                                  <span className="text-[#EDE0DC] text-lg font-bold">
+                                  <span className="text-[color:var(--t-tx0)] text-lg font-bold">
                                     {MONTH_NAMES[month]} {year}
                                   </span>
                                 </div>
                                 <div className="flex flex-col items-start self-stretch">
-                                  <span className="text-[#859394] text-[11px]">Academic Schedule</span>
+                                  <span className="text-[color:var(--t-tx2)] text-[11px]">Academic Schedule</span>
                                 </div>
                               </div>
                             </div>
@@ -1028,9 +1031,9 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                               </button>
                               <button
                                 onClick={goToday}
-                                className="flex flex-col shrink-0 items-start bg-[#251E1C] py-1 px-[13px] mr-[9px] border border-solid border-[#3F3735] hover:border-[#2CD4D9] transition-all duration-150 active:scale-95"
+                                className="flex flex-col shrink-0 items-start bg-[var(--t-bg3)] py-1 px-[13px] mr-[9px] border border-solid border-[color:var(--t-bd0)] hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-95"
                               >
-                                <span className="text-[#2CD4D9] text-xs font-bold">TODAY</span>
+                                <span className="text-[color:var(--t-ac)] text-xs font-bold">TODAY</span>
                               </button>
                               <button
                                 onClick={goNextMonth}
@@ -1041,20 +1044,20 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                               </button>
                               <button
                                 onClick={() => openAddEventForDate(selectedDate || TODAY)}
-                                className="flex shrink-0 items-center bg-[#2CD4D9] py-1 px-3 gap-1 hover:opacity-90 transition-all duration-150 active:scale-95"
+                                className="flex shrink-0 items-center bg-[var(--t-ac)] py-1 px-3 gap-1 hover:opacity-90 transition-all duration-150 active:scale-95"
                               >
                                 <img src={IMG.eventDot} className="w-2 h-2 object-fill" />
-                                <span className="text-[#003738] text-xs font-bold">EVENT</span>
+                                <span className="text-[color:var(--t-onac)] text-xs font-bold">EVENT</span>
                               </button>
                             </div>
                           </div>
 
-                          <div className="self-stretch bg-[#130D0B] p-[1px] border border-solid border-[#3F3735] overflow-x-auto">
+                          <div className="self-stretch bg-[var(--t-bg0)] p-[1px] border border-solid border-[color:var(--t-bd0)] overflow-x-auto">
                             <div className="min-w-[560px]">
-                              <div className="flex items-center self-stretch bg-[#251E1C] py-2">
+                              <div className="flex items-center self-stretch bg-[var(--t-bg3)] py-2">
                                 {WEEKDAYS.map((wd) => (
                                   <div key={wd} className="flex flex-1 flex-col items-center">
-                                    <span className="text-[#859394] text-[11px] font-bold">{wd}</span>
+                                    <span className="text-[color:var(--t-tx2)] text-[11px] font-bold">{wd}</span>
                                   </div>
                                 ))}
                               </div>
@@ -1069,8 +1072,8 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                       const isSelected = selectedDate && isSameDay(cell.date, selectedDate);
                                       const bgTint = dayEvents.length
                                         ? isToday
-                                          ? "bg-[#2CD4D933]"
-                                          : "bg-[#251E1C4D]"
+                                          ? "bg-[color-mix(in_srgb,_var(--t-ac)_20%,_transparent)]"
+                                          : "bg-[color-mix(in_srgb,_var(--t-bg3)_30%,_transparent)]"
                                         : "";
                                       return (
                                         <div
@@ -1082,9 +1085,9 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                             }`}
                                           style={
                                             isToday
-                                              ? { boxShadow: "0px 0px 10px #2CD4D940" }
+                                              ? { boxShadow: "0px 0px 10px color-mix(in srgb, var(--t-ac) 25%, transparent)" }
                                               : isSelected
-                                                ? { boxShadow: "inset 0px 0px 0px 2px #58F1F6" }
+                                                ? { boxShadow: "inset 0px 0px 0px 2px var(--t-ac2)" }
                                                 : undefined
                                           }
                                         >
@@ -1095,23 +1098,23 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                               openAddEventForDate(cell.date);
                                             }}
                                             aria-label={`Add a study event on ${cell.date.toDateString()}`}
-                                            className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center bg-[#2CD4D9] text-[#003738] text-xs font-bold opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-90 transition-all duration-150 z-10"
+                                            className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-90 transition-all duration-150 z-10"
                                           >
                                             +
                                           </button>
                                           <div className="flex items-center self-stretch justify-between">
                                             <span
                                               className={`text-xs font-bold ${isToday
-                                                ? "text-[#2CD4D9]"
+                                                ? "text-[color:var(--t-ac)]"
                                                 : cell.inMonth
-                                                  ? "text-[#EDE0DC]"
-                                                  : "text-[#524542]"
+                                                  ? "text-[color:var(--t-tx0)]"
+                                                  : "text-[color:var(--t-bd1)]"
                                                 }`}
                                             >
                                               {String(cell.date.getDate()).padStart(2, "0")}
                                               {isToday ? " TODAY" : ""}
                                             </span>
-                                            {isToday && <div className="bg-[#2CD4D9] w-2 h-2 shrink-0" />}
+                                            {isToday && <div className="bg-[var(--t-ac)] w-2 h-2 shrink-0" />}
                                           </div>
                                           <div className="flex flex-col items-start gap-1 mt-2 w-full">
                                             {dayEvents.map((ev) => {
@@ -1144,36 +1147,36 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 
                           <div className="flex flex-wrap items-center self-stretch py-1 gap-x-6 gap-y-2">
                             <div className="flex shrink-0 items-center gap-2">
-                              <div className="bg-[#2CD4D9] w-2.5 h-2.5" />
-                              <span className="text-[#EDE0DC] text-[11px] font-bold">Study Review</span>
+                              <div className="bg-[var(--t-ac)] w-2.5 h-2.5" />
+                              <span className="text-[color:var(--t-tx0)] text-[11px] font-bold">Study Review</span>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
-                              <div className="bg-[#FF6B6B] w-2.5 h-2.5" />
-                              <span className="text-[#EDE0DC] text-[11px] font-bold">Exam Checkpoint</span>
+                              <div className="bg-[var(--t-err)] w-2.5 h-2.5" />
+                              <span className="text-[color:var(--t-tx0)] text-[11px] font-bold">Exam Checkpoint</span>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
-                              <div className="bg-[#82F040] w-2.5 h-2.5" />
-                              <span className="text-[#EDE0DC] text-[11px] font-bold">Group Session</span>
+                              <div className="bg-[var(--t-ok)] w-2.5 h-2.5" />
+                              <span className="text-[color:var(--t-tx0)] text-[11px] font-bold">Group Session</span>
                             </div>
                           </div>
                         </div>
 
                         {/* Upcoming events card */}
                         <div
-                          className="flex flex-col self-stretch bg-[#181210] p-4 sm:p-[21px] gap-4 border border-solid border-[#3F3735]"
-                          style={{ boxShadow: "2px 2px 0px #0A0706" }}
+                          className="flex flex-col self-stretch bg-[var(--t-bg1)] p-4 sm:p-[21px] gap-4 border border-solid border-[color:var(--t-bd0)]"
+                          style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
                         >
                           <div className="flex justify-between items-start self-stretch pb-[13px]">
                             <div className="flex shrink-0 items-center gap-2.5">
                               <img src={IMG.bellIcon} className="w-[15px] h-4 object-fill" />
-                              <span className="text-[#EDE0DC] text-lg font-bold">UPCOMING STUDY EVENTS</span>
+                              <span className="text-[color:var(--t-tx0)] text-lg font-bold">UPCOMING STUDY EVENTS</span>
                             </div>
-                            <span className="text-[#859394] text-xs">{filteredUpcoming.length} Scheduled</span>
+                            <span className="text-[color:var(--t-tx2)] text-xs">{filteredUpcoming.length} Scheduled</span>
                           </div>
 
                           <div className="self-stretch">
                             {filteredUpcoming.length === 0 && (
-                              <div className="text-[#859394] text-xs py-6 text-center">
+                              <div className="text-[color:var(--t-tx2)] text-xs py-6 text-center">
                                 No events match this filter or search.
                               </div>
                             )}
@@ -1182,7 +1185,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                               return (
                                 <div
                                   key={u.id}
-                                  className={`flex flex-wrap sm:flex-nowrap justify-between items-center gap-3 self-stretch bg-[#1D1715] p-4 sm:p-[17px] mb-2.5 border border-solid border-[#3F3735] ${isDone ? "opacity-60" : ""
+                                  className={`flex flex-wrap sm:flex-nowrap justify-between items-center gap-3 self-stretch bg-[var(--t-bg2)] p-4 sm:p-[17px] mb-2.5 border border-solid border-[color:var(--t-bd0)] ${isDone ? "opacity-60" : ""
                                     }`}
                                   style={isDone ? { filter: "grayscale(1)" } : undefined}
                                 >
@@ -1191,7 +1194,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                     <div className="flex flex-1 min-w-0 flex-col gap-1">
                                       <div className="flex flex-wrap items-center gap-2">
                                         <span
-                                          className={`text-[#EDE0DC] text-sm font-bold truncate ${isDone ? "line-through" : ""
+                                          className={`text-[color:var(--t-tx0)] text-sm font-bold truncate ${isDone ? "line-through" : ""
                                             }`}
                                         >
                                           {u.title}
@@ -1199,8 +1202,8 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                         <div
                                           className="flex flex-col shrink-0 items-start py-[3px] px-[9px] border border-solid"
                                           style={{
-                                            backgroundColor: `${u.subjectColor}33`,
-                                            borderColor: `${u.subjectColor}4D`,
+                                            backgroundColor: withAlpha(u.subjectColor, "33"),
+                                            borderColor: withAlpha(u.subjectColor, "4D"),
                                           }}
                                         >
                                           <span className="text-[10px] font-bold" style={{ color: u.subjectColor }}>
@@ -1209,7 +1212,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                         </div>
                                       </div>
                                       <div className="flex flex-col items-start self-stretch">
-                                        <span className="text-[#BBC9C9] text-xs truncate">{u.meta}</span>
+                                        <span className="text-[color:var(--t-tx1)] text-xs truncate">{u.meta}</span>
                                       </div>
                                     </div>
                                   </div>
@@ -1217,7 +1220,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                     <div
                                       className="flex flex-col shrink-0 items-start py-[5px] px-[11px] border border-solid"
                                       style={{
-                                        backgroundColor: `${u.statusColor}1A`,
+                                        backgroundColor: withAlpha(u.statusColor, "1A"),
                                         borderColor: u.statusColor,
                                       }}
                                     >
@@ -1229,7 +1232,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                       <button
                                         onClick={() => setOpenEventMenuId((cur) => (cur === u.id ? null : u.id))}
                                         aria-label="Event options"
-                                        className="w-8 h-8 flex items-center justify-center text-[#BBC9C9] text-lg leading-none tracking-widest hover:text-[#EDE0DC] hover:bg-[#251E1C] transition-all duration-150 active:scale-90"
+                                        className="w-8 h-8 flex items-center justify-center text-[color:var(--t-tx1)] text-lg leading-none tracking-widest hover:text-[color:var(--t-tx0)] hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-90"
                                       >
                                         •••
                                       </button>
@@ -1240,32 +1243,32 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                             onClick={() => setOpenEventMenuId(null)}
                                           />
                                           <div
-                                            className="pz-anim absolute right-0 top-10 z-50 w-48 bg-[#0B1220F2] backdrop-blur-md border border-solid border-[#2E3B5C] p-1.5 flex flex-col gap-1"
-                                            style={{ boxShadow: "0 14px 36px rgba(0,0,0,0.6), 0 0 24px #1E3A5F4D", animation: "pzMenu .16s ease-out" }}
+                                            className="pz-anim absolute right-0 top-10 z-50 w-48 bg-[color-mix(in_srgb,_var(--t-mbg)_95%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-1.5 flex flex-col gap-1"
+                                            style={{ boxShadow: "0 14px 36px rgba(0,0,0,0.6), 0 0 24px color-mix(in srgb, var(--t-glow) 30%, transparent)", animation: "pzMenu .16s ease-out" }}
                                           >
                                             <button
                                               onClick={() => {
                                                 toggleComplete(u.id);
                                                 setOpenEventMenuId(null);
                                               }}
-                                              className="group/mi flex items-center gap-2.5 w-full text-left p-1.5 border border-solid border-transparent text-[#BBC9C9] hover:bg-[#2CD4D91A] hover:border-[#2CD4D94D] hover:text-[#2CD4D9] active:scale-[0.98] transition-all duration-150"
+                                              className="group/mi flex items-center gap-2.5 w-full text-left p-1.5 border border-solid border-transparent text-[color:var(--t-tx1)] hover:bg-[color-mix(in_srgb,_var(--t-ac)_10%,_transparent)] hover:border-[color:color-mix(in_srgb,_var(--t-ac)_30%,_transparent)] hover:text-[color:var(--t-ac)] active:scale-[0.98] transition-all duration-150"
                                             >
-                                              <span className="w-6 h-6 shrink-0 flex items-center justify-center border border-solid border-[#2CD4D94D] bg-[#2CD4D922] text-[#2CD4D9] group-hover/mi:bg-[#2CD4D9] group-hover/mi:text-[#003738] transition-colors">
+                                              <span className="w-6 h-6 shrink-0 flex items-center justify-center border border-solid border-[color:color-mix(in_srgb,_var(--t-ac)_30%,_transparent)] bg-[color-mix(in_srgb,_var(--t-ac)_13%,_transparent)] text-[color:var(--t-ac)] group-hover/mi:bg-[var(--t-ac)] group-hover/mi:text-[color:var(--t-onac)] transition-colors">
                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                   {isDone ? <path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5" /> : <polyline points="5 12 10 17 19 7" />}
                                                 </svg>
                                               </span>
                                               <span className="text-xs font-bold whitespace-nowrap">{isDone ? "Mark as not done" : "Mark as done"}</span>
                                             </button>
-                                            <div className="h-px bg-[#2E3B5C] mx-1" />
+                                            <div className="h-px bg-[var(--t-mbd)] mx-1" />
                                             <button
                                               onClick={() => {
                                                 deleteUpcoming(u.id);
                                                 setOpenEventMenuId(null);
                                               }}
-                                              className="group/mi flex items-center gap-2.5 w-full text-left p-1.5 border border-solid border-transparent text-[#FF6B6B] hover:bg-[#FF6B6B1A] hover:border-[#FF6B6B4D] active:scale-[0.98] transition-all duration-150"
+                                              className="group/mi flex items-center gap-2.5 w-full text-left p-1.5 border border-solid border-transparent text-[color:var(--t-err)] hover:bg-[color-mix(in_srgb,_var(--t-err)_10%,_transparent)] hover:border-[color:color-mix(in_srgb,_var(--t-err)_30%,_transparent)] active:scale-[0.98] transition-all duration-150"
                                             >
-                                              <span className="w-6 h-6 shrink-0 flex items-center justify-center border border-solid border-[#FF6B6B4D] bg-[#FF6B6B22] text-[#FF6B6B] group-hover/mi:bg-[#FF6B6B] group-hover/mi:text-[#2A0A0A] transition-colors">
+                                              <span className="w-6 h-6 shrink-0 flex items-center justify-center border border-solid border-[color:color-mix(in_srgb,_var(--t-err)_30%,_transparent)] bg-[color-mix(in_srgb,_var(--t-err)_13%,_transparent)] text-[color:var(--t-err)] group-hover/mi:bg-[var(--t-err)] group-hover/mi:text-[color:var(--t-onerr)] transition-colors">
                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                                   <polyline points="3 6 5 6 21 6" />
                                                   <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -1285,10 +1288,10 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 
                             <button
                               onClick={() => openAddEventForDate(selectedDate || TODAY)}
-                              className="flex justify-center items-center self-stretch bg-[#251E1C] py-[13px] mt-1 gap-[7px] border border-solid border-[#3F3735] w-full hover:border-[#2CD4D9] transition-all duration-150 active:scale-[0.98]"
+                              className="flex justify-center items-center self-stretch bg-[var(--t-bg3)] py-[13px] mt-1 gap-[7px] border border-solid border-[color:var(--t-bd0)] w-full hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-[0.98]"
                             >
                               <img src={IMG.plus} className="w-2.5 h-2.5 object-fill" />
-                              <span className="text-[#BBC9C9] text-xs font-bold">+ NEW STUDY EVENT</span>
+                              <span className="text-[color:var(--t-tx1)] text-xs font-bold">+ NEW STUDY EVENT</span>
                             </button>
                           </div>
                         </div>
@@ -1367,13 +1370,14 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
         {settingsOpen && (
           <div className="fixed inset-0 z-50 flex justify-end">
             <div className="flex-1 bg-black/60" onClick={() => setSettingsOpen(false)} />
-            <div className="w-full max-w-xs bg-[#1D1715] border-l border-solid border-[#3F3735] p-5 flex flex-col gap-4">
+            <div className="w-full max-w-xs bg-[var(--t-bg2)] border-l border-solid border-[color:var(--t-bd0)] p-5 flex flex-col gap-4">
               <div className="flex justify-between items-center">
-                <span className="text-[#EDE0DC] text-sm font-bold">SETTINGS</span>
+                <span className="text-[color:var(--t-tx0)] text-sm font-bold">SETTINGS</span>
                 <button onClick={() => setSettingsOpen(false)}>
-                  <img src={IMG.close} className="w-4 h-4" />
+                  <CloseIcon className="w-4 h-4" />
                 </button>
               </div>
+              <ThemePicker theme={theme} onChange={setTheme} />
               <ToggleRow label="Email reminders" />
               <ToggleRow label="Group session pings" defaultOn />
               <ToggleRow label="Voxel quest sound effects" />
@@ -1396,9 +1400,9 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 }
 
 const EVENT_TYPES = [
-  { key: "review", label: "Study Review", color: "#2CD4D9", icon: "📖" },
-  { key: "exam", label: "Exam Checkpoint", color: "#FF6B6B", icon: "🎯" },
-  { key: "group", label: "Group Session", color: "#82F040", icon: "👥" },
+  { key: "review", label: "Study Review", color: "var(--t-ac)", icon: "📖" },
+  { key: "exam", label: "Exam Checkpoint", color: "var(--t-err)", icon: "🎯" },
+  { key: "group", label: "Group Session", color: "var(--t-ok)", icon: "👥" },
 ];
 
 function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
@@ -1409,7 +1413,7 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
   const done = checks.filter(Boolean).length;
   const pct = (done / checks.length) * 100;
   const complete = done === checks.length;
-  const barColor = pct < 50 ? "#FEDA44" : pct < 100 ? "#58F1F6" : "#82F040";
+  const barColor = pct < 50 ? "var(--t-warn)" : pct < 100 ? "var(--t-ac2)" : "var(--t-ok)";
   const typeDef = EVENT_TYPES.find((t) => t.key === newEvent.type) || EVENT_TYPES[0];
 
   const picked = parseDateFromInput(newEvent.date);
@@ -1430,23 +1434,23 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
   }
 
   const field =
-    "w-full bg-[#101A2E] border border-solid border-[#2E3B5C] text-[#EDE0DC] text-xs py-2.5 px-3 text-left outline-none transition-all duration-200 placeholder:text-[#4A5578] focus:border-[#2CD4D9] focus:shadow-[0_0_14px_#2CD4D933] focus:bg-[#132038]";
+    "w-full bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2.5 px-3 text-left outline-none transition-all duration-200 placeholder:text-[color:var(--t-ph)] focus:border-[color:var(--t-ac)] focus:shadow-[0_0_14px_color-mix(in srgb, var(--t-ac) 20%, transparent)] focus:bg-[var(--t-in1)]";
 
   const Label = ({ children, ok, optional }) => (
-    <span className="flex items-center gap-1.5 text-[#8A93B8] text-[10px] font-bold tracking-wider text-left uppercase">
+    <span className="flex items-center gap-1.5 text-[color:var(--t-mtx)] text-[10px] font-bold tracking-wider text-left uppercase">
       <span
         className="inline-flex items-center justify-center w-3 h-3 rounded-full text-[8px] leading-none transition-all duration-300"
         style={{
-          backgroundColor: ok ? "#82F040" : "transparent",
-          border: `1px solid ${ok ? "#82F040" : "#3A4E78"}`,
-          color: "#0B1220",
+          backgroundColor: ok ? "var(--t-ok)" : "transparent",
+          border: `1px solid ${ok ? "var(--t-ok)" : "var(--t-mbd2)"}`,
+          color: "var(--t-mbg)",
           transform: ok ? "scale(1.15)" : "scale(1)",
         }}
       >
         {ok ? "✓" : ""}
       </span>
       {children}
-      {optional && <span className="normal-case tracking-normal font-normal text-[#4A5578]">(optional)</span>}
+      {optional && <span className="normal-case tracking-normal font-normal text-[color:var(--t-ph)]">(optional)</span>}
     </span>
   );
 
@@ -1455,41 +1459,41 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
       <form
         onSubmit={submit}
-        className="pz-anim relative bg-[#0B1220F2] backdrop-blur-md border border-solid border-[#2E3B5C] w-full max-w-md max-h-[94vh] overflow-y-auto"
+        className="pz-anim relative bg-[color-mix(in_srgb,_var(--t-mbg)_95%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] w-full max-w-md max-h-[94vh] overflow-y-auto"
         style={{
-          boxShadow: `0 20px 60px rgba(0,0,0,0.65), 0 0 40px ${typeDef.color}22`,
+          boxShadow: `0 20px 60px rgba(0,0,0,0.65), 0 0 40px ${withAlpha(typeDef.color, "22")}`,
           animation: launching ? "pzLaunch .45s ease-in forwards" : "pzPop .28s cubic-bezier(.2,.9,.3,1.2)",
         }}
       >
-        <div className="h-0.5 w-full" style={{ background: `linear-gradient(90deg, ${typeDef.color}, #FEDA44, ${typeDef.color})` }} />
+        <div className="h-0.5 w-full" style={{ background: `linear-gradient(90deg, ${typeDef.color}, var(--t-warn), ${typeDef.color})` }} />
 
         {/* header */}
         <div className="flex justify-between items-start px-5 pt-4 pb-3">
           <div className="flex items-center gap-3">
             <div
               className="w-9 h-9 flex items-center justify-center text-base border border-solid transition-colors duration-300"
-              style={{ backgroundColor: `${typeDef.color}22`, borderColor: `${typeDef.color}55` }}
+              style={{ backgroundColor: withAlpha(typeDef.color, "22"), borderColor: withAlpha(typeDef.color, "55") }}
             >
               {typeDef.icon}
             </div>
             <div className="flex flex-col text-left">
-              <span className="text-[#EDE0DC] text-sm font-bold tracking-wide">NEW STUDY EVENT</span>
-              <span className="text-[#8A93B8] text-[11px]">
+              <span className="text-[color:var(--t-tx0)] text-sm font-bold tracking-wide">NEW STUDY EVENT</span>
+              <span className="text-[color:var(--t-mtx)] text-[11px]">
                 {complete ? "All set — ready to launch!" : `${done} of ${checks.length} details filled in`}
               </span>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="text-[#8A93B8] text-xl leading-none hover:text-[#58F1F6] hover:rotate-90 transition-all duration-200" aria-label="Close">
+          <button type="button" onClick={onClose} className="text-[color:var(--t-mtx)] text-xl leading-none hover:text-[color:var(--t-ac2)] hover:rotate-90 transition-all duration-200" aria-label="Close">
             ×
           </button>
         </div>
 
         {/* progress bar */}
         <div className="px-5 pb-4">
-          <div className="relative h-1.5 bg-[#101A2E] border border-solid border-[#2E3B5C] overflow-hidden">
+          <div className="relative h-1.5 bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] overflow-hidden">
             <div
               className="absolute inset-y-0 left-0 transition-all duration-500 ease-out overflow-hidden"
-              style={{ width: `${pct}%`, backgroundColor: barColor, boxShadow: `0 0 10px ${barColor}99` }}
+              style={{ width: `${pct}%`, backgroundColor: barColor, boxShadow: `0 0 10px ${withAlpha(barColor, "99")}` }}
             >
               {pct > 0 && (
                 <div
@@ -1499,7 +1503,7 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
               )}
             </div>
           </div>
-          <div className="flex justify-between mt-1.5 text-[10px] text-[#4A5578]">
+          <div className="flex justify-between mt-1.5 text-[10px] text-[color:var(--t-ph)]">
             <span>Progress</span>
             <span className="font-bold transition-colors duration-500" style={{ color: barColor }}>
               {Math.round(pct)}%
@@ -1516,7 +1520,7 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
 
           {/* Type */}
           <div className="flex flex-col gap-1.5">
-            <span className="text-[#8A93B8] text-[10px] font-bold tracking-wider text-left uppercase">Type</span>
+            <span className="text-[color:var(--t-mtx)] text-[10px] font-bold tracking-wider text-left uppercase">Type</span>
             <div className="grid grid-cols-3 gap-1.5">
               {EVENT_TYPES.map((t) => {
                 const active = newEvent.type === t.key;
@@ -1527,10 +1531,10 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
                     onClick={() => set({ type: t.key })}
                     className="flex flex-col items-center gap-0.5 py-2 px-1 border border-solid text-[10px] font-bold transition-all duration-150 active:scale-95"
                     style={{
-                      backgroundColor: active ? `${t.color}26` : "#101A2E",
-                      borderColor: active ? t.color : "#2E3B5C",
-                      color: active ? t.color : "#8A93B8",
-                      boxShadow: active ? `0 0 12px ${t.color}44` : "none",
+                      backgroundColor: active ? withAlpha(t.color, "26") : "var(--t-in0)",
+                      borderColor: active ? t.color : "var(--t-mbd)",
+                      color: active ? t.color : "var(--t-mtx)",
+                      boxShadow: active ? `0 0 12px ${withAlpha(t.color, "44")}` : "none",
                     }}
                   >
                     <span className="text-sm leading-none">{t.icon}</span>
@@ -1559,7 +1563,7 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
                     key={label}
                     type="button"
                     onClick={() => quickDate(off)}
-                    className={`text-[10px] font-bold py-0.5 px-2 border border-solid transition-all duration-150 active:scale-95 ${active ? "bg-[#2CD4D933] border-[#2CD4D9] text-[#2CD4D9]" : "bg-[#101A2E] border-[#2E3B5C] text-[#8A93B8] hover:border-[#58F1F6] hover:text-[#58F1F6]"
+                    className={`text-[10px] font-bold py-0.5 px-2 border border-solid transition-all duration-150 active:scale-95 ${active ? "bg-[color-mix(in_srgb,_var(--t-ac)_20%,_transparent)] border-[color:var(--t-ac)] text-[color:var(--t-ac)]" : "bg-[var(--t-in0)] border-[color:var(--t-mbd)] text-[color:var(--t-mtx)] hover:border-[color:var(--t-ac2)] hover:text-[color:var(--t-ac2)]"
                       }`}
                   >
                     {label}
@@ -1567,7 +1571,7 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
                 );
               })}
               {dueHint && (
-                <span className="ml-auto text-[10px] font-bold" style={{ color: left < 0 ? "#FF6B6B" : left <= 1 ? "#FEDA44" : "#A0D673" }}>
+                <span className="ml-auto text-[10px] font-bold" style={{ color: left < 0 ? "var(--t-err)" : left <= 1 ? "var(--t-warn)" : "var(--t-ok2)" }}>
                   ⏳ {dueHint}
                 </span>
               )}
@@ -1591,16 +1595,16 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
             <input value={newEvent.meta} onChange={(e) => set({ meta: e.target.value })} placeholder="e.g. 15:00 • Room 3" className={field} />
           </label>
 
-          <span className="text-[#8A93B8] text-[10px] text-left">✓ This will also land in your Study Sprint Board backlog.</span>
+          <span className="text-[color:var(--t-mtx)] text-[10px] text-left">✓ This will also land in your Study Sprint Board backlog.</span>
 
           <button
             type="submit"
             disabled={!newEvent.label.trim() || launching}
             className="pz-anim relative overflow-hidden text-xs font-bold py-3 tracking-wider transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:brightness-110"
             style={{
-              backgroundColor: complete ? "#82F040" : "#2CD4D9",
-              color: complete ? "#0F2A00" : "#003738",
-              "--pz-glow": complete ? "#82F04099" : "#2CD4D900",
+              backgroundColor: complete ? "var(--t-ok)" : "var(--t-ac)",
+              color: complete ? "var(--t-onok2)" : "var(--t-onac)",
+              "--pz-glow": complete ? "color-mix(in srgb, var(--t-ok) 60%, transparent)" : "color-mix(in srgb, var(--t-ac) 0%, transparent)",
               animation: complete && !launching ? "pzPulse 1.8s ease-in-out infinite" : "none",
             }}
           >
@@ -1614,7 +1618,7 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
 
 function Badge({ color, children }) {
   return (
-    <span className="text-[10px] font-bold py-0.5 px-2 border border-solid shrink-0" style={{ backgroundColor: `${color}33`, borderColor: `${color}4D`, color }}>
+    <span className="text-[10px] font-bold py-0.5 px-2 border border-solid shrink-0" style={{ backgroundColor: withAlpha(color, "33"), borderColor: withAlpha(color, "4D"), color }}>
       {children}
     </span>
   );
@@ -1625,17 +1629,17 @@ function ToggleRow({ label, defaultOn = false }) {
   return (
     <button
       onClick={() => setOn((v) => !v)}
-      className="flex justify-between items-center py-2 border-b border-solid border-[#3F3735]"
+      className="flex justify-between items-center py-2 border-b border-solid border-[color:var(--t-bd0)]"
     >
-      <span className="text-[#BBC9C9] text-xs">{label}</span>
-      <div className={`w-9 h-5 flex items-center px-0.5 ${on ? "bg-[#2CD4D9] justify-end" : "bg-[#251E1C] justify-start"}`}>
-        <div className="w-3.5 h-3.5 bg-[#EDE0DC]" />
+      <span className="text-[color:var(--t-tx1)] text-xs">{label}</span>
+      <div className={`w-9 h-5 flex items-center px-0.5 ${on ? "bg-[var(--t-ac)] justify-end" : "bg-[var(--t-bg3)] justify-start"}`}>
+        <div className="w-3.5 h-3.5 bg-[var(--t-tx0)]" />
       </div>
     </button>
   );
 }
 
-function Spinner({ color = "#003738" }) {
+function Spinner({ color = "var(--t-onac)" }) {
   return (
     <svg className="animate-spin w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none">
       <circle cx="12" cy="12" r="10" stroke={color} strokeWidth="3" opacity="0.25" />
@@ -1670,12 +1674,12 @@ function QuizForgePanel({
           <div
             key={stat.label}
             title={stat.explain}
-            className="bg-[#181210] p-[15px] border border-solid border-[#3F3735] transition-transform duration-150 hover:-translate-y-0.5 cursor-help"
+            className="bg-[var(--t-bg1)] p-[15px] border border-solid border-[color:var(--t-bd0)] transition-transform duration-150 hover:-translate-y-0.5 cursor-help"
           >
             <div className="flex justify-between items-center self-stretch">
               <div className="flex shrink-0 items-center gap-1.5">
                 <img src={stat.icon} className="w-[13px] h-[13px] object-fill" />
-                <span className="text-[#859394] text-xs">{stat.label}</span>
+                <span className="text-[color:var(--t-tx2)] text-xs">{stat.label}</span>
               </div>
               <div className="w-2 h-2 shrink-0" style={{ backgroundColor: stat.dot }} />
             </div>
@@ -1693,10 +1697,10 @@ function QuizForgePanel({
                   </span>
                 </div>
               )}
-              {stat.note && <span className="text-[#BBC9C9] text-[10px]">{stat.note}</span>}
+              {stat.note && <span className="text-[color:var(--t-tx1)] text-[10px]">{stat.note}</span>}
             </div>
             <div className="flex flex-col items-start self-stretch pt-1">
-              <span className="text-[#859394] text-[11px]">{stat.sub}</span>
+              <span className="text-[color:var(--t-tx2)] text-[11px]">{stat.sub}</span>
             </div>
           </div>
         ))}
@@ -1704,15 +1708,15 @@ function QuizForgePanel({
 
       {/* Ingestion vault */}
       <div
-        className="flex flex-col self-stretch bg-[#181210] p-4 sm:p-[21px] gap-4 border border-solid border-[#3F3735]"
-        style={{ boxShadow: "2px 2px 0px #0A0706" }}
+        className="flex flex-col self-stretch bg-[var(--t-bg1)] p-4 sm:p-[21px] gap-4 border border-solid border-[color:var(--t-bd0)]"
+        style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
       >
         <div className="flex flex-wrap justify-between items-center gap-2 self-stretch">
           <div className="flex shrink-0 items-center gap-2">
-            <div className="bg-[#2CD4D9] w-2.5 h-2.5" />
-            <span className="text-[#EDE0DC] text-base font-bold">DOCUMENT INGESTION VAULT</span>
+            <div className="bg-[var(--t-ac)] w-2.5 h-2.5" />
+            <span className="text-[color:var(--t-tx0)] text-base font-bold">DOCUMENT INGESTION VAULT</span>
           </div>
-          <span className="text-[#38DBE0] text-[11px] bg-[#251E1C] py-[5px] px-[11px] border border-solid border-[#3F3735]">
+          <span className="text-[color:var(--t-ac)] text-[11px] bg-[var(--t-bg3)] py-[5px] px-[11px] border border-solid border-[color:var(--t-bd0)]">
             PDF, DOCX, MD (MAX 64MB)
           </span>
         </div>
@@ -1732,31 +1736,31 @@ function QuizForgePanel({
           }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={onDrop}
-          className={`flex flex-col items-center self-stretch py-8 sm:py-[34px] px-4 border-2 border-solid transition-all duration-150 ${isDragging ? "bg-[#2CD4D91A] border-[#2CD4D9] scale-[1.01]" : "bg-[#130D0B] border-[#3F3735]"
+          className={`flex flex-col items-center self-stretch py-8 sm:py-[34px] px-4 border-2 border-solid transition-all duration-150 ${isDragging ? "bg-[color-mix(in_srgb,_var(--t-ac)_10%,_transparent)] border-[color:var(--t-ac)] scale-[1.01]" : "bg-[var(--t-bg0)] border-[color:var(--t-bd0)]"
             }`}
         >
           <img src={IMG.qfDropIllustration} className="w-14 h-[68px] object-fill mb-2" />
-          <span className="text-[#EDE0DC] text-lg font-bold text-center">
+          <span className="text-[color:var(--t-tx0)] text-lg font-bold text-center">
             Drop Lecture Slides, PDFs, or Syllabi to ingest
           </span>
-          <p className="text-[#BBC9C9] text-xs text-center max-w-md pt-1 pb-5">
+          <p className="text-[color:var(--t-tx1)] text-xs text-center max-w-md pt-1 pb-5">
             Autonomous RAG vector chunking extracts syllabus schedules, formulas, and terminology to
             craft custom practice quizzes.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex shrink-0 items-center bg-[#2CD4D9] py-3 px-[22px] gap-2 hover:opacity-90 transition-all duration-150 active:scale-95"
+              className="flex shrink-0 items-center bg-[var(--t-ac)] py-3 px-[22px] gap-2 hover:opacity-90 transition-all duration-150 active:scale-95"
             >
               <img src={IMG.qfUpload} className="w-3 h-[15px] object-fill" />
-              <span className="text-[#003738] text-xs font-bold">Upload Study Documents</span>
+              <span className="text-[color:var(--t-onac)] text-xs font-bold">Upload Study Documents</span>
             </button>
             <button
               onClick={onSyncDrive}
-              className="flex items-center bg-[#251E1C] py-3 px-[22px] gap-2 border border-solid border-[#3F3735] hover:border-[#2CD4D9] transition-all duration-150 active:scale-95"
+              className="flex items-center bg-[var(--t-bg3)] py-3 px-[22px] gap-2 border border-solid border-[color:var(--t-bd0)] hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-95"
             >
-              {driveSyncing ? <Spinner color="#EDE0DC" /> : <img src={IMG.qfDrive} className="w-[15px] h-[15px] object-fill" />}
-              <span className="text-[#EDE0DC] text-xs font-bold">
+              {driveSyncing ? <Spinner color="var(--t-tx0)" /> : <img src={IMG.qfDrive} className="w-[15px] h-[15px] object-fill" />}
+              <span className="text-[color:var(--t-tx0)] text-xs font-bold">
                 {driveSyncing ? "Syncing…" : "Sync Google Drive"}
               </span>
             </button>
@@ -1766,20 +1770,20 @@ function QuizForgePanel({
 
       {/* Ingested files list */}
       <div
-        className="flex flex-col self-stretch bg-[#181210] p-4 sm:p-[21px] gap-4 border border-solid border-[#3F3735]"
-        style={{ boxShadow: "2px 2px 0px #0A0706" }}
+        className="flex flex-col self-stretch bg-[var(--t-bg1)] p-4 sm:p-[21px] gap-4 border border-solid border-[color:var(--t-bd0)]"
+        style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
       >
         <div className="flex flex-wrap justify-between items-center gap-2 self-stretch">
           <div className="flex flex-wrap shrink-0 items-center gap-2">
-            <div className="bg-[#A0D673] w-2.5 h-2.5" />
-            <span className="text-[#EDE0DC] text-base font-bold">INGESTED LORE &amp; SYLLABI SHARDS</span>
-            <span className="text-[#BBF38C] text-xs font-bold bg-[#2B580080] py-0.5 px-2">
+            <div className="bg-[var(--t-ok2)] w-2.5 h-2.5" />
+            <span className="text-[color:var(--t-tx0)] text-base font-bold">INGESTED LORE &amp; SYLLABI SHARDS</span>
+            <span className="text-[color:var(--t-ok3)] text-xs font-bold bg-[#2B580080] py-0.5 px-2">
               ({files.length} Files Synced)
             </span>
           </div>
           <button className="flex shrink-0 items-center gap-1 hover:opacity-80 transition-all duration-150 active:scale-95">
             <img src={IMG.qfReindex} className="w-2.5 h-2.5 object-fill" />
-            <span className="text-[#2CD4D9] text-xs">Re-index All Chunks</span>
+            <span className="text-[color:var(--t-ac)] text-xs">Re-index All Chunks</span>
           </button>
         </div>
 
@@ -1790,37 +1794,37 @@ function QuizForgePanel({
             return (
               <div
                 key={file.id}
-                className="flex flex-wrap sm:flex-nowrap justify-between items-center gap-3 self-stretch bg-[#211A18] p-4 sm:p-[15px] mb-3 border border-solid border-[#3F3735]"
+                className="flex flex-wrap sm:flex-nowrap justify-between items-center gap-3 self-stretch bg-[var(--t-bg2)] p-4 sm:p-[15px] mb-3 border border-solid border-[color:var(--t-bd0)]"
               >
                 <div className="flex items-center min-w-0 flex-1 gap-3">
                   <img src={file.icon} className="w-10 h-10 object-fill shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-col items-start self-stretch">
-                      <span className="text-[#EDE0DC] text-sm font-bold truncate w-full">{file.name}</span>
+                      <span className="text-[color:var(--t-tx0)] text-sm font-bold truncate w-full">{file.name}</span>
                     </div>
                     <div className="flex flex-wrap items-center self-stretch pt-0.5 gap-x-2">
-                      <span className="text-[#A0D673] text-[11px] font-bold">{file.chunks} Chunks</span>
-                      <span className="text-[#3F3735] text-[11px]">•</span>
-                      <span className="text-[#38DBE0] text-[11px]">{file.size}</span>
-                      <span className="text-[#3F3735] text-[11px]">•</span>
-                      <span className={`text-[11px] ${indexing ? "text-[#FEDA44]" : "text-[#BBF38C]"}`}>
+                      <span className="text-[color:var(--t-ok2)] text-[11px] font-bold">{file.chunks} Chunks</span>
+                      <span className="text-[color:var(--t-bd0)] text-[11px]">•</span>
+                      <span className="text-[color:var(--t-ac)] text-[11px]">{file.size}</span>
+                      <span className="text-[color:var(--t-bd0)] text-[11px]">•</span>
+                      <span className={`text-[11px] ${indexing ? "text-[color:var(--t-warn)]" : "text-[color:var(--t-ok3)]"}`}>
                         {file.status}
                       </span>
                     </div>
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-[9px]">
-                  <div className="flex flex-col shrink-0 items-start bg-[#130D0B] py-1 px-[9px] border border-solid border-[#A0D6734D]">
-                    <span className="text-[#BBF38C] text-[11px]">{indexing ? "SYNCING" : "READY"}</span>
+                  <div className="flex flex-col shrink-0 items-start bg-[var(--t-bg0)] py-1 px-[9px] border border-solid border-[color:color-mix(in_srgb,_var(--t-ok2)_30%,_transparent)]">
+                    <span className="text-[color:var(--t-ok3)] text-[11px]">{indexing ? "SYNCING" : "READY"}</span>
                   </div>
                   <button
                     disabled={indexing}
                     onClick={() => onForge(file.id)}
                     className={`flex shrink-0 items-center py-2.5 px-[16px] gap-1.5 transition-all duration-150 active:scale-95 ${indexing
-                      ? "bg-[#3F3735] cursor-not-allowed opacity-60"
+                      ? "bg-[var(--t-bd0)] cursor-not-allowed opacity-60"
                       : forgeState === "ready"
-                        ? "bg-[#A0D673]"
-                        : "bg-[#2CD4D9] hover:opacity-90"
+                        ? "bg-[var(--t-ok2)]"
+                        : "bg-[var(--t-ac)] hover:opacity-90"
                       }`}
                   >
                     {forgeState === "forging" ? (
@@ -1828,7 +1832,7 @@ function QuizForgePanel({
                     ) : (
                       <img src={IMG.qfForge} className="w-[13px] h-[13px] object-fill" />
                     )}
-                    <span className="text-[#003738] text-xs font-bold whitespace-nowrap">
+                    <span className="text-[color:var(--t-onac)] text-xs font-bold whitespace-nowrap">
                       {forgeState === "forging"
                         ? "Forging…"
                         : forgeState === "ready"
@@ -1844,32 +1848,32 @@ function QuizForgePanel({
           {repoLinks.map((link, i) => (
             <div
               key={i}
-              className="flex items-center gap-3 self-stretch bg-[#211A18] p-[15px] mb-3 border border-solid border-[#3F3735]"
+              className="flex items-center gap-3 self-stretch bg-[var(--t-bg2)] p-[15px] mb-3 border border-solid border-[color:var(--t-bd0)]"
             >
               <img src={IMG.qfLink} className="w-4 h-4 object-fill shrink-0" />
-              <span className="text-[#BBC9C9] text-xs truncate">{link}</span>
+              <span className="text-[color:var(--t-tx1)] text-xs truncate">{link}</span>
             </div>
           ))}
 
           {showRepoLink ? (
-            <form onSubmit={onAddRepoLink} className="flex flex-wrap items-center gap-2 self-stretch bg-[#130D0B] p-3 border border-solid border-[#3F3735]">
+            <form onSubmit={onAddRepoLink} className="flex flex-wrap items-center gap-2 self-stretch bg-[var(--t-bg0)] p-3 border border-solid border-[color:var(--t-bd0)]">
               <input
                 autoFocus
                 value={repoLinkValue}
                 onChange={(e) => setRepoLinkValue(e.target.value)}
                 placeholder="https://drive.google.com/..."
-                className="flex-1 min-w-[160px] bg-[#251E1C] border border-solid border-[#3F3735] text-[#EDE0DC] text-xs py-2 px-3 outline-none focus:border-[#2CD4D9]"
+                className="flex-1 min-w-[160px] bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac)]"
               />
               <button
                 type="submit"
-                className="bg-[#2CD4D9] text-[#003738] text-xs font-bold py-2 px-4 hover:opacity-90 transition-all duration-150 active:scale-95"
+                className="bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2 px-4 hover:opacity-90 transition-all duration-150 active:scale-95"
               >
                 Link
               </button>
               <button
                 type="button"
                 onClick={() => setShowRepoLink(false)}
-                className="text-[#859394] text-xs py-2 px-2 hover:text-[#BBC9C9] transition-colors"
+                className="text-[color:var(--t-tx2)] text-xs py-2 px-2 hover:text-[color:var(--t-tx1)] transition-colors"
               >
                 Cancel
               </button>
@@ -1877,10 +1881,10 @@ function QuizForgePanel({
           ) : (
             <button
               onClick={() => setShowRepoLink(true)}
-              className="flex justify-center items-center self-stretch bg-[#130D0B] py-[13px] mt-1 gap-2 border border-solid border-[#3F3735] hover:border-[#2CD4D9] transition-all duration-150 active:scale-[0.98]"
+              className="flex justify-center items-center self-stretch bg-[var(--t-bg0)] py-[13px] mt-1 gap-2 border border-solid border-[color:var(--t-bd0)] hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-[0.98]"
             >
               <img src={IMG.qfLink} className="w-[15px] h-[15px] object-fill" />
-              <span className="text-[#BBC9C9] text-xs">Link additional syllabus repository or notes</span>
+              <span className="text-[color:var(--t-tx1)] text-xs">Link additional syllabus repository or notes</span>
             </button>
           )}
         </div>
@@ -1894,7 +1898,7 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
   const [editTitle, setEditTitle] = useState(card.title);
   const [editBadge, setEditBadge] = useState(card.subject || "");
 
-  const badgeColor = BADGE_COLOR_BY_COLUMN[colId] || "#BBC9C9";
+  const badgeColor = BADGE_COLOR_BY_COLUMN[colId] || "var(--t-tx1)";
   const urgent = !isDone && colId !== "review" && isQuestUrgent(card.due || card.meta);
 
   function saveEdit() {
@@ -1912,7 +1916,7 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
           setEditing(true);
         }}
         aria-label="Edit quest"
-        className="text-[#BBC9C9] text-[11px] hover:text-[#58F1F6] transition-colors"
+        className="text-[color:var(--t-tx1)] text-[11px] hover:text-[color:var(--t-ac2)] transition-colors"
       >
         ✎
       </button>
@@ -1922,7 +1926,7 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
           onDelete(colId, card.id);
         }}
         aria-label="Delete quest"
-        className="text-[#FF6B6B] text-xs font-bold hover:opacity-75 transition-opacity"
+        className="text-[color:var(--t-err)] text-xs font-bold hover:opacity-75 transition-opacity"
       >
         ×
       </button>
@@ -1937,8 +1941,8 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
         onDragOver={(e) => onDragOver(e, colId, index)}
         onDrop={(e) => onDrop(e, colId)}
         onDragEnd={onDragEnd}
-        className={`group flex justify-between items-center gap-3 self-stretch bg-[#251E1C] p-2 border border-solid border-transparent cursor-grab active:cursor-grabbing transition-all duration-150 hover:border-[#A0D6734D] ${isDragged ? "opacity-40 scale-95" : "opacity-100"
-          } ${isDropTarget ? "ring-1 ring-[#A0D673]" : ""}`}
+        className={`group flex justify-between items-center gap-3 self-stretch bg-[var(--t-bg3)] p-2 border border-solid border-transparent cursor-grab active:cursor-grabbing transition-all duration-150 hover:border-[color:color-mix(in_srgb,_var(--t-ok2)_30%,_transparent)] ${isDragged ? "opacity-40 scale-95" : "opacity-100"
+          } ${isDropTarget ? "ring-1 ring-[color:var(--t-ok2)]" : ""}`}
       >
         <div className="flex items-center gap-[7px] min-w-0 flex-1">
           <img src={IMG.check} className="w-[15px] h-[15px] object-fill shrink-0" />
@@ -1947,16 +1951,16 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
               autoFocus
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
-              className="bg-[#130D0B] border border-solid border-[#3F3735] text-[#EDE0DC] text-[13px] py-1 px-2 outline-none focus:border-[#A0D673] flex-1 min-w-0"
+              className="bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-[13px] py-1 px-2 outline-none focus:border-[color:var(--t-ok2)] flex-1 min-w-0"
             />
           ) : (
-            <span className="text-[#BBC9C9] text-[13px] line-through truncate">{card.title}</span>
+            <span className="text-[color:var(--t-tx1)] text-[13px] line-through truncate">{card.title}</span>
           )}
         </div>
         {editing ? (
           <div className="flex items-center gap-2 shrink-0">
-            <button onClick={saveEdit} className="text-[#A0D673] text-[10px] font-bold">Save</button>
-            <button onClick={() => setEditing(false)} className="text-[#859394] text-[10px]">Cancel</button>
+            <button onClick={saveEdit} className="text-[color:var(--t-ok2)] text-[10px] font-bold">Save</button>
+            <button onClick={() => setEditing(false)} className="text-[color:var(--t-tx2)] text-[10px]">Cancel</button>
           </div>
         ) : (
           <div className="flex items-center gap-2 shrink-0">
@@ -1965,7 +1969,7 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
                 {card.subject}
               </span>
             )}
-            <span className="text-[#A0D673] text-[10px] font-bold">+{card.xp ?? 50} XP</span>
+            <span className="text-[color:var(--t-ok2)] text-[10px] font-bold">+{card.xp ?? 50} XP</span>
             {controls}
           </div>
         )}
@@ -1980,9 +1984,9 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
       onDragOver={(e) => onDragOver(e, colId, index)}
       onDrop={(e) => onDrop(e, colId)}
       onDragEnd={onDragEnd}
-      className={`group flex flex-col self-stretch min-w-0 bg-[#251E1C] p-3 gap-2 border border-solid border-transparent cursor-grab active:cursor-grabbing transition-all duration-150 hover:-translate-y-0.5 hover:border-[#58F1F64D] ${urgent ? "border-l-4 border-l-[#FF6B6B]" : ""} ${isDragged ? "opacity-40 scale-95" : "opacity-100"
-        } ${isDropTarget ? "ring-1 ring-[#58F1F6]" : ""}`}
-      style={{ boxShadow: urgent ? "0px 0px 10px #FF6B6B4D" : "0px 1px 2px #0000000D" }}
+      className={`group flex flex-col self-stretch min-w-0 bg-[var(--t-bg3)] p-3 gap-2 border border-solid border-transparent cursor-grab active:cursor-grabbing transition-all duration-150 hover:-translate-y-0.5 hover:border-[color:color-mix(in_srgb,_var(--t-ac2)_30%,_transparent)] ${urgent ? "border-l-4 border-l-[color:var(--t-err)]" : ""} ${isDragged ? "opacity-40 scale-95" : "opacity-100"
+        } ${isDropTarget ? "ring-1 ring-[color:var(--t-ac2)]" : ""}`}
+      style={{ boxShadow: urgent ? "0px 0px 10px color-mix(in srgb, var(--t-err) 30%, transparent)" : "0px 1px 2px #0000000D" }}
     >
       <div className="flex items-start justify-between gap-2 self-stretch">
         {editing ? (
@@ -1990,15 +1994,15 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
             autoFocus
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
-            className="bg-[#130D0B] border border-solid border-[#3F3735] text-[#EDE0DC] text-sm py-1 px-2 outline-none focus:border-[#58F1F6] flex-1 min-w-0"
+            className="bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-sm py-1 px-2 outline-none focus:border-[color:var(--t-ac2)] flex-1 min-w-0"
           />
         ) : (
-          <span className="text-[#EDE0DC] text-sm truncate flex-1 min-w-0" title={card.title}>{card.title}</span>
+          <span className="text-[color:var(--t-tx0)] text-sm truncate flex-1 min-w-0" title={card.title}>{card.title}</span>
         )}
         <div className="flex items-center gap-2 shrink-0">
           <div
             className="flex flex-col shrink-0 items-start py-0.5 px-2 border border-solid"
-            style={{ backgroundColor: `${badgeColor}33`, borderColor: `${badgeColor}4D` }}
+            style={{ backgroundColor: withAlpha(badgeColor, "33"), borderColor: withAlpha(badgeColor, "4D") }}
           >
             {editing ? (
               <input
@@ -2017,13 +2021,13 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
         </div>
       </div>
       <div className="flex items-center justify-between gap-2 self-stretch">
-        <span className="text-[10px] font-bold shrink-0" style={{ color: urgent ? "#FF6B6B" : card.metaColor || "#859394" }}>
+        <span className="text-[10px] font-bold shrink-0" style={{ color: urgent ? "var(--t-err)" : card.metaColor || "var(--t-tx2)" }}>
           {card.due || card.meta}
         </span>
         {editing ? (
           <div className="flex items-center gap-2 shrink-0">
-            <button onClick={saveEdit} className="text-[#A0D673] text-[10px] font-bold">Save</button>
-            <button onClick={() => setEditing(false)} className="text-[#859394] text-[10px]">Cancel</button>
+            <button onClick={saveEdit} className="text-[color:var(--t-ok2)] text-[10px] font-bold">Save</button>
+            <button onClick={() => setEditing(false)} className="text-[color:var(--t-tx2)] text-[10px]">Cancel</button>
           </div>
         ) : (
           controls
@@ -2031,16 +2035,16 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
       </div>
       {typeof card.progress === "number" ? (
         <>
-          <div className="self-stretch bg-[#130D0B] mt-1 mb-1">
-            <div className="bg-[#58F1F6] h-1.5 transition-all duration-500" style={{ width: `${card.progress}%` }} />
+          <div className="self-stretch bg-[var(--t-bg0)] mt-1 mb-1">
+            <div className="bg-[var(--t-ac2)] h-1.5 transition-all duration-500" style={{ width: `${card.progress}%` }} />
           </div>
           <div className="flex justify-between items-center self-stretch">
-            <span className="text-[#859394] text-[10px] font-bold">{card.due}</span>
-            <span className="text-[#A0D673] text-[10px] font-bold">+{card.xp} XP</span>
+            <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">{card.due}</span>
+            <span className="text-[color:var(--t-ok2)] text-[10px] font-bold">+{card.xp} XP</span>
           </div>
         </>
       ) : (
-        card.desc && <span className="text-[#BBC9C9] text-xs break-words">{card.desc}</span>
+        card.desc && <span className="text-[color:var(--t-tx1)] text-xs break-words">{card.desc}</span>
       )}
     </div>
   );
@@ -2102,60 +2106,60 @@ function SprintBoardPanel({
     <div className="flex flex-col self-stretch gap-4">
       {/* Sprint status bar */}
       <div
-        className="flex flex-wrap justify-between items-center gap-4 self-stretch bg-[#251E1C] p-4"
+        className="flex flex-wrap justify-between items-center gap-4 self-stretch bg-[var(--t-bg3)] p-4"
         style={{ boxShadow: "0px 1px 2px #0000000D" }}
       >
         <div className="flex flex-wrap shrink-0 items-center gap-x-6 gap-y-2">
           <div className="flex shrink-0 items-center gap-2">
-            <span className="text-[#859394] text-[10px] font-bold">SPRINT:</span>
-            <span className="text-[#EDE0DC] text-lg font-bold">Sprint 03</span>
-            <span className="text-[#A0D673] text-[10px] font-bold">(Week 4 of 8)</span>
+            <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">SPRINT:</span>
+            <span className="text-[color:var(--t-tx0)] text-lg font-bold">Sprint 03</span>
+            <span className="text-[color:var(--t-ok2)] text-[10px] font-bold">(Week 4 of 8)</span>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <span className="text-[#859394] text-[10px] font-bold">FOCUS:</span>
-            <span className="text-[#BBC9C9] text-[13px]">Midterm Boss Raids</span>
+            <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">FOCUS:</span>
+            <span className="text-[color:var(--t-tx1)] text-[13px]">Midterm Boss Raids</span>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <span className="text-[#859394] text-[10px] font-bold">PROGRESS:</span>
-          <div className="w-24 sm:w-[120px] h-2 bg-[#130D0B]" style={{ boxShadow: "0px 2px 4px #0000000D" }}>
-            <div className="bg-[#A0D673] h-2 transition-all duration-500" style={{ width: `${progressPct}%` }} />
+          <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">PROGRESS:</span>
+          <div className="w-24 sm:w-[120px] h-2 bg-[var(--t-bg0)]" style={{ boxShadow: "0px 2px 4px #0000000D" }}>
+            <div className="bg-[var(--t-ok2)] h-2 transition-all duration-500" style={{ width: `${progressPct}%` }} />
           </div>
-          <span className="text-[#A0D673] text-[10px] font-bold">
+          <span className="text-[color:var(--t-ok2)] text-[10px] font-bold">
             {doneCount}/{totalCards}
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-[9px]">
           <button
             onClick={() => setShowSprintLogs(true)}
-            className="flex shrink-0 items-center bg-[#302826] py-2 px-4 gap-2 hover:opacity-90 transition-all duration-150 active:scale-95"
+            className="flex shrink-0 items-center bg-[var(--t-bg4)] py-2 px-4 gap-2 hover:opacity-90 transition-all duration-150 active:scale-95"
           >
             <img src={IMG.sbLogs} className="w-[13px] h-[13px] object-fill" />
-            <span className="text-[#EDE0DC] text-xs font-bold">SPRINT LOGS</span>
+            <span className="text-[color:var(--t-tx0)] text-xs font-bold">SPRINT LOGS</span>
           </button>
           <button
             onClick={onAutoIngest}
-            className="flex shrink-0 items-center bg-[#2CD4D9] py-2 px-4 gap-[7px] hover:opacity-90 transition-all duration-150 active:scale-95"
+            className="flex shrink-0 items-center bg-[var(--t-ac)] py-2 px-4 gap-[7px] hover:opacity-90 transition-all duration-150 active:scale-95"
           >
             {autoIngesting ? <Spinner /> : <img src={IMG.sbIngest} className="w-3 h-[15px] object-fill" />}
-            <span className="text-[#003738] text-xs font-bold">{autoIngesting ? "Ingesting…" : "AUTO-INGEST"}</span>
+            <span className="text-[color:var(--t-onac)] text-xs font-bold">{autoIngesting ? "Ingesting…" : "AUTO-INGEST"}</span>
           </button>
         </div>
       </div>
 
       {/* Filter / group-by row */}
-      <div className="flex flex-wrap items-center justify-between gap-3 self-stretch bg-[#130D0B] p-2" style={{ boxShadow: "0px 2px 4px #0000000D" }}>
+      <div className="flex flex-wrap items-center justify-between gap-3 self-stretch bg-[var(--t-bg0)] p-2" style={{ boxShadow: "0px 2px 4px #0000000D" }}>
         <div className="relative shrink-0">
           <button
             onClick={() => setFilterOpen((v) => !v)}
-            className="flex shrink-0 items-center bg-[#251E1C] py-1.5 px-2 gap-2 hover:opacity-90 transition-all duration-150 active:scale-95"
+            className="flex shrink-0 items-center bg-[var(--t-bg3)] py-1.5 px-2 gap-2 hover:opacity-90 transition-all duration-150 active:scale-95"
           >
             <img src={IMG.sbFilterIcon} className="w-2.5 h-2.5 object-fill" />
-            <span className="text-[#859394] text-[10px] font-bold">FILTER:</span>
-            <span className="text-[#EDE0DC] text-[10px] font-bold">{subjectFilter}</span>
+            <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">FILTER:</span>
+            <span className="text-[color:var(--t-tx0)] text-[10px] font-bold">{subjectFilter}</span>
           </button>
           {filterOpen && (
-            <div className="absolute left-0 mt-1 z-40 bg-[#1D1715] border border-solid border-[#3F3735] min-w-[160px]">
+            <div className="absolute left-0 mt-1 z-40 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] min-w-[160px]">
               {subjects.map((s) => (
                 <button
                   key={s}
@@ -2163,7 +2167,7 @@ function SprintBoardPanel({
                     setSubjectFilter(s);
                     setFilterOpen(false);
                   }}
-                  className={`block w-full text-left px-3 py-2 text-[10px] font-bold hover:bg-[#251E1C] ${subjectFilter === s ? "text-[#58F1F6]" : "text-[#BBC9C9]"
+                  className={`block w-full text-left px-3 py-2 text-[10px] font-bold hover:bg-[var(--t-bg3)] ${subjectFilter === s ? "text-[color:var(--t-ac2)]" : "text-[color:var(--t-tx1)]"
                     }`}
                 >
                   {s}
@@ -2175,11 +2179,11 @@ function SprintBoardPanel({
 
         <button
           onClick={() => setView((v) => (v === "kanban" ? "list" : "kanban"))}
-          className="flex shrink-0 items-center bg-[#251E1C] py-1.5 px-2 hover:opacity-90 transition-all duration-150 active:scale-95"
+          className="flex shrink-0 items-center bg-[var(--t-bg3)] py-1.5 px-2 hover:opacity-90 transition-all duration-150 active:scale-95"
         >
           <img src={IMG.sbGroupIcon} className="w-3 h-3 mr-[7px] object-fill" />
-          <span className="text-[#859394] text-[10px] font-bold mr-[9px]">GROUP BY:</span>
-          <span className="text-[#EDE0DC] text-[10px] font-bold">
+          <span className="text-[color:var(--t-tx2)] text-[10px] font-bold mr-[9px]">GROUP BY:</span>
+          <span className="text-[color:var(--t-tx0)] text-[10px] font-bold">
             {view === "kanban" ? "STATUS (KANBAN)" : "FLAT LIST"}
           </span>
         </button>
@@ -2193,15 +2197,15 @@ function SprintBoardPanel({
               key={col.id}
               onDragOver={(e) => onColumnDragOver(e, col.id)}
               onDrop={(e) => onCardDrop(e, col.id)}
-              className="flex min-w-0 flex-col bg-[#211A18] p-2 gap-2"
+              className="flex min-w-0 flex-col bg-[var(--t-bg2)] p-2 gap-2"
               style={{ boxShadow: "0px 1px 2px #0000000D" }}
             >
-              <div className="flex justify-between items-center gap-2 self-stretch bg-[#130D0B] p-2" style={{ boxShadow: "0px 2px 4px #0000000D" }}>
+              <div className="flex justify-between items-center gap-2 self-stretch bg-[var(--t-bg0)] p-2" style={{ boxShadow: "0px 2px 4px #0000000D" }}>
                 <div className="flex min-w-0 items-center gap-2">
                   <div className="w-3 h-3 shrink-0" style={{ backgroundColor: col.dot }} />
-                  <span className="text-[#EDE0DC] text-[11px] font-bold leading-tight break-words min-w-0">{col.title}</span>
+                  <span className="text-[color:var(--t-tx0)] text-[11px] font-bold leading-tight break-words min-w-0">{col.title}</span>
                 </div>
-                <div className="flex flex-col shrink-0 items-start bg-[#251E1C] py-0.5 px-2">
+                <div className="flex flex-col shrink-0 items-start bg-[var(--t-bg3)] py-0.5 px-2">
                   <span className="text-[10px] font-bold" style={{ color: col.dot }}>
                     {col.cards.length}
                   </span>
@@ -2235,19 +2239,19 @@ function SprintBoardPanel({
                         value={addingText}
                         onChange={(e) => setAddingText(e.target.value)}
                         placeholder="New quest title…"
-                        className="bg-[#130D0B] border border-solid border-[#3C494A] text-[#EDE0DC] text-xs py-2 px-2 outline-none focus:border-[#58F1F6]"
+                        className="bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-2 outline-none focus:border-[color:var(--t-ac2)]"
                       />
                       <input
                         value={addingBadge}
                         onChange={(e) => setAddingBadge(e.target.value)}
                         placeholder="Badge / subject (e.g. CS240)"
-                        className="bg-[#130D0B] border border-solid border-[#3C494A] text-[#EDE0DC] text-xs py-2 px-2 outline-none focus:border-[#58F1F6]"
+                        className="bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-2 outline-none focus:border-[color:var(--t-ac2)]"
                       />
-                      <span className="text-[#859394] text-[10px]">
+                      <span className="text-[color:var(--t-tx2)] text-[10px]">
                         Badge color is set by this column — {col.title}.
                       </span>
                       <div className="flex gap-2">
-                        <button type="submit" className="flex-1 bg-[#58F1F6] text-[#003738] text-[10px] font-bold py-1.5 hover:opacity-90 transition-all duration-150 active:scale-95">
+                        <button type="submit" className="flex-1 bg-[var(--t-ac2)] text-[color:var(--t-onac)] text-[10px] font-bold py-1.5 hover:opacity-90 transition-all duration-150 active:scale-95">
                           Add
                         </button>
                         <button
@@ -2256,7 +2260,7 @@ function SprintBoardPanel({
                             setAddingColumnId(null);
                             setAddingBadge("");
                           }}
-                          className="text-[#859394] text-[10px] px-2 hover:text-[#BBC9C9]"
+                          className="text-[color:var(--t-tx2)] text-[10px] px-2 hover:text-[color:var(--t-tx1)]"
                         >
                           Cancel
                         </button>
@@ -2269,10 +2273,10 @@ function SprintBoardPanel({
                         setAddingText("");
                         setAddingBadge("");
                       }}
-                      className="flex justify-center items-center self-stretch bg-[#130D0B] py-2 gap-1.5 hover:opacity-90 transition-all duration-150 active:scale-[0.98]"
+                      className="flex justify-center items-center self-stretch bg-[var(--t-bg0)] py-2 gap-1.5 hover:opacity-90 transition-all duration-150 active:scale-[0.98]"
                     >
                       <img src={IMG.sbAddQuest} className="w-[9px] h-[9px] object-fill" />
-                      <span className="text-[#859394] text-[10px] font-bold">+ New Quest</span>
+                      <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">+ New Quest</span>
                     </button>
                   ))}
               </div>
@@ -2288,17 +2292,17 @@ function SprintBoardPanel({
               return (
                 <div
                   key={card.id}
-                  className="flex flex-wrap items-center justify-between gap-2 bg-[#211A18] p-3 border-l-2"
+                  className="flex flex-wrap items-center justify-between gap-2 bg-[var(--t-bg2)] p-3 border-l-2"
                   style={{ borderColor: badgeColor }}
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="text-[9px] font-bold text-[#859394] shrink-0">{col.title}</span>
+                    <span className="text-[9px] font-bold text-[color:var(--t-tx2)] shrink-0">{col.title}</span>
                     {isEditing ? (
                       <input
                         autoFocus
                         value={flatEditText}
                         onChange={(e) => setFlatEditText(e.target.value)}
-                        className="bg-[#130D0B] border border-solid border-[#3F3735] text-[#EDE0DC] text-sm py-1 px-2 outline-none focus:border-[#58F1F6] flex-1 min-w-0"
+                        className="bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-sm py-1 px-2 outline-none focus:border-[color:var(--t-ac2)] flex-1 min-w-0"
                       />
                     ) : (
                       <span
@@ -2310,14 +2314,14 @@ function SprintBoardPanel({
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[#A0D673] text-[10px] font-bold shrink-0">
+                    <span className="text-[color:var(--t-ok2)] text-[10px] font-bold shrink-0">
                       {card.xp ? `+${card.xp} XP` : card.subject}
                     </span>
                     {!isEditing && (
                       <select
                         value={col.id}
                         onChange={(e) => onMoveCard(card.id, col.id, e.target.value)}
-                        className="bg-[#130D0B] border border-solid border-[#3F3735] text-[10px] text-[#BBC9C9] py-1 px-1 outline-none focus:border-[#58F1F6]"
+                        className="bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] text-[10px] text-[color:var(--t-tx1)] py-1 px-1 outline-none focus:border-[color:var(--t-ac2)]"
                       >
                         {SPRINT_STATUS_OPTIONS.map((opt) => (
                           <option key={opt.id} value={opt.id}>
@@ -2333,11 +2337,11 @@ function SprintBoardPanel({
                             onEditCard(col.id, card.id, { title: flatEditText.trim() || card.title });
                             setFlatEditingId(null);
                           }}
-                          className="text-[#A0D673] text-[10px] font-bold px-1"
+                          className="text-[color:var(--t-ok2)] text-[10px] font-bold px-1"
                         >
                           Save
                         </button>
-                        <button onClick={() => setFlatEditingId(null)} className="text-[#859394] text-[10px] px-1">
+                        <button onClick={() => setFlatEditingId(null)} className="text-[color:var(--t-tx2)] text-[10px] px-1">
                           Cancel
                         </button>
                       </>
@@ -2348,7 +2352,7 @@ function SprintBoardPanel({
                           setFlatEditText(card.title);
                         }}
                         aria-label="Edit quest"
-                        className="text-[#BBC9C9] text-[11px] hover:text-[#58F1F6] px-1 transition-colors"
+                        className="text-[color:var(--t-tx1)] text-[11px] hover:text-[color:var(--t-ac2)] px-1 transition-colors"
                       >
                         ✎
                       </button>
@@ -2356,7 +2360,7 @@ function SprintBoardPanel({
                     <button
                       onClick={() => onDeleteCard(col.id, card.id)}
                       aria-label="Delete quest"
-                      className="text-[#FF6B6B] text-xs font-bold px-1 hover:opacity-75 transition-opacity"
+                      className="text-[color:var(--t-err)] text-xs font-bold px-1 hover:opacity-75 transition-opacity"
                     >
                       ×
                     </button>
@@ -2369,30 +2373,30 @@ function SprintBoardPanel({
       )}
 
       {/* Bottom summary bar */}
-      <div className="flex flex-wrap justify-between items-center gap-4 self-stretch bg-[#211A18] p-4">
+      <div className="flex flex-wrap justify-between items-center gap-4 self-stretch bg-[var(--t-bg2)] p-4">
         <div className="flex flex-wrap shrink-0 items-center gap-x-6 gap-y-2">
           <div className="flex shrink-0 items-center gap-1.5">
             <img src={IMG.sbBurndown} className="w-[13px] h-2 object-fill" />
-            <span className="text-[#EDE0DC] text-[10px] font-bold">Burndown: +18% Ahead</span>
+            <span className="text-[color:var(--t-tx0)] text-[10px] font-bold">Burndown: +18% Ahead</span>
           </div>
           <div className="flex shrink-0 items-center gap-[7px]">
-            <span className="text-[#859394] text-[10px] font-bold">Level 18</span>
-            <span className="text-[#A0D673] text-[10px] font-bold">82%</span>
+            <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">Level 18</span>
+            <span className="text-[color:var(--t-ok2)] text-[10px] font-bold">82%</span>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-[9px]">
           <button
             onClick={() => setShowQuickTask(true)}
-            className="flex flex-col shrink-0 items-start bg-[#251E1C] py-1 px-2 hover:opacity-90 transition-all duration-150 active:scale-95"
+            className="flex flex-col shrink-0 items-start bg-[var(--t-bg3)] py-1 px-2 hover:opacity-90 transition-all duration-150 active:scale-95"
           >
-            <span className="text-[#EDE0DC] text-[10px] font-bold">+ Quick Task</span>
+            <span className="text-[color:var(--t-tx0)] text-[10px] font-bold">+ Quick Task</span>
           </button>
           <button
             onClick={onSyncCalendar}
-            className="flex shrink-0 items-center gap-1.5 bg-[#251E1C] py-1 px-2 hover:opacity-90 transition-all duration-150 active:scale-95"
+            className="flex shrink-0 items-center gap-1.5 bg-[var(--t-bg3)] py-1 px-2 hover:opacity-90 transition-all duration-150 active:scale-95"
           >
-            {syncingCalendar && <Spinner color="#EDE0DC" />}
-            <span className="text-[#EDE0DC] text-[10px] font-bold">
+            {syncingCalendar && <Spinner color="var(--t-tx0)" />}
+            <span className="text-[color:var(--t-tx0)] text-[10px] font-bold">
               {syncingCalendar ? "Syncing…" : "Sync Calendar"}
             </span>
           </button>
@@ -2403,20 +2407,20 @@ function SprintBoardPanel({
       {showSprintLogs && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowSprintLogs(false)} />
-          <div className="relative bg-[#1D1715] border border-solid border-[#3F3735] p-5 w-full max-w-sm flex flex-col gap-3 max-h-[80vh] overflow-y-auto">
+          <div className="relative bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-5 w-full max-w-sm flex flex-col gap-3 max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-1">
-              <span className="text-[#EDE0DC] text-sm font-bold">SPRINT LOGS</span>
+              <span className="text-[color:var(--t-tx0)] text-sm font-bold">SPRINT LOGS</span>
               <button onClick={() => setShowSprintLogs(false)}>
-                <img src={IMG.close} className="w-4 h-4" />
+                <CloseIcon className="w-4 h-4" />
               </button>
             </div>
             {(doneColumn?.cards || []).map((c) => (
-              <div key={c.id} className="flex justify-between items-center gap-2 border-b border-solid border-[#3F3735] pb-2">
-                <span className="text-[#BBC9C9] text-xs">{c.title}</span>
-                <span className="text-[#A0D673] text-[10px] font-bold shrink-0">+{c.xp ?? 50} XP</span>
+              <div key={c.id} className="flex justify-between items-center gap-2 border-b border-solid border-[color:var(--t-bd0)] pb-2">
+                <span className="text-[color:var(--t-tx1)] text-xs">{c.title}</span>
+                <span className="text-[color:var(--t-ok2)] text-[10px] font-bold shrink-0">+{c.xp ?? 50} XP</span>
               </div>
             ))}
-            {!doneColumn?.cards.length && <p className="text-[#859394] text-xs">No conquered quests yet.</p>}
+            {!doneColumn?.cards.length && <p className="text-[color:var(--t-tx2)] text-xs">No conquered quests yet.</p>}
           </div>
         </div>
       )}
@@ -2427,12 +2431,12 @@ function SprintBoardPanel({
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowQuickTask(false)} />
           <form
             onSubmit={onSubmitQuickTask}
-            className="relative bg-[#1D1715] border border-solid border-[#3F3735] p-5 w-full max-w-sm flex flex-col gap-3"
+            className="relative bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-5 w-full max-w-sm flex flex-col gap-3"
           >
             <div className="flex justify-between items-center mb-1">
-              <span className="text-[#EDE0DC] text-sm font-bold">QUICK TASK</span>
+              <span className="text-[color:var(--t-tx0)] text-sm font-bold">QUICK TASK</span>
               <button type="button" onClick={() => setShowQuickTask(false)}>
-                <img src={IMG.close} className="w-4 h-4" />
+                <CloseIcon className="w-4 h-4" />
               </button>
             </div>
             <input
@@ -2440,17 +2444,17 @@ function SprintBoardPanel({
               value={quickTaskText}
               onChange={(e) => setQuickTaskText(e.target.value)}
               placeholder="e.g. Skim Chapter 6 notes"
-              className="bg-[#251E1C] border border-solid border-[#3F3735] text-[#EDE0DC] text-xs py-2 px-3 outline-none focus:border-[#58F1F6]"
+              className="bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac2)]"
             />
             <input
               value={quickTaskBadge}
               onChange={(e) => setQuickTaskBadge(e.target.value)}
               placeholder="Badge / subject (optional, e.g. CS240)"
-              className="bg-[#251E1C] border border-solid border-[#3F3735] text-[#EDE0DC] text-xs py-2 px-3 outline-none focus:border-[#58F1F6]"
+              className="bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac2)]"
             />
             <button
               type="submit"
-              className="bg-[#58F1F6] text-[#003738] text-xs font-bold py-2 hover:opacity-90 transition-all duration-150 active:scale-95"
+              className="bg-[var(--t-ac2)] text-[color:var(--t-onac)] text-xs font-bold py-2 hover:opacity-90 transition-all duration-150 active:scale-95"
             >
               Add to Backlog
             </button>
@@ -2464,14 +2468,14 @@ function SprintBoardPanel({
 function PlaceholderCard({ title, icon, text }) {
   return (
     <div
-      className="flex flex-col self-stretch bg-[#181210] p-6 sm:p-[21px] gap-3 border border-solid border-[#3F3735]"
-      style={{ boxShadow: "2px 2px 0px #0A0706" }}
+      className="flex flex-col self-stretch bg-[var(--t-bg1)] p-6 sm:p-[21px] gap-3 border border-solid border-[color:var(--t-bd0)]"
+      style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
     >
       <div className="flex items-center gap-2.5">
         <img src={icon} className="w-[15px] h-4 object-fill" />
-        <span className="text-[#EDE0DC] text-lg font-bold">{title}</span>
+        <span className="text-[color:var(--t-tx0)] text-lg font-bold">{title}</span>
       </div>
-      <p className="text-[#859394] text-sm max-w-md">{text}</p>
+      <p className="text-[color:var(--t-tx2)] text-sm max-w-md">{text}</p>
     </div>
   );
 }
@@ -2479,16 +2483,16 @@ function PlaceholderCard({ title, icon, text }) {
 function ComingSoon({ nav, onBack }) {
   return (
     <div
-      className="flex flex-col items-start self-stretch bg-[#181210] p-6 sm:p-[25px] gap-3 border border-solid border-[#3F3735] mt-6"
-      style={{ boxShadow: "2px 2px 0px #0A0706" }}
+      className="flex flex-col items-start self-stretch bg-[var(--t-bg1)] p-6 sm:p-[25px] gap-3 border border-solid border-[color:var(--t-bd0)] mt-6"
+      style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
     >
-      <span className="text-[#EDE0DC] text-xl font-bold">{nav}</span>
-      <p className="text-[#859394] text-sm max-w-md">
+      <span className="text-[color:var(--t-tx0)] text-xl font-bold">{nav}</span>
+      <p className="text-[color:var(--t-tx2)] text-sm max-w-md">
         This section isn't built out in the mockup yet. Head back to Personalized to see the Study Hub.
       </p>
       <button
         onClick={onBack}
-        className="bg-[#251E1C] border border-solid border-[#3F3735] text-[#2CD4D9] text-xs font-bold py-2 px-4 hover:border-[#2CD4D9] transition-colors"
+        className="bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-ac)] text-xs font-bold py-2 px-4 hover:border-[color:var(--t-ac)] transition-colors"
       >
         BACK TO STUDY HUB
       </button>

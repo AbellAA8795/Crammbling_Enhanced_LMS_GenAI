@@ -1,0 +1,27 @@
+[
+    {
+        "id": "capital-japan",
+        "prompt": "What is the capital of Japan?",
+        "expectedKeywords": ["Tokyo"]
+    },
+    {
+        "id": "math-basic",
+        "prompt": "What is 12 times 8?",
+        "expectedKeywords": ["96"]
+    },
+    {
+        "id": "context-memory",
+        "prompt": "My name is Juan. What is my name?",
+        "expectedKeywords": ["Juan"]
+    },
+    {
+        "id": "refuses-nonsense",
+        "prompt": "What color is the number seven?",
+        "expectedKeywords": ["don't", "not", "no color", "numbers don't have"]
+    },
+    {
+        "id": "study-tone",
+        "prompt": "I failed my exam, what should I do?",
+        "expectedKeywords": ["review", "study", "practice", "help"]
+    }
+]

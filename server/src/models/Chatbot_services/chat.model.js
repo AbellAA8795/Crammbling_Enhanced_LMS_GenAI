@@ -6,11 +6,6 @@ export async function createChat(userId, title) {
     return result.rows[0].o_chat_id;
 }
 
-export async function insertMessage(chatId, role, content) {
-    const query = `CALL insert_chat_message_procedure($1, $2, $3)`;
-    await pool.query(query, [chatId, role, content]);
-}
-
 export async function getUserChats(userId) {
     const query = `SELECT * FROM get_user_chats_function($1)`;
     const result = await pool.query(query, [userId]);
@@ -27,4 +22,9 @@ export async function chatBelongsToUser(chatId, userId) {
     const query = `SELECT chat_belongs_to_user_function($1, $2) AS belongs`;
     const result = await pool.query(query, [chatId, userId]);
     return result.rows[0].belongs;
+}
+
+export async function insertMessage(chatId, role, content, promptVersion = null) {
+    const query = `CALL insert_chat_message_procedure($1, $2, $3, $4)`;
+    await pool.query(query, [chatId, role, content, promptVersion]);
 }

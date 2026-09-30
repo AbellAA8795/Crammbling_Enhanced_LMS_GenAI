@@ -15,6 +15,7 @@ import loginRoutes from "./routes/Authentication/login.route.js";
 import userRoutes from "./routes/Authentication/user.route.js";
 import otpRoutes from "./routes/Authentication/otp.route.js";
 import chatRoutes from "./routes/Chatbot_services/chat.route.js";
+import promptRoutes from "./routes/Chatbot_services/prompt.route.js";
 
 
 app.get("/", (req, res) => {
@@ -28,7 +29,7 @@ app.use("/api/otp", otpRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/auth", googleAuthRoutes);
 app.use("/api/chat", chatRoutes);
-
+app.use("/api/prompts", promptRoutes);
 
 app.use((err, req, res, next) => {
     if (err.code === "LIMIT_FILE_SIZE") {

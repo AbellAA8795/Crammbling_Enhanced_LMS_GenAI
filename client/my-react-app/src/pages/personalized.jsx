@@ -770,14 +770,15 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                       key={item.key}
                       onClick={() => {
                         if (item.key === "dashboard") {
+                          setActiveNav("dashboard");
                           if (onNavigateToDashboard) {
                             onNavigateToDashboard();
-                          } else {
-                            setActiveNav("dashboard");
                           }
                         } else if (item.key === "chatbot" && onNavigateToChatbot) {
+                          setActiveNav("chatbot");
                           onNavigateToChatbot();
                         } else if (item.key === "group" && onNavigateToGroup) {
+                          setActiveNav("group");
                           onNavigateToGroup();
                         } else {
                           setActiveNav(item.key);

@@ -85,7 +85,7 @@ const NAV_IMG = {
 const NAV_ITEMS = [
     { key: "dashboard", label: "DASHBOARD", icon: NAV_IMG.dashboard, iconClass: "w-[18px] h-[15px]" },
     { key: "chatbot", label: "CHATBOT", icon: NAV_IMG.chatbot, iconClass: "w-[18px] h-[15px]" },
-    { key: "collab", label: "GROUP COLLAB", icon: NAV_IMG.group, iconClass: "w-5 h-2.5" },
+    { key: "group", label: "GROUP COLLAB", icon: NAV_IMG.group, iconClass: "w-5 h-2.5" },
     { key: "quiz", label: "QUIZ ARENA", icon: NAV_IMG.quiz, iconClass: "w-4 h-4" },
     { key: "personalized", label: "PERSONALIZER", icon: NAV_IMG.personalized, iconClass: "w-[18px] h-[13px]" },
 ];
@@ -441,11 +441,23 @@ export default function Chatbot({ onNavigate } = {}) {
         return <GroupCollab onNavigate={(key) => setFallbackPage(key === "group" ? null : key)} />;
     }
 
+    if (page === "dashboard") {
+        return <Dashboard />;
+    }
+
+    if (page === "group") {
+        return <GroupCollab onNavigate={(key) => setPage(key === "group" ? "group" : key)} />;
+    }
+
     if (page === "personalized") {
-        // Renders the existing PERSONALIZED page. If you'd like a way back to
-        // the chatbot from there too, add the same onNavigate wiring to its
-        // own "CHATBOT" nav item.
-        return <Personalized onBackToChatbot={() => setPage("chatbot")} />;
+        return (
+            <Personalized
+                onBackToChatbot={() => setPage("chatbot")}
+                onNavigateToChatbot={() => setPage("chatbot")}
+                onNavigateToGroup={() => setPage("group")}
+                onNavigateToDashboard={() => setPage("dashboard")}
+            />
+        );
     }
 
     return (

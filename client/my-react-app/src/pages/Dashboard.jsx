@@ -290,7 +290,7 @@ function Dashboard() {
   // The other pages bring their own sidebar/topbar, so they replace this page entirely.
   if (activeNav === "chatbot") return <Chatbot onNavigate={goTo} />;
   if (activeNav === "group") return <GroupCollab onNavigate={goTo} />;
-  if (activeNav === "personalized") return <Personalized onNavigateToDashboard={goTo} onNavigateToChatbot={() => goTo("chatbot")} onNavigateToGroup={() => goTo("group")} />;
+  if (activeNav === "personalized") return <Personalized onNavigateToDashboard={() => goTo("dashboard")} onNavigateToChatbot={() => goTo("chatbot")} onNavigateToGroup={() => goTo("group")} />;
 
   return (
     <div style={rootThemeStyle} className="flex flex-col bg-[var(--t-bg0)] min-h-screen">

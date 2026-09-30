@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import Dashboard from "./Dashboard";
 import Personalized from "./personalized";
 import GroupCollab from "./group_collab";
 import { ThemePicker, useTheme, CloseIcon } from "./Theme";
@@ -425,13 +426,16 @@ export default function Chatbot({ onNavigate } = {}) {
         if (onNavigate) {
             onNavigate(key);
         } else {
-            setFallbackPage(key); // "personalized" | "group"
+            setFallbackPage(key); // "dashboard" | "personalized" | "group"
         }
         setMobileNavOpen(false);
     }
 
+    if (!onNavigate && fallbackPage === "dashboard") {
+        return <Dashboard />;
+    }
     if (!onNavigate && fallbackPage === "personalized") {
-        return <Personalized onNavigateToChatbot={() => setFallbackPage(null)} onNavigateToGroup={() => setFallbackPage("group")} />;
+        return <Personalized onNavigateToChatbot={() => setFallbackPage(null)} onNavigateToGroup={() => setFallbackPage("group")} onNavigateToDashboard={() => setFallbackPage("dashboard")} />;
     }
     if (!onNavigate && fallbackPage === "group") {
         return <GroupCollab onNavigate={(key) => setFallbackPage(key === "group" ? null : key)} />;

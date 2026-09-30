@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import Dashboard from "./Dashboard";
 import Chatbot from "./chatbot";
 import GroupCollab from "./group_collab";
 import { ThemePicker, useTheme, withAlpha, CloseIcon, MenuIcon } from "./Theme";
@@ -326,7 +327,7 @@ function formatDateLabel(d) {
 /* ---------------------------------------------------------
    Main component
 --------------------------------------------------------- */
-export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToGroup } = {}) {
+export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToGroup, onNavigateToDashboard } = {}) {
   const [theme, setTheme, rootThemeStyle] = useTheme(); // shared with chatbot + group collab
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [navCollapsed, setNavCollapsed] = useState(false); // desktop drawer: pushed to the side
@@ -690,8 +691,12 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
   }
 
   // Self-sufficient fallback: if nothing external is controlling navigation
-  // (onNavigateToChatbot not passed in), swap the whole page for Chatbot
+  // (onNavigateToChatbot not passed in), swap the whole page for the target page
   // instead of nesting it inside this page's own sidebar/topbar.
+  if (activeNav === "dashboard" && !onNavigateToDashboard) {
+    return <Dashboard />;
+  }
+
   if (activeNav === "chatbot" && !onNavigateToChatbot) {
     return <Chatbot onNavigate={(key) => setActiveNav(key === "chatbot" ? "personalized" : key)} />;
   }
@@ -764,7 +769,13 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                     <button
                       key={item.key}
                       onClick={() => {
-                        if (item.key === "chatbot" && onNavigateToChatbot) {
+                        if (item.key === "dashboard") {
+                          if (onNavigateToDashboard) {
+                            onNavigateToDashboard();
+                          } else {
+                            setActiveNav("dashboard");
+                          }
+                        } else if (item.key === "chatbot" && onNavigateToChatbot) {
                           onNavigateToChatbot();
                         } else if (item.key === "group" && onNavigateToGroup) {
                           onNavigateToGroup();

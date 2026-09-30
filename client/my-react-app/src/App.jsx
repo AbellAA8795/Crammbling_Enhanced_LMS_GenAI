@@ -1,8 +1,8 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import Registration from "./pages/Registration";
-import ForgotPassword from "./pages/ForgotPassword";
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Login from './pages/Login.jsx';
+import Dashboard from './pages/Dashboard.jsx';
+import Registration from './pages/Registration.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
 
 function App() {
   return (

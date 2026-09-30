@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import Dashboard from "./Dashboard";
 import Chatbot from "./chatbot";
 import Personalized from "./personalized";
 import { ThemePicker, useTheme, withAlpha, CloseIcon, MenuIcon } from "./Theme";
@@ -1302,6 +1303,9 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
         );
     }
 
+    if (fallbackPage === "dashboard") {
+        return <Dashboard />;
+    }
     if (fallbackPage === "chatbot") {
         return <Chatbot onNavigate={(key) => setFallbackPage(key === "group" ? null : key)} />;
     }
@@ -1310,6 +1314,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
             <Personalized
                 onNavigateToChatbot={() => setFallbackPage("chatbot")}
                 onNavigateToGroup={() => setFallbackPage(null)}
+                onNavigateToDashboard={() => setFallbackPage("dashboard")}
             />
         );
     }

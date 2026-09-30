@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import notificationIcon from "../assets/notification.svg";
+import { Panel } from "../components/Panel";
+import QuizHistory from "../components/QuizHistory";
 
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: "\u2302" },
@@ -15,8 +16,7 @@ const BOTTOM_NAV_ITEMS = [
   { id: "logout", label: "Log Out", icon: "\u23FB" },
 ];
 
-const LEADERBOARD_FILTERS = ["This Week", "This Month", "All Time"];
-const ANALYTICS_FILTERS = ["This Week", "This Month", "All Time"];
+const FILTERS = ["This Week", "This Month", "All Time"];
 
 const PLAYER = {
   name: "John",
@@ -32,11 +32,11 @@ const PLAYER = {
 };
 
 const ANALYTICS_STATS = [
-  { label: "Total XP", value: "3,420" },
-  { label: "Current Level", value: "18" },
-  { label: "Study Streak", value: "14 days" },
-  { label: "Quizzes Completed", value: "47" },
-  { label: "Avg. Accuracy", value: "82%" },
+  { label: "Total XP", value: "3,420", color: "text-cyan" },
+  { label: "Current Level", value: "18", color: "text-lime" },
+  { label: "Study Streak", value: "14 days", color: "text-gold" },
+  { label: "Quizzes Completed", value: "47", color: "text-cyan" },
+  { label: "Avg. Accuracy", value: "82%", color: "text-lime" },
 ];
 
 const WEEKLY_ACTIVITY = [
@@ -62,42 +62,15 @@ const LEADERBOARD = [
   { rank: 10, name: "SofiaGarcia", level: 11, points: 3105 },
 ];
 
-const RANK_STYLES = {
-  1: "text-[#d4a94a] border-[#d4a94a]/50 bg-[#d4a94a]/10",
-  2: "text-[#c8c2b8] border-[#c8c2b8]/40 bg-[#c8c2b8]/10",
-  3: "text-[#c98a4f] border-[#c98a4f]/40 bg-[#c98a4f]/10",
-};
-
-const PODIUM_CONFIG = {
-  1: {
-    order: "order-2",
-    trophy: "\u{1F3C6}",
-    ring: "border-[#d4a94a]",
-    glow: "shadow-[0_0_18px_-2px_rgba(212,169,74,0.5)]",
-    pedestal: "h-24 border-[#d4a94a]/60 bg-gradient-to-b from-[#d4a94a]/20 to-[#d4a94a]/5 text-[#d4a94a]",
-    avatarSize: "w-16 h-16 text-[20px]",
-  },
-  2: {
-    order: "order-1",
-    trophy: "\u{1F948}",
-    ring: "border-[#c8c2b8]",
-    glow: "",
-    pedestal: "h-16 border-[#c8c2b8]/50 bg-gradient-to-b from-[#c8c2b8]/15 to-[#c8c2b8]/5 text-[#c8c2b8]",
-    avatarSize: "w-12 h-12 text-[15px]",
-  },
-  3: {
-    order: "order-3",
-    trophy: "\u{1F949}",
-    ring: "border-[#c98a4f]",
-    glow: "",
-    pedestal: "h-12 border-[#c98a4f]/50 bg-gradient-to-b from-[#c98a4f]/15 to-[#c98a4f]/5 text-[#c98a4f]",
-    avatarSize: "w-12 h-12 text-[15px]",
-  },
+const PODIUM = {
+  1: { order: "order-2", trophy: "\u{1F3C6}", color: "#f4c542", pedestal: "h-24", avatar: "w-14 h-14 text-[20px]" },
+  2: { order: "order-1", trophy: "\u{1F948}", color: "#cfc8bf", pedestal: "h-16", avatar: "w-11 h-11 text-[15px]" },
+  3: { order: "order-3", trophy: "\u{1F949}", color: "#d08a52", pedestal: "h-12", avatar: "w-11 h-11 text-[15px]" },
 };
 
 function PixelAvatar() {
   return (
-    <div className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-[#3a2e26] bg-[#d9a066] shrink-0">
+    <div className="relative w-16 h-16 overflow-hidden border-2 border-edge bg-[#d9a066] shrink-0">
       <div className="absolute top-0 left-0 w-full h-3 bg-[#4a3527]" />
       <div className="absolute top-7 left-3.5 w-2 h-2 bg-[#2a1c14]" />
       <div className="absolute top-7 right-3.5 w-2 h-2 bg-[#2a1c14]" />
@@ -106,88 +79,50 @@ function PixelAvatar() {
   );
 }
 
-function StatChip({ icon, label, value, accent }) {
-  return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#120d0b] border border-[#3a2e26]">
-      <span className="text-[15px]" style={{ color: accent }}>
-        {icon}
-      </span>
-      <div className="leading-tight">
-        <p className="text-[#6b6156] text-[10px] tracking-wide">{label}</p>
-        <p className="text-white text-[13px] font-bold tracking-wide">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-function PanelHeader({ icon, title, tag, right }) {
-  return (
-    <div className="flex items-center justify-between mb-4">
-      <div className="flex items-center gap-2">
-        <span className="text-[#22d3ee] text-[16px]">{icon}</span>
-        <h2 className="text-white text-[14px] tracking-[1.5px]">{title}</h2>
-      </div>
-      {right ? (
-        right
-      ) : (
-        tag && (
-          <span className="px-2.5 py-1 rounded-md bg-[#22d3ee]/15 border border-[#22d3ee]/40 text-[#22d3ee] text-[10px] tracking-wide">
-            {tag}
-          </span>
-        )
-      )}
-    </div>
-  );
-}
-
 function LogoutConfirmModal({ onConfirm, onCancel }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-[320px] rounded-2xl border border-[#3a2e26] bg-[#1c1310] p-6 shadow-[0_0_30px_-5px_rgba(0,0,0,0.6)]">
-        <div className="flex items-center gap-2.5 mb-3">
-          <span className="text-[#e05252] text-[18px]">{"\u23FB"}</span>
-          <h3 className="text-white text-[15px] tracking-wide">Log out</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+      <div role="dialog" aria-modal="true" className="panel w-[340px]">
+        <div className="px-4 py-3 border-b border-edge bg-bar flex items-center gap-2">
+          <span className="text-danger">{"\u23FB"}</span>
+          <h3 className="panel-title">Log out</h3>
         </div>
-        <p className="text-[#9c948a] text-[13px] tracking-wide leading-relaxed mb-6">
-          Are you sure you want to log out? 
-        </p>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="flex-1 px-3 py-2.5 rounded-lg text-[13px] tracking-wide text-white border border-[#3a2e26] bg-[#120d0b] hover:bg-[#0d0907] transition-colors duration-150"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="flex-1 px-3 py-2.5 rounded-lg text-[13px] tracking-wide text-white bg-[#e05252] hover:bg-[#c94646] transition-colors duration-150"
-          >
-            Log Out
-          </button>
+        <div className="p-4">
+          <p className="font-display text-[14px] text-mute mb-5">Are you sure you want to log out?</p>
+          <div className="flex gap-3">
+            <button type="button" onClick={onCancel} className="btn btn-ghost flex-1">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              className="btn flex-1 bg-danger text-ink shadow-[inset_0_-3px_0_rgba(0,0,0,0.28)] hover:brightness-110"
+            >
+              Log Out
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function FilterDropdown({ options, value, onChange, ariaLabel }) {
+function FilterDropdown({ value, onChange, ariaLabel }) {
   return (
     <div className="relative">
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label={ariaLabel}
-        className="appearance-none cursor-pointer pl-3 pr-7 py-1.5 rounded-md bg-[#22d3ee]/15 border border-[#22d3ee]/40 text-[#22d3ee] text-[10px] tracking-wide focus:outline-none focus:border-[#22d3ee]/70 hover:bg-[#22d3ee]/20 transition-colors duration-150"
+        className="appearance-none cursor-pointer pl-2.5 pr-6 py-1.5 bg-inset border border-edge text-cyan font-label text-[10px] font-bold uppercase tracking-wider focus:outline-none focus:border-cyan/60"
       >
-        {options.map((option) => (
-          <option key={option} value={option} className="bg-[#1c1310] text-white">
+        {FILTERS.map((option) => (
+          <option key={option} value={option} className="bg-panel text-ink">
             {option}
           </option>
         ))}
       </select>
-      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#22d3ee] text-[9px]">
+      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-cyan text-[9px]">
         {"\u25BE"}
       </span>
     </div>
@@ -195,32 +130,27 @@ function FilterDropdown({ options, value, onChange, ariaLabel }) {
 }
 
 function PodiumCard({ entry }) {
-  const config = PODIUM_CONFIG[entry.rank];
+  const cfg = PODIUM[entry.rank];
   const isYou = entry.name === "You";
-
   return (
-    <div className={`flex flex-1 max-w-[128px] flex-col items-center ${config.order}`}>
-      <span className="text-[20px] mb-1 leading-none">{config.trophy}</span>
+    <div className={`flex flex-1 max-w-[128px] flex-col items-center ${cfg.order}`}>
+      <span className="text-[20px] leading-none mb-1">{cfg.trophy}</span>
       <div
-        className={`${config.avatarSize} ${config.ring} ${config.glow} rounded-full border-2 bg-[#8bc34a]/20 flex items-center justify-center font-bold text-[#8bc34a] mb-2`}
+        className={`${cfg.avatar} border-2 bg-lime/10 flex items-center justify-center font-display font-bold text-lime mb-2`}
+        style={{ borderColor: cfg.color }}
       >
         {entry.name.charAt(0)}
       </div>
-      <p
-        className={`text-[12px] tracking-wide text-center truncate w-full ${
-          isYou ? "text-[#22d3ee]" : "text-white"
-        }`}
-      >
+      <p className={`font-display text-[12px] text-center truncate w-full ${isYou ? "text-cyan" : "text-ink"}`}>
         {entry.name}
       </p>
-      <p className="text-[#9c948a] text-[10px] tracking-wide mb-2">Lvl {entry.level}</p>
+      <p className="label mb-2">Lvl {entry.level}</p>
       <div
-        className={`w-full rounded-t-lg border border-b-0 flex flex-col items-center justify-start pt-2 gap-0.5 ${config.pedestal}`}
+        className={`${cfg.pedestal} w-full border border-b-0 flex flex-col items-center pt-2 gap-0.5`}
+        style={{ borderColor: `${cfg.color}66`, background: `${cfg.color}1a`, color: cfg.color }}
       >
-        <span className="text-[16px] font-bold">{entry.rank}</span>
-        <span className="text-[10px] tracking-wide opacity-90">
-          {entry.points.toLocaleString()} pts
-        </span>
+        <span className="font-display text-[18px] font-bold leading-none">{entry.rank}</span>
+        <span className="font-label text-[10px]">{entry.points.toLocaleString()} pts</span>
       </div>
     </div>
   );
@@ -230,11 +160,11 @@ function Dashboard() {
   const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState("dashboard");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [leaderboardFilter, setLeaderboardFilter] = useState(LEADERBOARD_FILTERS[0]);
-  const [analyticsFilter, setAnalyticsFilter] = useState(ANALYTICS_FILTERS[0]);
+  const [leaderboardFilter, setLeaderboardFilter] = useState(FILTERS[0]);
+  const [analyticsFilter, setAnalyticsFilter] = useState(FILTERS[0]);
   const maxXp = Math.max(...WEEKLY_ACTIVITY.map((d) => d.xp));
-  const topThree = LEADERBOARD.filter((entry) => entry.rank <= 3);
-  const rest = LEADERBOARD.filter((entry) => entry.rank > 3);
+  const topThree = LEADERBOARD.filter((e) => e.rank <= 3);
+  const rest = LEADERBOARD.filter((e) => e.rank > 3);
 
   const handleBottomNavClick = (id) => {
     if (id === "logout") {
@@ -250,34 +180,48 @@ function Dashboard() {
     navigate("/");
   };
 
+  const navButton = (item, isActive, onClick, extra = "") => (
+    <button
+      key={item.id}
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-3 text-left px-3 py-2.5 border font-label text-[12px] font-bold uppercase tracking-[0.1em] cursor-pointer transition-colors duration-100 ${
+        isActive
+          ? "bg-inset border-edge text-ink"
+          : "border-transparent text-mute hover:bg-inset/60 hover:text-ink"
+      } ${extra}`}
+    >
+      <span className={`text-[14px] ${extra ? "" : "text-cyan"}`}>{item.icon}</span>
+      {item.label}
+    </button>
+  );
+
   return (
-    <div className="h-screen w-full flex flex-col bg-[#0d0907] font-mono overflow-hidden">
-      {/* Top navbar */}
-      <header className="flex items-center justify-between px-6 py-3 bg-[#1c1310] border-b border-[#3a2e26] shrink-0">
-        <div className="flex items-center gap-2">
-          <div
-            className="w-7 h-7 bg-[#8bc34a]/20 border border-[#8bc34a]/50 flex items-center justify-center text-[#8bc34a] text-xs font-bold"
-            style={{ clipPath: "polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0% 50%)" }}
-          >
+    <div className="h-screen w-full flex flex-col bg-deep text-ink font-display overflow-hidden">
+      {/* Top bar */}
+      <header className="flex items-center justify-between px-5 h-14 bg-bar border-b border-edge shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 border border-cyan/50 bg-cyan/10 flex items-center justify-center text-cyan font-label text-[13px] font-bold">
             C
           </div>
-          <span className="text-white text-[17px] font-bold tracking-[2px]">
-            CRAMMBLING
-          </span>
+          <span className="text-[17px] font-bold tracking-[0.12em]">CRAMMBLING</span>
         </div>
 
         <div className="flex items-center gap-3">
           <button
             type="button"
             aria-label="Notifications"
-            className="w-8 h-8 rounded-full bg-[#120d0b] border border-[#3a2e26] flex items-center justify-center hover:bg-[#1c1310] transition-colors duration-150"
+            className="w-9 h-9 bg-inset border border-edge flex items-center justify-center cursor-pointer hover:border-mute transition-colors duration-100"
           >
-            <img src={notificationIcon} alt="" className="w-4 h-4 opacity-70 brightness-150" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px] text-mute" aria-hidden="true">
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+            </svg>
           </button>
           <button
             type="button"
             aria-label="Profile"
-            className="w-8 h-8 rounded-full bg-[#22d3ee] flex items-center justify-center text-[#0d0907] text-sm font-bold"
+            className="w-9 h-9 bg-cyan flex items-center justify-center text-deep font-label text-sm font-bold cursor-pointer shadow-[inset_0_-3px_0_rgba(0,0,0,0.25)]"
           >
             J
           </button>
@@ -286,257 +230,183 @@ function Dashboard() {
 
       <div className="flex flex-1 min-h-0">
         {/* Sidebar */}
-        <nav className="w-56 shrink-0 bg-[#1c1310] border-r border-[#3a2e26] py-6 px-3 flex flex-col gap-1">
-          <p className="text-[#6b6156] text-[12px] tracking-wide px-3 mb-2">
-            NAVIGATION BAR
-          </p>
-          {NAV_ITEMS.map((item) => {
-            const isActive = activeNav === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveNav(item.id)}
-                className={`flex items-center gap-2.5 text-left px-3 py-2.5 rounded-lg text-[14px] tracking-wide transition-colors duration-150 ${
-                  isActive
-                    ? "bg-[#22d3ee]/15 text-[#22d3ee] border border-[#22d3ee]/40"
-                    : "text-white border border-transparent hover:bg-[#120d0b] hover:text-[#22d3ee]"
-                }`}
-              >
-                <span className="text-[14px]">{item.icon}</span>
-                {item.label}
-              </button>
-            );
-          })}
+        <nav className="w-56 shrink-0 bg-bar border-r border-edge py-5 px-3 flex flex-col gap-1">
+          <p className="label px-3 mb-2 text-faint">Navigation Bar</p>
+          {NAV_ITEMS.map((item) => navButton(item, activeNav === item.id, () => setActiveNav(item.id)))}
 
-          {/* Bottom nav: settings and log out*/}
-          <div className="mt-auto pt-3 border-t border-[#3a2e26] flex flex-col gap-1">
-            {BOTTOM_NAV_ITEMS.map((item) => {
-              const isLogout = item.id === "logout";
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleBottomNavClick(item.id)}
-                  className={`flex items-center gap-2.5 text-left px-3 py-2.5 rounded-lg text-[14px] tracking-wide transition-colors duration-150 border border-transparent ${
-                    isLogout
-                      ? "text-[#e05252] hover:bg-[#e05252]/10 hover:border-[#e05252]/30"
-                      : "text-white hover:bg-[#120d0b] hover:text-[#22d3ee]"
-                  }`}
-                >
-                  <span className="text-[14px]">{item.icon}</span>
-                  {item.label}
-                </button>
-              );
-            })}
+          <div className="mt-auto pt-3 border-t border-edge flex flex-col gap-1">
+            {BOTTOM_NAV_ITEMS.map((item) =>
+              navButton(
+                item,
+                activeNav === item.id,
+                () => handleBottomNavClick(item.id),
+                item.id === "logout" ? "text-danger! hover:bg-danger/10!" : ""
+              )
+            )}
           </div>
         </nav>
 
-        {/* Main content area */}
-        <main
-          className="flex-1 p-6 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#3a2e26_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#3a2e26] [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-[#4a3527]"
-        >
+        {/* Main */}
+        <main className="flex-1 p-6 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#2e2521_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-edge">
           {activeNav === "dashboard" ? (
             <div className="flex flex-col gap-6">
               {/* Player card */}
-              <section className="rounded-2xl border border-[#3a2e26] bg-[#1c1310] p-6">
-                <div className="flex flex-wrap items-start justify-between gap-4">
+              <section className="panel p-5">
+                <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <PixelAvatar />
                     <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-white text-[18px] font-bold tracking-wide">
-                          {PLAYER.name.toUpperCase()}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-md bg-[#8bc34a]/15 border border-[#8bc34a]/40 text-[#8bc34a] text-[10px] tracking-wide">
-                          LVL {PLAYER.level}
-                        </span>
+                      <p className="label">Welcome back</p>
+                      <div className="flex items-center gap-2.5 mt-1">
+                        <h1 className="text-[26px] leading-none font-bold uppercase tracking-wide">
+                          {PLAYER.name}
+                        </h1>
+                        <span className="tag tag-lime">[LVL {PLAYER.level}]</span>
                       </div>
-                      <div className="flex items-center gap-3 text-[13px] tracking-wide">
-                        <span className="text-[#e05252]">
+                      <div className="flex items-center gap-3 mt-2.5 text-[13px]">
+                        <span className="text-danger tracking-wide">
                           {"\u2764".repeat(PLAYER.hp)}
-                          <span className="text-[#3a2e26]">
-                            {"\u2764".repeat(PLAYER.hpMax - PLAYER.hp)}
-                          </span>
+                          <span className="text-edge">{"\u2764".repeat(PLAYER.hpMax - PLAYER.hp)}</span>
                         </span>
-                        <span className="text-[#3a2e26]">|</span>
+                        <span className="text-edge">|</span>
                         <span className="flex gap-0.5">
                           {Array.from({ length: PLAYER.focusMax }).map((_, i) => (
-                            <span
-                              key={i}
-                              className={`w-2.5 h-2.5 ${
-                                i < PLAYER.focus ? "bg-[#d4a94a]" : "bg-[#3a2e26]"
-                              }`}
-                            />
+                            <span key={i} className={`w-2.5 h-2.5 ${i < PLAYER.focus ? "bg-gold" : "bg-edge"}`} />
                           ))}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <StatChip icon={"\u25B2"} label="STREAK" value={`${PLAYER.streakDays} DAYS`} accent="#d4a94a" />
-                    <StatChip icon={"\u23F1"} label="STUDY HOURS" value={`${PLAYER.studyHours} HRS`} accent="#22d3ee" />
-                    <StatChip icon={"\u2691"} label="TOP PERFORMER" value={`RANK #${PLAYER.rank}`} accent="#8bc34a" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="tag tag-gold">{"\u25B2"} {PLAYER.streakDays} day streak</span>
+                    <span className="tag tag-cyan">{"\u23F1"} {PLAYER.studyHours} hrs studied</span>
+                    <span className="tag tag-lime">{"\u2691"} Rank #{PLAYER.rank}</span>
                   </div>
                 </div>
 
                 <div className="mt-5">
-                  <div className="flex items-center justify-between text-[11px] tracking-wide mb-1.5">
-                    <span className="text-[#9c948a]">EXPERIENCE PROGRESS</span>
-                    <span className="text-[#22d3ee]">
-                      LVL {PLAYER.level} ({PLAYER.xpPercent}%)
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="label">Experience progress</span>
+                    <span className="font-label text-[11px] font-bold text-cyan">
+                      LVL {PLAYER.level} - {PLAYER.xpPercent}%
                     </span>
                   </div>
-                  <div className="w-full h-3 rounded-full bg-[#120d0b] border border-[#3a2e26] overflow-hidden">
+                  <div className="w-full h-3.5 bg-deep border border-edge">
                     <div
-                      className="h-full bg-[#8bc34a] rounded-full"
-                      style={{ width: `${PLAYER.xpPercent}%` }}
+                      className="h-full bg-lime"
+                      style={{
+                        width: `${PLAYER.xpPercent}%`,
+                        backgroundImage:
+                          "repeating-linear-gradient(90deg, transparent 0 9px, rgba(0,0,0,0.3) 9px 10px)",
+                      }}
                     />
                   </div>
                 </div>
               </section>
 
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
                 {/* Leaderboard */}
-                <section className="rounded-2xl border border-[#3a2e26] bg-[#1c1310] p-6">
-                  <PanelHeader
-                    icon={"\u26C6"}
-                    title="CLASS LEADERBOARD"
-                    right={
-                      <FilterDropdown
-                        options={LEADERBOARD_FILTERS}
-                        value={leaderboardFilter}
-                        onChange={setLeaderboardFilter}
-                        ariaLabel="Filter leaderboard"
-                      />
-                    }
-                  />
-
-                  {/* Podium for ranks 1-3 */}
-                  <div className="flex items-end justify-center gap-3 mb-5 pb-1">
+                <Panel
+                  icon={"\u26C6"}
+                  title="Class Leaderboard"
+                  right={
+                    <FilterDropdown
+                      value={leaderboardFilter}
+                      onChange={setLeaderboardFilter}
+                      ariaLabel="Filter leaderboard"
+                    />
+                  }
+                >
+                  <div className="flex items-end justify-center gap-3 mb-5">
                     {topThree.map((entry) => (
                       <PodiumCard key={entry.rank} entry={entry} />
                     ))}
                   </div>
 
-                  {/* Ranks 4-10 */}
                   <div className="flex flex-col gap-2">
                     {rest.map((entry) => {
                       const isYou = entry.name === "You";
                       return (
                         <div
                           key={entry.rank}
-                          className={`flex items-center justify-between px-3 py-2.5 rounded-xl border ${
-                            isYou
-                              ? "border-[#22d3ee]/40 bg-[#22d3ee]/10"
-                              : "border-[#3a2e26] bg-[#120d0b]"
+                          className={`flex items-center justify-between px-3 py-2 border ${
+                            isYou ? "border-cyan/40 bg-cyan/10" : "border-edge bg-inset"
                           }`}
                         >
                           <div className="flex items-center gap-2.5">
-                            <span className="w-7 h-7 rounded-full border flex items-center justify-center text-[11px] font-bold text-[#9c948a] border-[#3a2e26] bg-[#120d0b]">
+                            <span className="w-7 h-7 border border-edge bg-deep flex items-center justify-center font-label text-[11px] font-bold text-mute">
                               {entry.rank}
                             </span>
-                            <span className="w-7 h-7 rounded-full bg-[#8bc34a]/20 border border-[#8bc34a]/40 flex items-center justify-center text-[#8bc34a] text-[11px] font-bold">
+                            <span className="w-7 h-7 border border-lime/40 bg-lime/10 flex items-center justify-center font-display text-[12px] font-bold text-lime">
                               {entry.name.charAt(0)}
                             </span>
-                            <span
-                              className={`text-[12px] tracking-wide ${
-                                isYou ? "text-[#22d3ee]" : "text-white"
-                              }`}
-                            >
+                            <span className={`font-display text-[13px] ${isYou ? "text-cyan" : "text-ink"}`}>
                               {entry.name}
                             </span>
                           </div>
-                          <div className="flex items-center gap-4">
-                            <span className="text-[#d4a94a] text-[11px] tracking-wide">
-                              Lvl {entry.level}
-                            </span>
-                            <span className="text-[#9c948a] text-[11px] tracking-wide w-16 text-right">
-                              {entry.points.toLocaleString()} pts
-                            </span>
+                          <div className="flex items-center gap-4 font-label text-[11px]">
+                            <span className="text-gold">Lvl {entry.level}</span>
+                            <span className="text-mute w-20 text-right">{entry.points.toLocaleString()} pts</span>
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                </section>
+                </Panel>
 
                 {/* Analytics */}
-                <section className="relative overflow-hidden rounded-2xl border border-[#3a2e26] bg-[#1c1310] p-6">
-                 
-                  <div
-                    className="pointer-events-none absolute inset-0"
-                    style={{
-                      background:
-                        "radial-gradient(circle at 15% 0%, rgba(34,211,238,0.14), transparent 55%), radial-gradient(circle at 100% 100%, rgba(139,195,74,0.10), transparent 50%)",
-                    }}
-                  />
-                  <div
-                    className="pointer-events-none absolute inset-0 opacity-[0.06]"
-                    style={{
-                      backgroundImage:
-                        "linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(90deg, #ffffff 1px, transparent 1px)",
-                      backgroundSize: "22px 22px",
-                    }}
-                  />
-
-                  <div className="relative">
-                    <PanelHeader
-                      icon={"\u25A4"}
-                      title="ANALYTICS"
-                      right={
-                        <FilterDropdown
-                          options={ANALYTICS_FILTERS}
-                          value={analyticsFilter}
-                          onChange={setAnalyticsFilter}
-                          ariaLabel="Filter analytics"
-                        />
-                      }
+                <Panel
+                  icon={"\u25A4"}
+                  title="Analytics"
+                  right={
+                    <FilterDropdown
+                      value={analyticsFilter}
+                      onChange={setAnalyticsFilter}
+                      ariaLabel="Filter analytics"
                     />
+                  }
+                >
+                  <div className="grid grid-cols-2 gap-2 mb-5">
+                    {ANALYTICS_STATS.map((stat, i) => (
+                      <div
+                        key={stat.label}
+                        className={`border border-edge bg-inset px-4 py-3 ${
+                          i === ANALYTICS_STATS.length - 1 && ANALYTICS_STATS.length % 2 ? "col-span-2" : ""
+                        }`}
+                      >
+                        <p className={`font-display text-[22px] font-bold leading-none ${stat.color}`}>
+                          {stat.value}
+                        </p>
+                        <p className="label mt-1.5">{stat.label}</p>
+                      </div>
+                    ))}
+                  </div>
 
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                      {ANALYTICS_STATS.map((stat) => (
-                        <div
-                          key={stat.label}
-                          className="rounded-xl border border-[#3a2e26] bg-[#120d0b]/80 backdrop-blur-sm px-4 py-3"
-                        >
-                          <p className="text-[#22d3ee] text-[17px] font-bold">
-                            {stat.value}
-                          </p>
-                          <p className="text-[#9c948a] text-[10px] tracking-wide mt-1">
-                            {stat.label}
-                          </p>
+                  <p className="label mb-2">Weekly activity</p>
+                  <div className="border border-edge bg-inset p-3">
+                    <div className="flex items-end justify-between gap-2 h-28 px-1">
+                      {WEEKLY_ACTIVITY.map((d) => (
+                        <div key={d.day} className="flex-1 flex flex-col items-center gap-2">
+                          <div className="w-full flex items-end justify-center h-20">
+                            <div
+                              className={`w-full max-w-[24px] ${d.xp === maxXp ? "bg-gold" : "bg-lime"}`}
+                              style={{ height: `${(d.xp / maxXp) * 100}%` }}
+                              title={`${d.xp} XP`}
+                            />
+                          </div>
+                          <span className="label text-faint">{d.day}</span>
                         </div>
                       ))}
                     </div>
-
-                    <p className="text-[#9c948a] text-[11px] tracking-wide mb-3">
-                      Weekly Activity
-                    </p>
-                    <div className="rounded-xl border border-[#3a2e26] bg-[#120d0b]/60 backdrop-blur-sm p-3">
-                      <div className="flex items-end justify-between gap-2 h-28 px-1">
-                        {WEEKLY_ACTIVITY.map((d) => (
-                          <div key={d.day} className="flex-1 flex flex-col items-center gap-2">
-                            <div className="w-full flex items-end justify-center h-20">
-                              <div
-                                className="w-full max-w-[24px] rounded-t-md bg-gradient-to-t from-[#8bc34a]/40 to-[#8bc34a]"
-                                style={{ height: `${(d.xp / maxXp) * 100}%` }}
-                              />
-                            </div>
-                            <span className="text-[#6b6156] text-[10px] tracking-wide">
-                              {d.day}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   </div>
-                </section>
+                </Panel>
               </div>
+
+              <QuizHistory />
             </div>
           ) : (
-            <div className="h-full rounded-2xl border border-dashed border-[#3a2e26] flex items-center justify-center text-[#5a5048] text-[14px] tracking-wide">
+            <div className="h-full border border-dashed border-edge flex items-center justify-center label">
               Page content goes here
             </div>
           )}
@@ -544,10 +414,7 @@ function Dashboard() {
       </div>
 
       {showLogoutConfirm && (
-        <LogoutConfirmModal
-          onConfirm={handleConfirmLogout}
-          onCancel={() => setShowLogoutConfirm(false)}
-        />
+        <LogoutConfirmModal onConfirm={handleConfirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
       )}
     </div>
   );

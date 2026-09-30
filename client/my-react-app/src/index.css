@@ -1,6 +1,43 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap");
 @import "tailwindcss";
 @source "./**/*.{js,jsx,ts,tsx}";
 
+@theme {
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-label: "Space Mono", ui-monospace, monospace;
+
+  --color-deep: #0a0807;   /* page background */
+  --color-bar: #110d0b;    /* header, sidebar, panel title bars */
+  --color-panel: #171210;  /* panels */
+  --color-inset: #201917;  /* rows and boxes inside panels */
+  --color-edge: #2e2521;   /* borders */
+  --color-ink: #ece6dd;    /* main text */
+  --color-mute: #9b9086;   /* secondary text */
+  --color-faint: #6b6058;  /* hints */
+  --color-cyan: #57e0e8;
+  --color-lime: #a5e060;
+  --color-gold: #f4c542;
+  --color-rose: #f08a9a;
+  --color-danger: #e05252;
+}
+
 body {
   margin: 0;
+}
+
+@layer components {
+  .panel { @apply bg-panel border border-edge; }
+  .panel-title { @apply font-label text-[12px] font-bold uppercase tracking-[0.12em] text-ink; }
+  .label { @apply font-label text-[10px] uppercase tracking-[0.14em] text-mute; }
+
+  .tag { @apply inline-flex items-center gap-1.5 px-2 py-1 border font-label text-[10px] font-bold uppercase tracking-wider whitespace-nowrap; }
+  .tag-gold { @apply bg-gold/10 border-gold/40 text-gold; }
+  .tag-cyan { @apply bg-cyan/10 border-cyan/40 text-cyan; }
+  .tag-lime { @apply bg-lime/10 border-lime/40 text-lime; }
+  .tag-rose { @apply bg-rose/10 border-rose/40 text-rose; }
+
+  .btn { @apply inline-flex items-center justify-center gap-1.5 px-3 py-2 font-label text-[11px] font-bold uppercase tracking-wider cursor-pointer transition-[filter,transform,color,border-color] duration-100 active:translate-y-px disabled:cursor-wait disabled:opacity-60; }
+  .btn-lime { @apply bg-lime text-deep shadow-[inset_0_-3px_0_rgba(0,0,0,0.28)] hover:brightness-110; }
+  .btn-ghost { @apply border border-edge text-mute hover:text-ink hover:border-mute; }
+  .btn-cyan { @apply border border-cyan/40 bg-cyan/10 text-cyan hover:bg-cyan/20; }
 }

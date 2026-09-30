@@ -1,241 +1,293 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import personIcon from "../assets/person.svg";
-import keyIcon from "../assets/key.svg";
 import googleIcon from "../assets/google-icon.svg";
+import { AuthCard, Field, EmailVerifyForm, primaryButton } from "../components/AuthShared";
+
+const NAME_PATTERN = /^\p{L}[\p{L}\s.'-]*$/u;
+const USERNAME_PATTERN = /^[A-Za-z0-9_]+$/;
+const STEPS = ["Your details", "Verify email"];
+
+const NAME_FIELDS = ["firstName", "middleName", "lastName"];
+
+const stripNameChars = (value) => value.replace(/[^\p{L}\s.'-]/gu, "");
+
+const INITIAL = {
+  firstName: "",
+  middleName: "",
+  lastName: "",
+  username: "",
+  password: "",
+  confirmPassword: "",
+};
+
+const nameError = (value, label, required) => {
+  if (!value.trim()) return required ? `${label} is required.` : "";
+  if (!NAME_PATTERN.test(value.trim())) return `${label} should have letters only.`;
+  return "";
+};
+
+function validate(v) {
+  return {
+    firstName: nameError(v.firstName, "First name", true),
+    middleName: nameError(v.middleName, "Middle name", false),
+    lastName: nameError(v.lastName, "Last name", true),
+    username: !v.username.trim()
+      ? "Username is required."
+      : v.username.length < 4
+      ? "Username must be at least 4 characters."
+      : v.username.length > 20
+      ? "Username must be 20 characters or fewer."
+      : !USERNAME_PATTERN.test(v.username)
+      ? "Use only letters, numbers, and underscores."
+      : "",
+    password: !v.password
+      ? "Password is required."
+      : v.password.length < 8
+      ? "Password must be at least 8 characters."
+      : !/[A-Za-z]/.test(v.password) || !/\d/.test(v.password)
+      ? "Password needs at least one letter and one number."
+      : "",
+    confirmPassword: !v.confirmPassword
+      ? "Please confirm your password."
+      : v.confirmPassword !== v.password
+      ? "Passwords do not match."
+      : "",
+  };
+}
+
+function StepProgress({ step }) {
+  const pct = (step / STEPS.length) * 100;
+  return (
+    <div className="mb-6">
+      <div
+        role="progressbar"
+        aria-label={`Registration progress: ${STEPS[step - 1]}`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={pct}
+        className="h-2 w-full bg-deep border border-edge overflow-hidden"
+      >
+        <div
+          className="h-full bg-lime transition-[width] duration-500 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="flex justify-between mt-2 font-label text-[10px] uppercase tracking-[0.12em]">
+        {STEPS.map((label, i) => (
+          <span key={label} className={i < step ? "text-lime" : "text-faint"}>
+            {label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SuccessModal({ onContinue }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="w-[320px] border border-edge bg-panel p-6 shadow-[0_0_30px_-5px_rgba(0,0,0,0.6)]"
+      >
+        <div className="flex items-center gap-2.5 mb-3">
+          <span className="text-lime text-[18px]">{"\u2713"}</span>
+          <h3 className="text-ink text-[15px] tracking-wide">Account created</h3>
+        </div>
+        <p className="text-mute text-[13px] tracking-wide leading-relaxed mb-6">
+          Your account was created successfully. Taking you to your dashboard...
+        </p>
+        <button
+          type="button"
+          onClick={onContinue}
+          className="w-full px-3 py-2.5 text-[13px] font-bold tracking-wide text-panel bg-lime hover:brightness-110 transition-colors duration-150"
+        >
+          Go to Dashboard
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function Registration() {
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [errors, setErrors] = useState({
-    username: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-  });
+  const [step, setStep] = useState(1);
+  const [values, setValues] = useState(INITIAL);
+  const [touched, setTouched] = useState({});
+  const [showSuccess, setShowSuccess] = useState(false);
 
-  const clearError = (field) => {
-    setErrors((prev) => (prev[field] ? { ...prev, [field]: "" } : prev));
+  const errors = validate(values);
+
+  // After the success popup appears, continue to the dashboard automatically.
+  useEffect(() => {
+    if (!showSuccess) return;
+    const t = setTimeout(() => navigate("/dashboard"), 2500);
+    return () => clearTimeout(t);
+  }, [showSuccess, navigate]);
+
+  const handleChange = (field) => (e) => {
+    const raw = e.target.value;
+
+    const value = NAME_FIELDS.includes(field) ? stripNameChars(raw) : raw;
+    setValues((prev) => ({ ...prev, [field]: value }));
+    setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  const handleUsernameChange = (e) => {
-    setUsername(e.target.value);
-    clearError("username");
-  };
+  const handleBlur = (field) => () =>
+    setTouched((prev) => ({ ...prev, [field]: true }));
 
-  const handleEmailChange = (e) => {
-    setEmail(e.target.value);
-    clearError("email");
-  };
+  // Live feedback
+  const err = (field) => (touched[field] ? errors[field] : "");
+  const ok = (field) => touched[field] && !errors[field] && values[field].trim() !== "";
 
-  const handlePasswordChange = (e) => {
-    setPassword(e.target.value);
-    clearError("password");
-    clearError("confirmPassword");
-  };
-
-  const handleConfirmPasswordChange = (e) => {
-    setConfirmPassword(e.target.value);
-    clearError("confirmPassword");
-  };
-
-  const handleSubmit = (e) => {
+  const handleDetailsSubmit = (e) => {
     e.preventDefault();
+    setTouched({
+      firstName: true,
+      middleName: true,
+      lastName: true,
+      username: true,
+      password: true,
+      confirmPassword: true,
+    });
+    if (Object.values(errors).some(Boolean)) return;
+    setStep(2);
+  };
 
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    const newErrors = {
-      username: !username.trim() ? "Username is required." : "",
-      email: !email.trim()
-        ? "Email is required."
-        : !emailPattern.test(email)
-        ? "Enter a valid email address."
-        : "",
-      password: !password
-        ? "Password is required."
-        : password.length < 8
-        ? "Password must be at least 8 characters."
-        : "",
-      confirmPassword: !confirmPassword
-        ? "Please confirm your password."
-        : confirmPassword !== password
-        ? "Passwords do not match."
-        : "",
-    };
-
-    if (Object.values(newErrors).some(Boolean)) {
-      setErrors(newErrors);
-      return;
-    }
-
-    // TODO: replace with real registration API call
-    setErrors({ username: "", email: "", password: "", confirmPassword: "" });
-    navigate("/dashboard");
+  const handleVerified = () => {
+    // TODO: send `values` + verified email to the real registration API
+    setShowSuccess(true);
   };
 
   const handleGoogleSignup = () => {
     navigate("/dashboard");
   };
 
+  const field = (name, props) => ({
+    id: name,
+    first: true,
+    value: values[name],
+    onChange: handleChange(name),
+    onBlur: handleBlur(name),
+    error: err(name),
+    valid: ok(name),
+    ...props,
+  });
+
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#0d0907] font-mono px-4 py-10">
-      <div className="relative w-full max-w-[420px] bg-[#1c1310] rounded-2xl border border-[#3a2e26] shadow-[0_20px_60px_rgba(0,0,0,0.6)] p-9">
-        {/* corner accents */}
-        <div className="absolute top-5 left-5 w-3 h-3 border-t-2 border-l-2 border-[#6b6156]" />
-        <div className="absolute top-5 right-5 w-3 h-3 border-t-2 border-r-2 border-[#6b6156]" />
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 flex gap-3">
-          <span className="w-1.5 h-1.5 bg-[#d4a94a]" />
-          <span className="w-1.5 h-1.5 bg-[#d4a94a]" />
-        </div>
+    <>
+      <AuthCard subtitle="CREATE ACCOUNT" wide>
+        <StepProgress step={step} />
 
-        <h1 className="text-center text-white text-[30px] font-bold tracking-[3px] mt-2 mb-1">
-          CRAMMBLING
-        </h1>
-        <p className="text-center text-[#22d3ee] text-[13px] tracking-[2px] mb-8">
-          ■ CREATE ACCOUNT ■
-        </p>
+        {step === 1 ? (
+          <>
+            <form onSubmit={handleDetailsSubmit} noValidate>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5 items-start">
+                <Field
+                  {...field("firstName", {
+                    label: "First Name",
+                    placeholder: "First name",
+                    autoComplete: "given-name",
+                  })}
+                />
+                <Field
+                  {...field("lastName", {
+                    label: "Last Name",
+                    placeholder: "Last name",
+                    autoComplete: "family-name",
+                  })}
+                />
+                <Field
+                  {...field("middleName", {
+                    label: "Middle Name",
+                    optional: true,
+                    placeholder: "Middle name",
+                    autoComplete: "additional-name",
+                  })}
+                />
+                <Field
+                  {...field("username", {
+                    label: "Username",
+                    placeholder: "Username",
+                    tooltip: "4-20 characters. Letters, numbers, and underscores only.",
+                    icon: personIcon,
+                    autoComplete: "username",
+                  })}
+                />
+                <Field
+                  {...field("password", {
+                    label: "Password",
+                    type: "password",
+                    placeholder: "Password",
+                    tooltip: "At least 8 characters, with at least one letter and one number.",
+                    autoComplete: "new-password",
+                  })}
+                />
+                <Field
+                  {...field("confirmPassword", {
+                    label: "Confirm Password",
+                    type: "password",
+                    placeholder: "Confirm password",
+                    autoComplete: "new-password",
+                  })}
+                />
+              </div>
 
-        <form onSubmit={handleSubmit}>
-          <label className="flex items-center gap-1.5 text-left text-[#9c948a] text-[12px] tracking-wide mb-2">
-            <span className="w-1.5 h-1.5 bg-[#8bc34a]" />
-            Username
-          </label>
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Username"
-              value={username}
-              onChange={handleUsernameChange}
-              className={`w-full py-3.5 pl-4 pr-10 bg-[#120d0b] border rounded-lg text-white placeholder:text-[#5a5048] text-[15px] tracking-wide transition-colors duration-200 focus:outline-none ${
-                errors.username
-                  ? "border-[#e05252] focus:border-[#e05252]"
-                  : "border-[#3a2e26] focus:border-[#6b6156]"
-              }`}
-            />
-            <img
-              src={personIcon}
-              alt=""
-              className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 opacity-50 brightness-200 pointer-events-none"
-            />
-          </div>
-          {errors.username && (
-            <p className="text-[#e05252] text-[12px] mt-1.5">{errors.username}</p>
-          )}
+              <button type="submit" className={`${primaryButton} mt-6!`}>
+                Next
+              </button>
+            </form>
 
-          <label className="flex items-center gap-1.5 text-left text-[#9c948a] text-[12px] tracking-wide mt-5 mb-2">
-            <span className="w-1.5 h-1.5 bg-[#8bc34a]" />
-            Email
-          </label>
-          <div className="relative">
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={handleEmailChange}
-              className={`w-full py-3.5 pl-4 pr-10 bg-[#120d0b] border rounded-lg text-white placeholder:text-[#5a5048] text-[15px] tracking-wide transition-colors duration-200 focus:outline-none ${
-                errors.email
-                  ? "border-[#e05252] focus:border-[#e05252]"
-                  : "border-[#3a2e26] focus:border-[#6b6156]"
-              }`}
-            />
-          </div>
-          {errors.email && (
-            <p className="text-[#e05252] text-[12px] mt-1.5">{errors.email}</p>
-          )}
+            <div className="flex items-center gap-3 mt-5 mb-4">
+              <span className="flex-1 h-px bg-edge" />
+              <span className="text-faint text-[12px] tracking-wide">or sign up with</span>
+              <span className="flex-1 h-px bg-edge" />
+            </div>
 
-          <label className="flex items-center gap-1.5 text-left text-[#9c948a] text-[12px] tracking-wide mt-5 mb-2">
-            <span className="w-1.5 h-1.5 bg-[#8bc34a]" />
-            Password
-          </label>
-          <div className="relative">
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={handlePasswordChange}
-              className={`w-full py-3.5 pl-4 pr-10 bg-[#120d0b] border rounded-lg text-white placeholder:text-[#5a5048] text-[15px] tracking-wide transition-colors duration-200 focus:outline-none ${
-                errors.password
-                  ? "border-[#e05252] focus:border-[#e05252]"
-                  : "border-[#3a2e26] focus:border-[#6b6156]"
-              }`}
-            />
-            <img
-              src={keyIcon}
-              alt=""
-              className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 opacity-50 brightness-200 pointer-events-none"
-            />
-          </div>
-          {errors.password && (
-            <p className="text-[#e05252] text-[12px] mt-1.5">{errors.password}</p>
-          )}
+            <button
+              type="button"
+              onClick={handleGoogleSignup}
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-transparent border border-lime text-lime text-[13px] tracking-wide cursor-pointer transition-all duration-150 hover:bg-lime/10"
+            >
+              <img src={googleIcon} alt="" className="w-3.5 h-3.5" />
+              Google
+            </button>
 
-          <label className="flex items-center gap-1.5 text-left text-[#9c948a] text-[12px] tracking-wide mt-5 mb-2">
-            <span className="w-1.5 h-1.5 bg-[#8bc34a]" />
-            Confirm Password
-          </label>
-          <div className="relative">
-            <input
-              type="password"
-              placeholder="Confirm Password"
-              value={confirmPassword}
-              onChange={handleConfirmPasswordChange}
-              className={`w-full py-3.5 pl-4 pr-10 bg-[#120d0b] border rounded-lg text-white placeholder:text-[#5a5048] text-[15px] tracking-wide transition-colors duration-200 focus:outline-none ${
-                errors.confirmPassword
-                  ? "border-[#e05252] focus:border-[#e05252]"
-                  : "border-[#3a2e26] focus:border-[#6b6156]"
-              }`}
-            />
-            <img
-              src={keyIcon}
-              alt=""
-              className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 opacity-50 brightness-200 pointer-events-none"
-            />
-          </div>
-          {errors.confirmPassword && (
-            <p className="text-[#e05252] text-[12px] mt-1.5">
-              {errors.confirmPassword}
+            <p className="text-center text-mute text-[13px] tracking-wide mt-5">
+              Already have an account?{" "}
+              <button
+                type="button"
+                onClick={() => navigate("/")}
+                className="text-cyan bg-transparent border-none p-0 cursor-pointer tracking-wide hover:underline"
+              >
+                Log in
+              </button>
             </p>
-          )}
+          </>
+        ) : (
+          <EmailVerifyForm
+            submitLabel="Verify & Create Account"
+            onVerified={handleVerified}
+            footer={
+              <p className="text-center text-mute text-[13px] tracking-wide mt-6">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="text-cyan bg-transparent border-none p-0 cursor-pointer tracking-wide hover:underline"
+                >
+                  Back to details
+                </button>
+              </p>
+            }
+          />
+        )}
+      </AuthCard>
 
-          <button
-            type="submit"
-            className="w-full mt-7 py-3.5 bg-[#a8d979] rounded-lg text-[#1c1310] text-[16px] font-bold tracking-wide cursor-pointer shadow-[0_4px_14px_rgba(168,217,121,0.35)] transition-all duration-150 hover:bg-[#9bcf66] hover:-translate-y-px"
-          >
-            Create Account
-          </button>
-        </form>
-
-        <p className="text-center text-[#6b6156] text-[12px] tracking-wide mt-7 mb-4">
-          Or sign up with
-        </p>
-
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleGoogleSignup}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-transparent rounded-lg border border-[#8bc34a] text-[#8bc34a] text-[13px] tracking-wide cursor-pointer transition-all duration-150 hover:bg-[#8bc34a]/10"
-          >
-            <img src={googleIcon} alt="" className="w-3.5 h-3.5" />
-            Google
-          </button>
-        </div>
-
-        <p className="text-center text-[#9c948a] text-[13px] tracking-wide mt-6">
-          Already have an account?{" "}
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            className="text-[#22d3ee] bg-transparent border-none p-0 cursor-pointer tracking-wide hover:underline"
-          >
-            Log in
-          </button>
-        </p>
-      </div>
-    </div>
+      {showSuccess && <SuccessModal onContinue={() => navigate("/dashboard")} />}
+    </>
   );
 }
 

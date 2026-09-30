@@ -327,6 +327,7 @@ function formatDateLabel(d) {
 --------------------------------------------------------- */
 export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToGroup } = {}) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [navCollapsed, setNavCollapsed] = useState(false); // desktop drawer: pushed to the side
   const [activeNav, setActiveNav] = useState("personalized");
   const [activeSubTab, setActiveSubTab] = useState("calendar");
   const [subjectFilter, setSubjectFilter] = useState("All Subjects");
@@ -699,6 +700,17 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 
   return (
     <div className="flex flex-col bg-white min-h-screen">
+      <style>{`
+        @keyframes pzPop { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+        @keyframes pzMenu { from { opacity: 0; transform: translateY(-6px) scale(.97); } to { opacity: 1; transform: none; } }
+        @keyframes pzShimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+        @keyframes pzPulse { 0%,100% { box-shadow: 0 0 0 0 var(--pz-glow); } 50% { box-shadow: 0 0 22px 2px var(--pz-glow); } }
+        @keyframes pzLaunch { to { transform: translateY(-40px) scale(.9); opacity: 0; } }
+        .pz-date { color-scheme: dark; }
+        .pz-date::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .7; transition: opacity .15s; }
+        .pz-date::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+        @media (prefers-reduced-motion: reduce) { .pz-anim { animation: none !important; } }
+      `}</style>
       <div className="self-stretch bg-[#130D0B] min-h-screen relative">
         <div className="flex items-start self-stretch relative">
           {/* Mobile sidebar backdrop */}
@@ -712,8 +724,9 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
           {/* ---------------- SIDEBAR ---------------- */}
           <div
             className={`bg-[#130D0B] w-64 shrink-0 z-50 flex flex-col h-screen
-              fixed inset-y-0 left-0 transition-transform duration-200 lg:translate-x-0
-              ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`}
+              fixed inset-y-0 left-0 transition-transform duration-300 ease-out
+              ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}
+              ${navCollapsed ? "lg:-translate-x-full" : "lg:translate-x-0"}`}
           >
             <div className="flex justify-end lg:hidden px-3 pt-3">
               <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu">
@@ -797,14 +810,30 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
             </div>
           </div>
 
+          {/* Desktop drawer handle — pushes the navigation bar to the side and back */}
+          <button
+            onClick={() => setNavCollapsed((v) => !v)}
+            aria-label={navCollapsed ? "Open navigation bar" : "Push navigation bar aside"}
+            title={navCollapsed ? "Open navigation" : "Push navigation aside"}
+            className="hidden lg:flex fixed top-1/2 -translate-y-1/2 z-[55] w-5 h-16 items-center justify-center bg-[#251E1C] border border-solid border-[#3F3735] border-l-0 text-[#2CD4D9] hover:bg-[#2CD4D9] hover:text-[#003738] hover:shadow-[0_0_14px_#2CD4D966] transition-all duration-300 active:scale-95"
+            style={{ left: navCollapsed ? 0 : 256 }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: navCollapsed ? "rotate(0deg)" : "rotate(180deg)", transition: "transform .3s" }}>
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+
           {/* ---------------- MAIN ---------------- */}
-          <div className="flex-1 bg-[#181210] pb-16 min-w-0 lg:ml-64">
+          <div className={`flex-1 bg-[#181210] pb-16 min-w-0 transition-[margin] duration-300 ease-out ${navCollapsed ? "lg:ml-0" : "lg:ml-64"}`}>
             {/* Top bar */}
             <div className="sticky top-0 z-30 backdrop-blur flex flex-wrap justify-between items-center gap-3 self-stretch bg-[#130D0BF0] py-3 px-4 sm:px-6 mb-8 lg:mb-[72px]">
               <div className="flex flex-1 min-w-0 items-center gap-3 sm:gap-4">
                 <button
-                  onClick={() => setMobileNavOpen(true)}
-                  className="lg:hidden shrink-0"
+                  onClick={() => {
+                    setNavCollapsed(false);
+                    setMobileNavOpen(true);
+                  }}
+                  className={`shrink-0 ${navCollapsed ? "" : "lg:hidden"}`}
                   aria-label="Open menu"
                 >
                   <img src={IMG.menu} className="w-6 h-6" />
@@ -1210,26 +1239,40 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                             className="fixed inset-0 z-40"
                                             onClick={() => setOpenEventMenuId(null)}
                                           />
-                                          <div className="absolute right-0 top-9 z-50 min-w-[160px] bg-[#1D1715] border border-solid border-[#3F3735] py-1">
+                                          <div
+                                            className="pz-anim absolute right-0 top-10 z-50 w-48 bg-[#0B1220F2] backdrop-blur-md border border-solid border-[#2E3B5C] p-1.5 flex flex-col gap-1"
+                                            style={{ boxShadow: "0 14px 36px rgba(0,0,0,0.6), 0 0 24px #1E3A5F4D", animation: "pzMenu .16s ease-out" }}
+                                          >
                                             <button
                                               onClick={() => {
                                                 toggleComplete(u.id);
                                                 setOpenEventMenuId(null);
                                               }}
-                                              className="flex items-center gap-2 w-full text-left px-3 py-2 text-xs text-[#BBC9C9] hover:bg-[#251E1C] hover:text-[#2CD4D9] transition-colors"
+                                              className="group/mi flex items-center gap-2.5 w-full text-left p-1.5 border border-solid border-transparent text-[#BBC9C9] hover:bg-[#2CD4D91A] hover:border-[#2CD4D94D] hover:text-[#2CD4D9] active:scale-[0.98] transition-all duration-150"
                                             >
-                                              <img src={u.chk} className="w-3.5 h-3.5 object-fill" />
-                                              {isDone ? "Mark as not done" : "Mark as done"}
+                                              <span className="w-6 h-6 shrink-0 flex items-center justify-center border border-solid border-[#2CD4D94D] bg-[#2CD4D922] text-[#2CD4D9] group-hover/mi:bg-[#2CD4D9] group-hover/mi:text-[#003738] transition-colors">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                  {isDone ? <path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5" /> : <polyline points="5 12 10 17 19 7" />}
+                                                </svg>
+                                              </span>
+                                              <span className="text-xs font-bold whitespace-nowrap">{isDone ? "Mark as not done" : "Mark as done"}</span>
                                             </button>
+                                            <div className="h-px bg-[#2E3B5C] mx-1" />
                                             <button
                                               onClick={() => {
                                                 deleteUpcoming(u.id);
                                                 setOpenEventMenuId(null);
                                               }}
-                                              className="flex items-center gap-2 w-full text-left px-3 py-2 text-xs text-[#FF6B6B] hover:bg-[#251E1C] transition-colors"
+                                              className="group/mi flex items-center gap-2.5 w-full text-left p-1.5 border border-solid border-transparent text-[#FF6B6B] hover:bg-[#FF6B6B1A] hover:border-[#FF6B6B4D] active:scale-[0.98] transition-all duration-150"
                                             >
-                                              <span className="w-3.5 text-center leading-none">×</span>
-                                              Delete event
+                                              <span className="w-6 h-6 shrink-0 flex items-center justify-center border border-solid border-[#FF6B6B4D] bg-[#FF6B6B22] text-[#FF6B6B] group-hover/mi:bg-[#FF6B6B] group-hover/mi:text-[#2A0A0A] transition-colors">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                  <polyline points="3 6 5 6 21 6" />
+                                                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                                  <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                                                </svg>
+                                              </span>
+                                              <span className="text-xs font-bold whitespace-nowrap">Delete event</span>
                                             </button>
                                           </div>
                                         </>
@@ -1338,90 +1381,242 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
           </div>
         )}
 
-        {/* Add event modal — Minecraft inventory-panel styling */}
+        {/* Add event modal */}
         {showAddEvent && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-            <div className="absolute inset-0 bg-black/60" onClick={() => setShowAddEvent(false)} />
-            <form
-              onSubmit={submitNewEvent}
-              className="relative bg-[#1D1715] border border-solid border-[#3F3735] p-5 w-full max-w-sm flex flex-col gap-3"
-            >
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[#EDE0DC] text-sm font-bold">NEW STUDY EVENT</span>
-                <button
-                  type="button"
-                  onClick={() => setShowAddEvent(false)}
-                  className="text-[#859394] hover:text-[#EDE0DC] transition-colors"
-                >
-                  <img src={IMG.close} className="w-4 h-4" />
-                </button>
-              </div>
-
-              <label className="flex flex-col gap-1">
-                <span className="text-[#859394] text-[11px]">Title</span>
-                <input
-                  autoFocus
-                  value={newEvent.label}
-                  onChange={(e) => setNewEvent((p) => ({ ...p, label: e.target.value }))}
-                  className="bg-[#251E1C] border border-solid border-[#3F3735] text-[#EDE0DC] text-xs py-2 px-3 outline-none focus:border-[#2CD4D9]"
-                  placeholder="e.g. Linear Algebra Review"
-                />
-              </label>
-
-              <label className="flex flex-col gap-1">
-                <span className="text-[#859394] text-[11px]">Date</span>
-                <input
-                  type="date"
-                  value={newEvent.date}
-                  onChange={(e) => setNewEvent((p) => ({ ...p, date: e.target.value }))}
-                  className="bg-[#251E1C] border border-solid border-[#3F3735] text-[#EDE0DC] text-xs py-2 px-3 outline-none focus:border-[#2CD4D9]"
-                />
-                <span className="text-[#859394] text-[10px]">No date picked? We'll use {formatDateLabel(TODAY)}.</span>
-              </label>
-
-              <label className="flex flex-col gap-1">
-                <span className="text-[#859394] text-[11px]">Subject</span>
-                <input
-                  value={newEvent.subject}
-                  onChange={(e) => setNewEvent((p) => ({ ...p, subject: e.target.value }))}
-                  className="bg-[#251E1C] border border-solid border-[#3F3735] text-[#EDE0DC] text-xs py-2 px-3 outline-none focus:border-[#2CD4D9]"
-                />
-              </label>
-
-              <label className="flex flex-col gap-1">
-                <span className="text-[#859394] text-[11px]">Type</span>
-                <select
-                  value={newEvent.type}
-                  onChange={(e) => setNewEvent((p) => ({ ...p, type: e.target.value }))}
-                  className="bg-[#251E1C] border border-solid border-[#3F3735] text-[#EDE0DC] text-xs py-2 px-3 outline-none focus:border-[#2CD4D9]"
-                >
-                  <option value="review">Study Review</option>
-                  <option value="exam">Exam Checkpoint</option>
-                  <option value="group">Group Session</option>
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-1">
-                <span className="text-[#859394] text-[11px]">Details (optional)</span>
-                <input
-                  value={newEvent.meta}
-                  onChange={(e) => setNewEvent((p) => ({ ...p, meta: e.target.value }))}
-                  className="bg-[#251E1C] border border-solid border-[#3F3735] text-[#EDE0DC] text-xs py-2 px-3 outline-none focus:border-[#2CD4D9]"
-                  placeholder="e.g. 15:00 • Room 3"
-                />
-              </label>
-
-              <button
-                type="submit"
-                className="mt-2 bg-[#2CD4D9] text-[#003738] text-xs font-bold py-2 hover:opacity-90 transition-all duration-150 active:scale-95"
-              >
-                Add Event
-              </button>
-            </form>
-          </div>
+          <NewEventModal
+            newEvent={newEvent}
+            setNewEvent={setNewEvent}
+            onClose={() => setShowAddEvent(false)}
+            onSubmit={submitNewEvent}
+          />
         )}
       </div>
     </div>
+  );
+}
+
+const EVENT_TYPES = [
+  { key: "review", label: "Study Review", color: "#2CD4D9", icon: "📖" },
+  { key: "exam", label: "Exam Checkpoint", color: "#FF6B6B", icon: "🎯" },
+  { key: "group", label: "Group Session", color: "#82F040", icon: "👥" },
+];
+
+function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
+  const [launching, setLaunching] = useState(false);
+  const set = (patch) => setNewEvent((p) => ({ ...p, ...patch }));
+
+  const checks = [!!newEvent.label.trim(), !!newEvent.date, !!newEvent.subject.trim(), !!newEvent.meta.trim()];
+  const done = checks.filter(Boolean).length;
+  const pct = (done / checks.length) * 100;
+  const complete = done === checks.length;
+  const barColor = pct < 50 ? "#FEDA44" : pct < 100 ? "#58F1F6" : "#82F040";
+  const typeDef = EVENT_TYPES.find((t) => t.key === newEvent.type) || EVENT_TYPES[0];
+
+  const picked = parseDateFromInput(newEvent.date);
+  const left = picked ? Math.round((picked - TODAY) / 86400000) : null;
+  const dueHint = left === null ? null : left < 0 ? "In the past" : left === 0 ? "Today" : left === 1 ? "Tomorrow" : `In ${left} days`;
+
+  function quickDate(offset) {
+    const d = new Date(TODAY);
+    d.setDate(d.getDate() + offset);
+    set({ date: formatDateForInput(d) });
+  }
+
+  function submit(e) {
+    e.preventDefault();
+    if (!newEvent.label.trim() || launching) return;
+    setLaunching(true);
+    setTimeout(() => onSubmit({ preventDefault() { } }), 450);
+  }
+
+  const field =
+    "w-full bg-[#101A2E] border border-solid border-[#2E3B5C] text-[#EDE0DC] text-xs py-2.5 px-3 text-left outline-none transition-all duration-200 placeholder:text-[#4A5578] focus:border-[#2CD4D9] focus:shadow-[0_0_14px_#2CD4D933] focus:bg-[#132038]";
+
+  const Label = ({ children, ok, optional }) => (
+    <span className="flex items-center gap-1.5 text-[#8A93B8] text-[10px] font-bold tracking-wider text-left uppercase">
+      <span
+        className="inline-flex items-center justify-center w-3 h-3 rounded-full text-[8px] leading-none transition-all duration-300"
+        style={{
+          backgroundColor: ok ? "#82F040" : "transparent",
+          border: `1px solid ${ok ? "#82F040" : "#3A4E78"}`,
+          color: "#0B1220",
+          transform: ok ? "scale(1.15)" : "scale(1)",
+        }}
+      >
+        {ok ? "✓" : ""}
+      </span>
+      {children}
+      {optional && <span className="normal-case tracking-normal font-normal text-[#4A5578]">(optional)</span>}
+    </span>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-4">
+      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+      <form
+        onSubmit={submit}
+        className="pz-anim relative bg-[#0B1220F2] backdrop-blur-md border border-solid border-[#2E3B5C] w-full max-w-md max-h-[94vh] overflow-y-auto"
+        style={{
+          boxShadow: `0 20px 60px rgba(0,0,0,0.65), 0 0 40px ${typeDef.color}22`,
+          animation: launching ? "pzLaunch .45s ease-in forwards" : "pzPop .28s cubic-bezier(.2,.9,.3,1.2)",
+        }}
+      >
+        <div className="h-0.5 w-full" style={{ background: `linear-gradient(90deg, ${typeDef.color}, #FEDA44, ${typeDef.color})` }} />
+
+        {/* header */}
+        <div className="flex justify-between items-start px-5 pt-4 pb-3">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-9 h-9 flex items-center justify-center text-base border border-solid transition-colors duration-300"
+              style={{ backgroundColor: `${typeDef.color}22`, borderColor: `${typeDef.color}55` }}
+            >
+              {typeDef.icon}
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="text-[#EDE0DC] text-sm font-bold tracking-wide">NEW STUDY EVENT</span>
+              <span className="text-[#8A93B8] text-[11px]">
+                {complete ? "All set — ready to launch!" : `${done} of ${checks.length} details filled in`}
+              </span>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="text-[#8A93B8] text-xl leading-none hover:text-[#58F1F6] hover:rotate-90 transition-all duration-200" aria-label="Close">
+            ×
+          </button>
+        </div>
+
+        {/* progress bar */}
+        <div className="px-5 pb-4">
+          <div className="relative h-1.5 bg-[#101A2E] border border-solid border-[#2E3B5C] overflow-hidden">
+            <div
+              className="absolute inset-y-0 left-0 transition-all duration-500 ease-out overflow-hidden"
+              style={{ width: `${pct}%`, backgroundColor: barColor, boxShadow: `0 0 10px ${barColor}99` }}
+            >
+              {pct > 0 && (
+                <div
+                  className="pz-anim absolute inset-y-0 w-1/3"
+                  style={{ background: "linear-gradient(90deg, transparent, #ffffff88, transparent)", animation: "pzShimmer 1.8s linear infinite" }}
+                />
+              )}
+            </div>
+          </div>
+          <div className="flex justify-between mt-1.5 text-[10px] text-[#4A5578]">
+            <span>Progress</span>
+            <span className="font-bold transition-colors duration-500" style={{ color: barColor }}>
+              {Math.round(pct)}%
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 px-5 pb-5">
+          {/* Title */}
+          <label className="flex flex-col gap-1.5">
+            <Label ok={checks[0]}>Title</Label>
+            <input autoFocus value={newEvent.label} onChange={(e) => set({ label: e.target.value })} placeholder="e.g. Linear Algebra Review" className={field} />
+          </label>
+
+          {/* Type */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[#8A93B8] text-[10px] font-bold tracking-wider text-left uppercase">Type</span>
+            <div className="grid grid-cols-3 gap-1.5">
+              {EVENT_TYPES.map((t) => {
+                const active = newEvent.type === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => set({ type: t.key })}
+                    className="flex flex-col items-center gap-0.5 py-2 px-1 border border-solid text-[10px] font-bold transition-all duration-150 active:scale-95"
+                    style={{
+                      backgroundColor: active ? `${t.color}26` : "#101A2E",
+                      borderColor: active ? t.color : "#2E3B5C",
+                      color: active ? t.color : "#8A93B8",
+                      boxShadow: active ? `0 0 12px ${t.color}44` : "none",
+                    }}
+                  >
+                    <span className="text-sm leading-none">{t.icon}</span>
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Date + quick picks */}
+          <div className="flex flex-col gap-1.5">
+            <Label ok={checks[1]}>Date</Label>
+            <input type="date" value={newEvent.date} onChange={(e) => set({ date: e.target.value })} className={`${field} pz-date`} />
+            <div className="flex items-center flex-wrap gap-1.5 min-h-[22px]">
+              {[
+                ["Today", 0],
+                ["Tomorrow", 1],
+                ["Next week", 7],
+              ].map(([label, off]) => {
+                const d = new Date(TODAY);
+                d.setDate(d.getDate() + off);
+                const active = newEvent.date === formatDateForInput(d);
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => quickDate(off)}
+                    className={`text-[10px] font-bold py-0.5 px-2 border border-solid transition-all duration-150 active:scale-95 ${active ? "bg-[#2CD4D933] border-[#2CD4D9] text-[#2CD4D9]" : "bg-[#101A2E] border-[#2E3B5C] text-[#8A93B8] hover:border-[#58F1F6] hover:text-[#58F1F6]"
+                      }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+              {dueHint && (
+                <span className="ml-auto text-[10px] font-bold" style={{ color: left < 0 ? "#FF6B6B" : left <= 1 ? "#FEDA44" : "#A0D673" }}>
+                  ⏳ {dueHint}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Subject */}
+          <label className="flex flex-col gap-1.5">
+            <Label ok={checks[2]}>Subject</Label>
+            <input value={newEvent.subject} onChange={(e) => set({ subject: e.target.value })} placeholder="e.g. CS240" className={field} />
+            {newEvent.subject.trim() && (
+              <span className="self-start">
+                <Badge color={typeDef.color}>{newEvent.subject.trim().toUpperCase()}</Badge>
+              </span>
+            )}
+          </label>
+
+          {/* Details */}
+          <label className="flex flex-col gap-1.5">
+            <Label ok={checks[3]} optional>Details</Label>
+            <input value={newEvent.meta} onChange={(e) => set({ meta: e.target.value })} placeholder="e.g. 15:00 • Room 3" className={field} />
+          </label>
+
+          <span className="text-[#8A93B8] text-[10px] text-left">✓ This will also land in your Study Sprint Board backlog.</span>
+
+          <button
+            type="submit"
+            disabled={!newEvent.label.trim() || launching}
+            className="pz-anim relative overflow-hidden text-xs font-bold py-3 tracking-wider transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:brightness-110"
+            style={{
+              backgroundColor: complete ? "#82F040" : "#2CD4D9",
+              color: complete ? "#0F2A00" : "#003738",
+              "--pz-glow": complete ? "#82F04099" : "#2CD4D900",
+              animation: complete && !launching ? "pzPulse 1.8s ease-in-out infinite" : "none",
+            }}
+          >
+            {launching ? "🚀 ADDING..." : complete ? "🚀 ADD EVENT" : "ADD EVENT"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function Badge({ color, children }) {
+  return (
+    <span className="text-[10px] font-bold py-0.5 px-2 border border-solid shrink-0" style={{ backgroundColor: `${color}33`, borderColor: `${color}4D`, color }}>
+      {children}
+    </span>
   );
 }
 
@@ -1785,7 +1980,7 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
       onDragOver={(e) => onDragOver(e, colId, index)}
       onDrop={(e) => onDrop(e, colId)}
       onDragEnd={onDragEnd}
-      className={`group flex flex-col self-stretch bg-[#251E1C] p-4 gap-2 border border-solid border-transparent cursor-grab active:cursor-grabbing transition-all duration-150 hover:-translate-y-0.5 hover:border-[#58F1F64D] ${urgent ? "border-l-4 border-l-[#FF6B6B]" : ""} ${isDragged ? "opacity-40 scale-95" : "opacity-100"
+      className={`group flex flex-col self-stretch min-w-0 bg-[#251E1C] p-3 gap-2 border border-solid border-transparent cursor-grab active:cursor-grabbing transition-all duration-150 hover:-translate-y-0.5 hover:border-[#58F1F64D] ${urgent ? "border-l-4 border-l-[#FF6B6B]" : ""} ${isDragged ? "opacity-40 scale-95" : "opacity-100"
         } ${isDropTarget ? "ring-1 ring-[#58F1F6]" : ""}`}
       style={{ boxShadow: urgent ? "0px 0px 10px #FF6B6B4D" : "0px 1px 2px #0000000D" }}
     >
@@ -1798,7 +1993,7 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
             className="bg-[#130D0B] border border-solid border-[#3F3735] text-[#EDE0DC] text-sm py-1 px-2 outline-none focus:border-[#58F1F6] flex-1 min-w-0"
           />
         ) : (
-          <span className="text-[#EDE0DC] text-base truncate flex-1 min-w-0">{card.title}</span>
+          <span className="text-[#EDE0DC] text-sm truncate flex-1 min-w-0" title={card.title}>{card.title}</span>
         )}
         <div className="flex items-center gap-2 shrink-0">
           <div
@@ -1814,7 +2009,7 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
                 style={{ color: badgeColor }}
               />
             ) : (
-              <span className="text-[10px] font-bold whitespace-nowrap" style={{ color: badgeColor }}>
+              <span className="text-[10px] font-bold whitespace-nowrap max-w-[84px] truncate" style={{ color: badgeColor }}>
                 {card.subject || "NEW QUEST"}
               </span>
             )}
@@ -1845,7 +2040,7 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
           </div>
         </>
       ) : (
-        card.desc && <span className="text-[#BBC9C9] text-[13px]">{card.desc}</span>
+        card.desc && <span className="text-[#BBC9C9] text-xs break-words">{card.desc}</span>
       )}
     </div>
   );
@@ -1992,19 +2187,19 @@ function SprintBoardPanel({
 
       {/* Board */}
       {view === "kanban" ? (
-        <div className="flex flex-col lg:flex-row items-stretch self-stretch gap-4 lg:overflow-x-auto pb-2">
+        <div className="grid self-stretch gap-3 pb-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))" }}>
           {filteredColumns.map((col) => (
             <div
               key={col.id}
               onDragOver={(e) => onColumnDragOver(e, col.id)}
               onDrop={(e) => onCardDrop(e, col.id)}
-              className="flex w-full lg:w-72 lg:shrink-0 flex-col bg-[#211A18] p-2 gap-2"
+              className="flex min-w-0 flex-col bg-[#211A18] p-2 gap-2"
               style={{ boxShadow: "0px 1px 2px #0000000D" }}
             >
-              <div className="flex justify-between items-center self-stretch bg-[#130D0B] p-2" style={{ boxShadow: "0px 2px 4px #0000000D" }}>
-                <div className="flex shrink-0 items-center gap-2">
-                  <div className="w-3 h-3" style={{ backgroundColor: col.dot }} />
-                  <span className="text-[#EDE0DC] text-xs font-bold">{col.title}</span>
+              <div className="flex justify-between items-center gap-2 self-stretch bg-[#130D0B] p-2" style={{ boxShadow: "0px 2px 4px #0000000D" }}>
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="w-3 h-3 shrink-0" style={{ backgroundColor: col.dot }} />
+                  <span className="text-[#EDE0DC] text-[11px] font-bold leading-tight break-words min-w-0">{col.title}</span>
                 </div>
                 <div className="flex flex-col shrink-0 items-start bg-[#251E1C] py-0.5 px-2">
                   <span className="text-[10px] font-bold" style={{ color: col.dot }}>

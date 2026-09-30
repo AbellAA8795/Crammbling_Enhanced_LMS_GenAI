@@ -626,8 +626,8 @@ function NewTaskModal({ isClassroom, onClose, onCreate }) {
                                         type="button"
                                         onClick={() => quickDue(off)}
                                         className={`text-[10px] font-bold py-0.5 px-2 border border-solid transition-all duration-150 active:scale-95 ${active
-                                                ? "bg-[#2CD4D933] border-[#2CD4D9] text-[#2CD4D9]"
-                                                : "bg-[#101A2E] border-[#2E3B5C] text-[#8A93B8] hover:border-[#58F1F6] hover:text-[#58F1F6]"
+                                            ? "bg-[#2CD4D933] border-[#2CD4D9] text-[#2CD4D9]"
+                                            : "bg-[#101A2E] border-[#2E3B5C] text-[#8A93B8] hover:border-[#58F1F6] hover:text-[#58F1F6]"
                                             }`}
                                     >
                                         {label}
@@ -656,8 +656,8 @@ function NewTaskModal({ isClassroom, onClose, onCreate }) {
                                         type="button"
                                         onClick={() => setPoints(p)}
                                         className={`flex-1 text-xs font-bold py-2 border border-solid transition-all duration-150 active:scale-95 ${Number(points) === p
-                                                ? "bg-[#FEDA4433] border-[#FEDA44] text-[#FEDA44] shadow-[0_0_12px_#FEDA4444]"
-                                                : "bg-[#101A2E] border-[#2E3B5C] text-[#8A93B8] hover:border-[#FEDA44] hover:text-[#FEDA44]"
+                                            ? "bg-[#FEDA4433] border-[#FEDA44] text-[#FEDA44] shadow-[0_0_12px_#FEDA4444]"
+                                            : "bg-[#101A2E] border-[#2E3B5C] text-[#8A93B8] hover:border-[#FEDA44] hover:text-[#FEDA44]"
                                             }`}
                                     >
                                         {p}
@@ -1088,6 +1088,7 @@ function GroupContextMenu({ x, y, group, onClose, onOpenMessages, onOpenTab }) {
  */
 export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
+    const [navCollapsed, setNavCollapsed] = useState(false); // desktop drawer: pushed to the side
     const [fallbackPage, setFallbackPage] = useState(null); // used only when no onNavigate prop is passed
     const [searchQuery, setSearchQuery] = useState("");
     const [searchFocused, setSearchFocused] = useState(false);
@@ -1320,8 +1321,9 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                     {/* ---------------- SIDEBAR (scrollable, fits any device) ---------------- */}
                     <div
                         className={`bg-[#130D0B] w-64 shrink-0 z-50 flex flex-col h-screen
-              fixed inset-y-0 left-0 transition-transform duration-200 lg:translate-x-0
-              ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`}
+              fixed inset-y-0 left-0 transition-transform duration-300 ease-out
+              ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}
+              ${navCollapsed ? "lg:-translate-x-full" : "lg:translate-x-0"}`}
                     >
                         <div className="flex justify-end lg:hidden px-3 pt-3">
                             <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu">
@@ -1388,12 +1390,32 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                         </div>
                     </div>
 
+                    {/* Desktop drawer handle — pushes the navigation bar to the side and back */}
+                    <button
+                        onClick={() => setNavCollapsed((v) => !v)}
+                        aria-label={navCollapsed ? "Open navigation bar" : "Push navigation bar aside"}
+                        title={navCollapsed ? "Open navigation" : "Push navigation aside"}
+                        className="hidden lg:flex fixed top-1/2 -translate-y-1/2 z-[55] w-5 h-16 items-center justify-center bg-[#251E1C] border border-solid border-[#3F3735] border-l-0 text-[#2CD4D9] hover:bg-[#2CD4D9] hover:text-[#003738] hover:shadow-[0_0_14px_#2CD4D966] transition-all duration-300 active:scale-95"
+                        style={{ left: navCollapsed ? 0 : 256 }}
+                    >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: navCollapsed ? "rotate(0deg)" : "rotate(180deg)", transition: "transform .3s" }}>
+                            <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                    </button>
+
                     {/* ---------------- MAIN ---------------- */}
-                    <div className="flex-1 bg-[#181210] pb-16 min-w-0 lg:ml-64">
+                    <div className={`flex-1 bg-[#181210] pb-16 min-w-0 transition-[margin] duration-300 ease-out ${navCollapsed ? "lg:ml-0" : "lg:ml-64"}`}>
                         {/* Top bar — same search, streak/XP, notifications and profile/settings as the other pages */}
                         <div className="sticky top-0 z-30 backdrop-blur flex flex-wrap justify-between items-center gap-3 self-stretch bg-[#130D0BF0] py-3 px-4 sm:px-6">
                             <div className="flex flex-1 min-w-0 items-center gap-3 sm:gap-4">
-                                <button onClick={() => setMobileNavOpen(true)} className="lg:hidden shrink-0" aria-label="Open menu">
+                                <button
+                                    onClick={() => {
+                                        setNavCollapsed(false);
+                                        setMobileNavOpen(true);
+                                    }}
+                                    className={`shrink-0 ${navCollapsed ? "" : "lg:hidden"}`}
+                                    aria-label="Open menu"
+                                >
                                     <img src={IMG.menu} className="w-6 h-6" />
                                 </button>
 

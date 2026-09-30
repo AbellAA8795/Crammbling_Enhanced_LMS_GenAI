@@ -83,9 +83,9 @@ const NAV_IMG = {
 const NAV_ITEMS = [
     { key: "dashboard", label: "DASHBOARD", icon: NAV_IMG.dashboard, iconClass: "w-[18px] h-[15px]" },
     { key: "chatbot", label: "CHATBOT", icon: NAV_IMG.chatbot, iconClass: "w-[18px] h-[15px]" },
-    { key: "collab", label: "group", icon: NAV_IMG.group, iconClass: "w-5 h-2.5" },
+    { key: "collab", label: "GROUP COLLAB", icon: NAV_IMG.group, iconClass: "w-5 h-2.5" },
     { key: "quiz", label: "QUIZ ARENA", icon: NAV_IMG.quiz, iconClass: "w-4 h-4" },
-    { key: "personalized", label: "PERSONALIZED", icon: NAV_IMG.personalized, iconClass: "w-[18px] h-[13px]" },
+    { key: "personalized", label: "PERSONALIZER", icon: NAV_IMG.personalized, iconClass: "w-[18px] h-[13px]" },
 ];
 
 const ASSET = (id) => `https://storage.googleapis.com/tagjs-prod.appspot.com/v1/tD9ysWtmXJ/${id}_expires_30_days.png`;
@@ -310,6 +310,7 @@ export default function Chatbot({ onNavigate } = {}) {
     const [activeId, setActiveId] = useState(() => conversations[0].id);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
+    const [navCollapsed, setNavCollapsed] = useState(false); // desktop drawer: pushed to the side
     const [input, setInput] = useState("");
     const [pendingFiles, setPendingFiles] = useState([]);
     const [isThinking, setIsThinking] = useState(false);
@@ -442,10 +443,26 @@ export default function Chatbot({ onNavigate } = {}) {
 
     return (
         <div className="flex h-screen w-full bg-[#181210] overflow-hidden">
-            {/* desktop sidebar */}
-            <div className="hidden md:flex h-full">
+            {/* desktop sidebar — collapsible drawer */}
+            <div
+                className="hidden md:flex h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
+                style={{ width: navCollapsed ? 0 : 256 }}
+            >
                 <Sidebar activePage="chatbot" onNavigate={handleNavigate} onCloseMobile={() => { }} />
             </div>
+
+            {/* Desktop drawer handle — pushes the navigation bar to the side and back */}
+            <button
+                onClick={() => setNavCollapsed((v) => !v)}
+                aria-label={navCollapsed ? "Open navigation bar" : "Push navigation bar aside"}
+                title={navCollapsed ? "Open navigation" : "Push navigation aside"}
+                className="hidden md:flex fixed top-1/2 -translate-y-1/2 z-30 w-5 h-16 items-center justify-center bg-[#251E1C] border border-solid border-[#3F3735] border-l-0 text-[#2CD4D9] hover:bg-[#2CD4D9] hover:text-[#003738] hover:shadow-[0_0_14px_#2CD4D966] transition-all duration-300 active:scale-95"
+                style={{ left: navCollapsed ? 0 : 256 }}
+            >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: navCollapsed ? "rotate(0deg)" : "rotate(180deg)", transition: "transform .3s" }}>
+                    <polyline points="9 18 15 12 9 6" />
+                </svg>
+            </button>
 
             {/* mobile sidebar overlay */}
             {mobileNavOpen && (
@@ -472,7 +489,14 @@ export default function Chatbot({ onNavigate } = {}) {
                 {/* top bar */}
                 <div className="flex flex-wrap justify-between items-center gap-3 bg-[#211A18F0] py-3 px-4 sm:px-8">
                     <div className="flex items-center gap-3">
-                        <button className="md:hidden text-[#EDE0DC]" onClick={() => setMobileNavOpen(true)} aria-label="Open menu">
+                        <button
+                            className={`text-[#EDE0DC] ${navCollapsed ? "" : "md:hidden"}`}
+                            onClick={() => {
+                                setNavCollapsed(false);
+                                setMobileNavOpen(true);
+                            }}
+                            aria-label="Open menu"
+                        >
                             <Icon.Menu className="w-5 h-5" />
                         </button>
                         <button

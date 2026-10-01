@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiRequest } from "../api/client";
 
 /**
  * Exact list of school email domains that are allowed besides gmail.com.
@@ -227,15 +228,24 @@ export const primaryButton = "btn btn-lime w-full mt-7 py-3.5 text-[13px]";
 
 /**
  * Email + verification code block, used by Forgot Password and the last
- * step of Registration. Front-end only: "Send code" just starts the UI
- * (cooldown + "code sent" message), and any 6-digit code passes.
+ * step of Registration.
+ *
+ * `initialEmail` / `lockEmail` are optional: Registration passes the email
+ * already collected in step 1 and locks the field so it can't drift from
+ * the account that was actually created server-side. Forgot Password (or
+ * any other caller) can omit both and the field behaves exactly as before
+ * — free text entry.
  */
-export function EmailVerifyForm({ submitLabel, onVerified, footer }) {
-  const [email, setEmail] = useState("");
+export function EmailVerifyForm({ submitLabel, onVerified, footer, initialEmail = "", lockEmail = false }) {
+  const [email, setEmail] = useState(initialEmail);
   const [code, setCode] = useState("");
-  const [touched, setTouched] = useState({ email: false, code: false });
+  const [touched, setTouched] = useState({ email: !!initialEmail, code: false });
   const [codeSent, setCodeSent] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [sendError, setSendError] = useState("");
+  const [verifyError, setVerifyError] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -255,25 +265,48 @@ export function EmailVerifyForm({ submitLabel, onVerified, footer }) {
 
   const touch = (field) => setTouched((p) => ({ ...p, [field]: true }));
 
-  const handleSendCode = () => {
+  const handleSendCode = async () => {
     touch("email");
     if (emailError) return;
-    // TODO: call the API that emails a verification code to `email`.
-    // The server must repeat the domain allowlist check before sending.
-    setCodeSent(true);
-    setCooldown(30);
+
+    setSendError("");
+    setIsSending(true);
+    try {
+      await apiRequest("/api/otp/send", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      });
+      setCodeSent(true);
+      setCooldown(30);
+    } catch (err) {
+      setSendError(err.message || "Failed to send code. Please try again.");
+    } finally {
+      setIsSending(false);
+    }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setTouched({ email: true, code: true });
     if (emailError || codeError) return;
-    // TODO: verify the code with the API (for the same email it was sent to)
-    onVerified(email);
+
+    setVerifyError("");
+    setIsVerifying(true);
+    try {
+      await apiRequest("/api/otp/verify", {
+        method: "POST",
+        body: JSON.stringify({ email, otp: code }),
+      });
+      onVerified(email);
+    } catch (err) {
+      setVerifyError(err.message || "Invalid or expired code.");
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   const sendLabel =
-    cooldown > 0 ? `Resend (${cooldown}s)` : codeSent ? "Resend code" : "Send code";
+    isSending ? "Sending..." : cooldown > 0 ? `Resend (${cooldown}s)` : codeSent ? "Resend code" : "Send code";
 
   return (
     <form onSubmit={handleSubmit} noValidate>
@@ -284,6 +317,7 @@ export function EmailVerifyForm({ submitLabel, onVerified, footer }) {
         type="email"
         placeholder="name@gmail.com or school email"
         value={email}
+        disabled={lockEmail}
         onChange={(e) => {
           setEmail(e.target.value);
           touch("email");
@@ -296,13 +330,18 @@ export function EmailVerifyForm({ submitLabel, onVerified, footer }) {
           <button
             type="button"
             onClick={handleSendCode}
-            disabled={cooldown > 0 || (touched.email && !!emailError)}
+            disabled={cooldown > 0 || isSending || (touched.email && !!emailError)}
             className="btn btn-cyan whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {sendLabel}
           </button>
         }
       />
+      {sendError && (
+        <p role="alert" className="text-danger text-[12px] mt-1.5">
+          {sendError}
+        </p>
+      )}
 
       <Field
         id="verify-code"
@@ -318,7 +357,7 @@ export function EmailVerifyForm({ submitLabel, onVerified, footer }) {
           touch("code");
         }}
         onBlur={() => touch("code")}
-        error={touched.code && codeSent ? codeError : touched.code && !codeSent ? codeError : ""}
+        error={touched.code ? codeError : ""}
         valid={touched.code && !codeError}
         hint={
           codeSent
@@ -326,9 +365,14 @@ export function EmailVerifyForm({ submitLabel, onVerified, footer }) {
             : "We'll send a 6-digit code to your email."
         }
       />
+      {verifyError && (
+        <p role="alert" className="text-danger text-[12px] mt-1.5">
+          {verifyError}
+        </p>
+      )}
 
-      <button type="submit" className={primaryButton}>
-        {submitLabel}
+      <button type="submit" className={primaryButton} disabled={isVerifying}>
+        {isVerifying ? "Verifying..." : submitLabel}
       </button>
 
       {footer}

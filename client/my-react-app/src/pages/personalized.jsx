@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import Dashboard from "./Dashboard";
 import Chatbot from "./chatbot";
 import GroupCollab from "./group_collab";
-import { ThemePicker, useTheme, withAlpha, CloseIcon, MenuIcon } from "./Theme";
+import QuizArena from "./QuizArena";
+import LogoutConfirmModal from "../components/LogoutConfirmModal";
+import Settings from "../components/Settings";
+import { useTheme, withAlpha, CloseIcon, MenuIcon } from "./Theme";
 /* ---------------------------------------------------------
    Static assets (kept identical to the original design)
 --------------------------------------------------------- */
@@ -328,6 +332,7 @@ function formatDateLabel(d) {
    Main component
 --------------------------------------------------------- */
 export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToGroup, onNavigateToDashboard } = {}) {
+  const navigate = useNavigate();
   const [theme, setTheme, rootThemeStyle] = useTheme(); // shared with chatbot + group collab
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [navCollapsed, setNavCollapsed] = useState(false); // desktop drawer: pushed to the side
@@ -336,7 +341,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
   const [subjectFilter, setSubjectFilter] = useState("All Subjects");
   const [filterOpen, setFilterOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [loggedOut, setLoggedOut] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [viewDate, setViewDate] = useState(new Date(2027, 2, 1)); // month being viewed
   const [selectedDate, setSelectedDate] = useState(null); // date picked on the calendar grid
   const [events, setEvents] = useState(INITIAL_EVENTS);
@@ -674,20 +679,10 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     setShowAddEvent(true);
   }
 
-  if (loggedOut) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--t-bg0)] px-6 text-center">
-        <img src={IMG.logo} className="w-12 h-12 mb-4 object-fill" />
-        <span className="text-[color:var(--t-ac)] text-lg font-bold mb-2">CRAMMBLING</span>
-        <p className="text-[color:var(--t-tx2)] text-sm mb-6">You've been logged out.</p>
-        <button
-          onClick={() => setLoggedOut(false)}
-          className="bg-[var(--t-ac)] text-[color:var(--t-onac)] text-sm font-bold py-2 px-6 border border-solid border-[color:var(--t-bd0)] hover:opacity-90 transition-all duration-150 active:scale-95"
-        >
-          LOG BACK IN
-        </button>
-      </div>
-    );
+  function handleConfirmLogout() {
+    setShowLogoutConfirm(false);
+    // TODO: clear auth/session state here once real auth is wired up
+    navigate("/");
   }
 
   // Self-sufficient fallback: if nothing external is controlling navigation
@@ -751,10 +746,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                   >
                     <span className="text-[color:var(--t-ac)] text-[17px] font-bold">CRAMMBLING</span>
                   </div>
-                  <div className="flex items-center self-stretch pt-1 gap-1">
-                    <div className="bg-[var(--t-ok)] w-1.5 h-1.5" />
-                    <span className="text-[color:var(--t-warn)] text-[10px] font-bold">VOXEL QUEST Lv.18</span>
-                  </div>
                 </div>
               </div>
 
@@ -816,7 +807,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                 <span className="text-[color:var(--t-tx1)] text-[11px]">SETTINGS</span>
               </button>
               <button
-                onClick={() => setLoggedOut(true)}
+                onClick={() => setShowLogoutConfirm(true)}
                 className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]"
               >
                 <img src={IMG.logout} className="w-3.5 h-3.5 mx-3 object-fill" />
@@ -853,10 +844,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                 >
                   <MenuIcon className="w-6 h-6" />
                 </button>
-
-                <div className="hidden sm:flex flex-col shrink-0 items-start bg-[var(--t-bg3)] py-[3px] px-[9px] border border-solid border-[color:var(--t-bd0)]">
-                  <span className="text-[color:var(--t-ac)] text-[10px]">VOXEL ENGINE V2.4</span>
-                </div>
               </div>
 
               <div className="flex shrink-0 items-center gap-2 sm:gap-3">
@@ -906,7 +893,13 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
               </div>
 
               <div className="flex flex-col self-stretch px-4 sm:px-6 lg:px-10 gap-6">
-                {activeNav !== "personalized" ? (
+                {activeNav === "quiz" ? (
+                  // QuizArena brings its own side padding (same as this container),
+                  // so cancel this container's padding to avoid doubling it.
+                  <div className="-mx-4 sm:-mx-6 lg:-mx-10 self-stretch">
+                    <QuizArena where="Personalized" onBack={() => setActiveNav("personalized")} />
+                  </div>
+                ) : activeNav !== "personalized" ? (
                   <ComingSoon nav={NAV_ITEMS.find((n) => n.key === activeNav)?.label} onBack={() => setActiveNav("personalized")} />
                 ) : (
                   <>
@@ -925,7 +918,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                         </div>
                         <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-2 border border-solid border-[color:var(--t-bd0)]">
                           <div className="bg-[var(--t-ok)] w-1.5 h-1.5" />
-                          <span className="text-[color:var(--t-ok)] text-[11px]">SYNC ACTIVE</span>
+                          <span className="text-[color:var(--t-ok)] text-[11px]">ACTIVE</span>
                         </div>
                       </div>
 
@@ -1378,24 +1371,8 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
           </div>
         </div>
 
-        {/* Settings drawer */}
-        {settingsOpen && (
-          <div className="fixed inset-0 z-50 flex justify-end">
-            <div className="flex-1 bg-black/60" onClick={() => setSettingsOpen(false)} />
-            <div className="w-full max-w-xs bg-[var(--t-bg2)] border-l border-solid border-[color:var(--t-bd0)] p-5 flex flex-col gap-4">
-              <div className="flex justify-between items-center">
-                <span className="text-[color:var(--t-tx0)] text-sm font-bold">SETTINGS</span>
-                <button onClick={() => setSettingsOpen(false)}>
-                  <CloseIcon className="w-4 h-4" />
-                </button>
-              </div>
-              <ThemePicker theme={theme} onChange={setTheme} />
-              <ToggleRow label="Email reminders" />
-              <ToggleRow label="Group session pings" defaultOn />
-              <ToggleRow label="Voxel quest sound effects" />
-            </div>
-          </div>
-        )}
+        {/* Settings drawer — shared by every page (and Quiz Arena) */}
+        <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} theme={theme} onThemeChange={setTheme} />
 
         {/* Add event modal */}
         {showAddEvent && (
@@ -1405,6 +1382,11 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
             onClose={() => setShowAddEvent(false)}
             onSubmit={submitNewEvent}
           />
+        )}
+
+        {/* Logout confirmation — same popup as the Dashboard */}
+        {showLogoutConfirm && (
+          <LogoutConfirmModal onConfirm={handleConfirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
         )}
       </div>
     </div>
@@ -1633,21 +1615,6 @@ function Badge({ color, children }) {
     <span className="text-[10px] font-bold py-0.5 px-2 border border-solid shrink-0" style={{ backgroundColor: withAlpha(color, "33"), borderColor: withAlpha(color, "4D"), color }}>
       {children}
     </span>
-  );
-}
-
-function ToggleRow({ label, defaultOn = false }) {
-  const [on, setOn] = useState(defaultOn);
-  return (
-    <button
-      onClick={() => setOn((v) => !v)}
-      className="flex justify-between items-center py-2 border-b border-solid border-[color:var(--t-bd0)]"
-    >
-      <span className="text-[color:var(--t-tx1)] text-xs">{label}</span>
-      <div className={`w-9 h-5 flex items-center px-0.5 ${on ? "bg-[var(--t-ac)] justify-end" : "bg-[var(--t-bg3)] justify-start"}`}>
-        <div className="w-3.5 h-3.5 bg-[var(--t-tx0)]" />
-      </div>
-    </button>
   );
 }
 

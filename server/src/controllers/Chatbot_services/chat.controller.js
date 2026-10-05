@@ -5,11 +5,25 @@ import {
   getChatMessages,
   chatBelongsToUser,
 } from "../../models/Chatbot_services/chat.model.js";
-import { streamOllamaReply } from "../../services/Chatbot_services/ollama.service.js";
+import {
+  streamOllamaReply,
+  getOllamaReply,
+  buildMessages,
+  pickModel,
+  getCachedActivePrompt,
+  invalidatePromptCache,
+  OllamaTimeoutError,
+  OllamaUnavailableError,
+  OllamaResponseError,
+} from "../../services/Chatbot_services/ollama.service.js";
+import { summarizeIfNeeded, getBoundedContext } from "../../services/Chatbot_services/summarization.service.js";
 import { getActivePrompt } from "../../models/Chatbot_services/prompt.model.js";
 import { ollamaQueue, getQueuePosition } from "../../services/Chatbot_services/queue.service.js";
-import { MAX_HISTORY_MESSAGES } from "../../middleware/Chatbot_services/chatMiddleware.js";
 import fs from "fs/promises";
+
+// Re-exported so prompt.controller.js can invalidate the cache after
+// creating/activating a prompt version without importing ollama.service directly.
+export { invalidatePromptCache };
 
 // Helper: turn the first message into a short title
 function generateTitleFromMessage(message) {
@@ -28,6 +42,23 @@ function sendSSE(res, data) {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
+// Maps a thrown error to a client-safe message + log line. Keeps the
+// "what do we tell the user" decision in one place instead of repeated
+// per controller (ISO 25010 — Security: no stack traces/internal detail
+// reach the client; Reliability: every failure path is classified).
+function describeError(err) {
+    if (err instanceof OllamaTimeoutError) {
+        return { log: "timeout", client: "The assistant took too long to respond. Please try again." };
+    }
+    if (err instanceof OllamaUnavailableError) {
+        return { log: "unavailable", client: "The assistant is temporarily unavailable. Please try again shortly." };
+    }
+    if (err instanceof OllamaResponseError) {
+        return { log: "bad response", client: "The assistant had trouble responding. Please try again." };
+    }
+    return { log: "unknown", client: "Something went wrong generating a response." };
+}
+
 export async function startNewChatController(req, res) {
     try {
         const userId = req.user.id;
@@ -37,7 +68,7 @@ export async function startNewChatController(req, res) {
         const chatId = await createChat(userId, title);
         await insertMessage(chatId, "user", message);
 
-        const activePrompt = await getActivePrompt();
+        const systemPrompt = await getCachedActivePrompt(() => getActivePrompt());
 
         startSSE(res);
         sendSSE(res, { type: "start", chatId, title });
@@ -47,22 +78,33 @@ export async function startNewChatController(req, res) {
             sendSSE(res, { type: "queued", position });
         }
 
-        let fullReply = "";
+        const messages = buildMessages({
+            systemPrompt,
+            conversationSummary: null,
+            recentHistory: [],
+            userMessage: message,
+        });
+        const model = pickModel(message, 0);
+
+        let result;
         try {
-            fullReply = await ollamaQueue.add(() =>
-                streamOllamaReply(
-                    [{ role: "user", content: message }],
-                    activePrompt?.content,
-                    (chunk) => sendSSE(res, { type: "chunk", content: chunk })
-                )
+            result = await ollamaQueue.add(() =>
+                streamOllamaReply(messages, {
+                    model,
+                    onChunk: (chunk) => sendSSE(res, { type: "chunk", content: chunk }),
+                })
             );
         } catch (ollamaError) {
-            console.error("Ollama streaming error:", ollamaError);
-            sendSSE(res, { type: "error", message: "The assistant is currently unavailable." });
+            const { log, client } = describeError(ollamaError);
+            console.error(`[chat:new] ${log}:`, ollamaError.message);
+            sendSSE(res, { type: "error", message: client });
             return res.end();
         }
 
-        await insertMessage(chatId, "assistant", fullReply, activePrompt?.version);
+        await insertMessage(
+            chatId, "assistant", result.fullText, systemPrompt?.version,
+            result.promptTokens, result.completionTokens, result.latencyMs, result.model
+        );
 
         sendSSE(res, { type: "done" });
         res.end();
@@ -89,12 +131,13 @@ export async function continueChatController(req, res) {
 
         await insertMessage(chatId, "user", message);
 
-        let history = await getChatMessages(chatId, userId);
-        if (history.length > MAX_HISTORY_MESSAGES) {
-            history = history.slice(-MAX_HISTORY_MESSAGES);
-        }
+        // Keeps context bounded regardless of how long the conversation
+        // has grown (memory management) — summarizes older turns if needed,
+        // then returns only the stored summary + the most recent messages.
+        await summarizeIfNeeded(chatId);
+        const { summary, recentHistory } = await getBoundedContext(chatId);
 
-        const activePrompt = await getActivePrompt();
+        const systemPrompt = await getCachedActivePrompt(() => getActivePrompt());
 
         startSSE(res);
         sendSSE(res, { type: "start" });
@@ -104,22 +147,33 @@ export async function continueChatController(req, res) {
             sendSSE(res, { type: "queued", position });
         }
 
-        let fullReply = "";
+        const messages = buildMessages({
+            systemPrompt,
+            conversationSummary: summary,
+            recentHistory,
+            userMessage: message,
+        });
+        const model = pickModel(message, recentHistory.length);
+
+        let result;
         try {
-            fullReply = await ollamaQueue.add(() =>
-                streamOllamaReply(
-                    history,
-                    activePrompt?.content,
-                    (chunk) => sendSSE(res, { type: "chunk", content: chunk })
-                )
+            result = await ollamaQueue.add(() =>
+                streamOllamaReply(messages, {
+                    model,
+                    onChunk: (chunk) => sendSSE(res, { type: "chunk", content: chunk }),
+                })
             );
         } catch (ollamaError) {
-            console.error("Ollama streaming error:", ollamaError);
-            sendSSE(res, { type: "error", message: "The assistant is currently unavailable." });
+            const { log, client } = describeError(ollamaError);
+            console.error(`[chat:${chatId}] ${log}:`, ollamaError.message);
+            sendSSE(res, { type: "error", message: client });
             return res.end();
         }
 
-        await insertMessage(chatId, "assistant", fullReply, activePrompt?.version);
+        await insertMessage(
+            chatId, "assistant", result.fullText, systemPrompt?.version,
+            result.promptTokens, result.completionTokens, result.latencyMs, result.model
+        );
 
         sendSSE(res, { type: "done" });
         res.end();
@@ -190,19 +244,37 @@ export async function uploadToChatController(req, res) {
 
     await insertMessage(chatId, "user", combinedMessage);
 
-    let history = await getChatMessages(chatId, userId);
-    if (history.length > MAX_HISTORY_MESSAGES) {
-      history = history.slice(-MAX_HISTORY_MESSAGES);
+    await summarizeIfNeeded(chatId);
+    const { summary, recentHistory } = await getBoundedContext(chatId);
+    const systemPrompt = await getCachedActivePrompt(() => getActivePrompt());
+
+    const messages = buildMessages({
+      systemPrompt,
+      conversationSummary: summary,
+      recentHistory,
+      userMessage: fileNote,
+    });
+    const model = pickModel(combinedMessage, recentHistory.length);
+
+    let result;
+    try {
+      result = await ollamaQueue.add(() => getOllamaReply(messages, { model }));
+    } catch (ollamaError) {
+      const { log, client } = describeError(ollamaError);
+      console.error(`[chat:upload:${chatId}] ${log}:`, ollamaError.message);
+      return res.status(ollamaError.statusCode || 500).json({ success: false, message: client });
     }
 
-    const botReply = await getOllamaReply(history);
-    await insertMessage(chatId, "assistant", botReply);
+    await insertMessage(
+      chatId, "assistant", result.fullText, systemPrompt?.version,
+      result.promptTokens, result.completionTokens, result.latencyMs, result.model
+    );
 
     return res.status(200).json({
       success: true,
       data: {
         fileName: req.file.originalname,
-        reply: botReply,
+        reply: result.fullText,
       },
     });
   } catch (error) {

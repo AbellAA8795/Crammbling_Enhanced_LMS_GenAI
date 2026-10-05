@@ -7,8 +7,6 @@ import { useNavigate } from "react-router-dom";
 import { listChats, getChatMessages, uploadChatFile } from "../api/chat";
 import { streamChatMessage } from "../api/chatStream";
 
-
-
 /* ------------------------------------------------------------------ */
 /*  Tiny inline icon set (keeps this file dependency-free)             */
 /* ------------------------------------------------------------------ */

@@ -16,7 +16,7 @@ import userRoutes from "./routes/Authentication/user.route.js";
 import otpRoutes from "./routes/Authentication/otp.route.js";
 import chatRoutes from "./routes/Chatbot_services/chat.route.js";
 import promptRoutes from "./routes/Chatbot_services/prompt.route.js";
-
+import feedbackRoutes from "./routes/Chatbot_services/feedback.route.js";
 
 app.get("/", (req, res) => {
     res.send("Crammbling backend is running!");
@@ -24,12 +24,12 @@ app.get("/", (req, res) => {
 
 // middleware
 app.use("/api/login", loginRoutes);
-app.use("/api/users", userRoutes);
 app.use("/api/otp", otpRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/auth", googleAuthRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/prompts", promptRoutes);
+app.use("/api/chat", feedbackRoutes);
 
 app.use((err, req, res, next) => {
     if (err.code === "LIMIT_FILE_SIZE") {

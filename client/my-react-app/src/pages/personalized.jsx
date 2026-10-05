@@ -152,7 +152,6 @@ const NAV_ITEMS = [
   { key: "dashboard", label: "DASHBOARD", icon: IMG.dashboard, iconClass: "w-[18px] h-[15px]" },
   { key: "chatbot", label: "CHATBOT", icon: IMG.chatbot, iconClass: "w-[18px] h-[15px]" },
   { key: "group", label: "GROUP COLLAB", icon: IMG.group, iconClass: "w-5 h-2.5" },
-  { key: "quiz", label: "QUIZ ARENA", icon: IMG.quiz, iconClass: "w-4 h-4" },
   { key: "personalized", label: "PERSONALIZED", icon: IMG.personalized, iconClass: "w-[18px] h-[13px]" },
 ];
 
@@ -478,10 +477,9 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     if (forgeStatusMap[id] === "forging") return;
     setForgeStatusMap((prev) => ({ ...prev, [id]: "forging" }));
     setTimeout(() => {
-      setForgeStatusMap((prev) => ({ ...prev, [id]: "ready" }));
-      setTimeout(() => {
-        setForgeStatusMap((prev) => ({ ...prev, [id]: "idle" }));
-      }, 1800);
+      setForgeStatusMap((prev) => ({ ...prev, [id]: "idle" }));
+      // Quiz Arena's only entrance: a finished "Forge Quiz"
+      setActiveNav("quiz");
     }, 1200);
   }
 
@@ -755,7 +753,8 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 
               <nav className="flex flex-col self-stretch px-3 gap-1">
                 {NAV_ITEMS.map((item) => {
-                  const active = activeNav === item.key;
+                  // Quiz Arena has no nav entry; while it is open, keep PERSONALIZED highlighted
+                  const active = activeNav === item.key || (item.key === "personalized" && activeNav === "quiz");
                   return (
                     <button
                       key={item.key}
@@ -889,7 +888,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                 className="self-stretch absolute top-[-56px] lg:top-[-72px] right-0 left-0 pb-[1px]"
                 style={{ background: "linear-gradient(180deg, var(--t-bg2), color-mix(in srgb, var(--t-bg3) 55%, var(--t-bg2)), var(--t-bg1))" }}
               >
-               
+
               </div>
 
               <div className="flex flex-col self-stretch px-4 sm:px-6 lg:px-10 gap-6">
@@ -897,7 +896,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                   // QuizArena brings its own side padding (same as this container),
                   // so cancel this container's padding to avoid doubling it.
                   <div className="-mx-4 sm:-mx-6 lg:-mx-10 self-stretch">
-                    <QuizArena where="Personalized" onBack={() => setActiveNav("personalized")} />
+                    <QuizArena where="Personalized" onBack={() => { setActiveNav("personalized"); setActiveSubTab("quizforge"); }} />
                   </div>
                 ) : activeNav !== "personalized" ? (
                   <ComingSoon nav={NAV_ITEMS.find((n) => n.key === activeNav)?.label} onBack={() => setActiveNav("personalized")} />

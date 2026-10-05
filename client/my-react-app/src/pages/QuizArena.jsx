@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 
 /* ------------------------------------------------------------------ */
 /*  QUIZ ARENA                                                          */
-/*  1. Upload a file (or paste notes)                                   */
-/*  2. Pick a mode: Quiz, Boss Battle or Flashcards                     */
-/*  3. Questions are generated automatically from the file's content    */
+/*  1. Host page passes the forged file in via the `file` prop          */
+/*  2. Flashcards are generated and can be edited (scroll sideways)     */
+/*  3. Pick a mode: Quiz, Boss Battle or Flashcards                     */
 /*                                                                      */
 /*  Question generation here runs in the browser and works on plain     */
 /*  text (.txt, .md, .csv, pasted notes). PDF / Word / PowerPoint files */
@@ -79,7 +79,19 @@ function pickTerm(sentence) {
 }
 
 function blankOut(sentence, term) {
-  return sentence.replace(new RegExp(`\\b${escapeRe(term)}\\b`), "_____");
+  const r = sentence.replace(new RegExp(`\\b${escapeRe(term)}\\b`), "_____");
+  return r !== sentence ? r : sentence.replace(term, "_____");
+}
+
+/* Turn the (possibly edited) flashcards back into facts so quizzes use the user's version. */
+function cardsToFacts(deck) {
+  return deck
+    .filter((c) => c.front.trim() && c.back.trim())
+    .map((c) => {
+      const back = c.back.trim();
+      const front = c.front.trim();
+      return { sentence: front.includes("_____") ? front.replace("_____", back) : `${front} \u2014 ${back}`, term: back };
+    });
 }
 
 function buildFacts(text) {
@@ -160,6 +172,9 @@ const KEYFRAMES = `
 @keyframes qaHurt { 0% { box-shadow: inset 0 0 0 0 transparent } 30% { box-shadow: inset 0 0 70px 0 color-mix(in srgb, var(--t-err) 55%, transparent) } 100% { box-shadow: inset 0 0 0 0 transparent } }
 @keyframes qaPop { from { opacity: 0; transform: translateY(8px) scale(.97) } to { opacity: 1; transform: none } }
 @keyframes qaDmg { 0% { opacity: 0; transform: translateY(6px) } 20% { opacity: 1 } 100% { opacity: 0; transform: translateY(-34px) } }
+.qa-hide-scroll { scrollbar-width: none }
+.qa-hide-scroll::-webkit-scrollbar { display: none }
+.qa-page { will-change: transform, opacity }
 @media (prefers-reduced-motion: reduce) { .qa-anim { animation: none !important } }
 `;
 
@@ -189,179 +204,239 @@ function Step({ n, title, children, right }) {
   );
 }
 
-/* ------------------------------ setup view ----------------------------- */
+/* ------------------------------ deck view ------------------------------ */
 
-function SetupView({ onStart }) {
-  const [text, setText] = useState("");
-  const [fileInfo, setFileInfo] = useState(null); // { name, size, demo }
-  const [reading, setReading] = useState(false);
-  const [dragging, setDragging] = useState(false);
-  const [mode, setMode] = useState("quiz");
-  const [types, setTypes] = useState(["mcq", "ident", "tf"]);
-  const [count, setCount] = useState(10);
-  const [error, setError] = useState("");
-  const [generating, setGenerating] = useState(false);
-  const fileRef = useRef(null);
+const fieldCls =
+  "w-full resize-y bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-2.5 outline-none focus:border-[color:var(--t-ac)]";
 
-  const hasContent = text.trim().length > 0;
+function CardTile({ c, n, onSave, onDelete }) {
+  const [editing, setEditing] = useState(!c.front && !c.back);
+  const [front, setFront] = useState(c.front);
+  const [back, setBack] = useState(c.back);
 
-  async function readFile(file) {
-    if (!file) return;
-    setError("");
-    setReading(true);
-    const ext = file.name.split(".").pop().toLowerCase();
-    try {
-      if (TEXT_EXT.includes(ext)) {
-        const content = await file.text();
-        setText(content);
-        setFileInfo({ name: file.name, size: file.size, demo: false });
-      } else {
-        // TODO: send the file to the backend / AI service, get the extracted text back,
-        // and call setText(extracted). Until then PDF, Word and PowerPoint files use
-        // sample notes so the whole flow can still be tried.
-        setText(DEMO_TEXT);
-        setFileInfo({ name: file.name, size: file.size, demo: true });
-      }
-    } catch {
-      setError("That file could not be read. Try another one or paste your notes below.");
-    } finally {
-      setReading(false);
-    }
-  }
-
-  function handleDrop(e) {
-    e.preventDefault();
-    setDragging(false);
-    readFile(e.dataTransfer.files?.[0]);
-  }
-
-  function clearFile() {
-    setFileInfo(null);
-    setText("");
-    setError("");
-  }
-
-  function toggleType(key) {
-    setTypes((prev) => {
-      if (prev.includes(key)) return prev.length === 1 ? prev : prev.filter((k) => k !== key);
-      return [...prev, key];
-    });
-  }
-
-  function generate() {
-    setError("");
-    const facts = buildFacts(text);
-    if (facts.length < 3) {
-      setError("Not enough content to build questions. Upload a longer file or paste more notes (at least a few full sentences).");
-      return;
-    }
-    setGenerating(true);
-    setTimeout(() => {
-      const total = Math.min(count, facts.length);
-      const title = fileInfo?.name || "Pasted notes";
-      if (mode === "cards") {
-        onStart({ mode, title, deck: makeCards(facts, total) });
-      } else {
-        onStart({ mode, title, questions: makeQuestions(facts, types, total) });
-      }
-      setGenerating(false);
-    }, 900);
+  function save() {
+    onSave({ ...c, front: front.trim(), back: back.trim() });
+    setEditing(false);
   }
 
   return (
+    <div className={`${card} h-full flex flex-col gap-3 p-4`} style={cardShadow}>
+      <div className="flex items-center justify-between">
+        <span className="text-[color:var(--t-ac)] text-[11px] font-bold tracking-wider">CARD {n}</span>
+        <div className="flex items-center gap-3">
+          {editing ? (
+            <button type="button" onClick={save} className="text-[color:var(--t-ok)] text-[11px] font-bold hover:opacity-75">Save</button>
+          ) : (
+            <button type="button" onClick={() => setEditing(true)} className="text-[color:var(--t-ac)] text-[11px] font-bold hover:opacity-75">Edit</button>
+          )}
+          <button type="button" onClick={onDelete} className="text-[color:var(--t-err)] text-[11px] font-bold hover:opacity-75">Delete</button>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider uppercase">Front</span>
+        {editing ? (
+          <textarea rows={4} value={front} onChange={(e) => setFront(e.target.value)} className={fieldCls} placeholder="Question or prompt (use _____ for a blank)" />
+        ) : (
+          <p className="text-[color:var(--t-tx0)] text-sm leading-snug min-h-[84px]">{c.front}</p>
+        )}
+      </div>
+      <div className="flex flex-col gap-1 pt-3 border-t border-solid border-[color:var(--t-bd0)]">
+        <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider uppercase">Back</span>
+        {editing ? (
+          <input value={back} onChange={(e) => setBack(e.target.value)} className={fieldCls} placeholder="Answer" />
+        ) : (
+          <p className="text-[color:var(--t-ac)] text-base font-bold">{c.back}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DeckView({ title, demo, deck, generating, error, setDeck, onStart }) {
+  const [mode, setMode] = useState("quiz");
+  const [types, setTypes] = useState(["mcq", "ident", "tf"]);
+  const [count, setCount] = useState(10);
+  const [msg, setMsg] = useState("");
+  const scroller = useRef(null);
+  const raf = useRef(0);
+  const [active, setActive] = useState(0);
+  const CARD_W = "min(320px, 78vw)";
+
+  /* Book-style flip: every card is tilted and dimmed by how far it is from the centre. */
+  function layout() {
+    const el = scroller.current;
+    if (!el) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const mid = el.scrollLeft + el.clientWidth / 2;
+    let best = 0;
+    let bestD = Infinity;
+    el.querySelectorAll("[data-page]").forEach((node, i) => {
+      const d = (node.offsetLeft + node.offsetWidth / 2 - mid) / node.offsetWidth;
+      if (Math.abs(d) < bestD) {
+        bestD = Math.abs(d);
+        best = i;
+      }
+      if (reduce) return;
+      const c = Math.max(-2, Math.min(2, d));
+      const a = Math.abs(c);
+      // Focus effect: the centred card is sharp, enlarged and glowing; the rest blur and dim
+      // smoothly with distance so only the card being read can be read.
+      const near = 1 - Math.min(a, 1); // 1 at the centre, 0 one card away
+      node.style.transform = `perspective(1000px) translateZ(${-a * 70}px) rotateY(${-c * 44}deg) scale(${1.04 - a * 0.1})`;
+      node.style.opacity = String(Math.max(0.3, 1 - a * 0.5));
+      node.style.filter = `blur(${(a * 4).toFixed(2)}px) brightness(${1 - a * 0.25})`;
+      node.style.boxShadow = `0 0 ${near * 30}px color-mix(in srgb, var(--t-ac) ${near * 35}%, transparent)`;
+      node.style.zIndex = String(10 - Math.round(a));
+    });
+    setActive(best);
+  }
+
+  function onScroll() {
+    cancelAnimationFrame(raf.current);
+    raf.current = requestAnimationFrame(layout);
+  }
+
+  function goTo(i) {
+    const el = scroller.current;
+    const node = el?.querySelectorAll("[data-page]")[i];
+    if (!node) return;
+    el.scrollTo({ left: node.offsetLeft + node.offsetWidth / 2 - el.clientWidth / 2, behavior: "smooth" });
+  }
+
+  useEffect(() => {
+    layout();
+    window.addEventListener("resize", layout);
+    return () => {
+      window.removeEventListener("resize", layout);
+      cancelAnimationFrame(raf.current);
+    };
+  }, [deck.length, generating, error]);
+
+  function toggleType(key) {
+    setTypes((prev) => (prev.includes(key) ? (prev.length === 1 ? prev : prev.filter((k) => k !== key)) : [...prev, key]));
+  }
+
+  function start() {
+    setMsg("");
+    const valid = deck.filter((c) => c.front.trim() && c.back.trim());
+    if (mode === "cards") {
+      if (!valid.length) return setMsg("Add at least one complete flashcard first.");
+      return onStart({ mode, title, deck: valid.map((c) => ({ ...c, source: "" })) });
+    }
+    const facts = cardsToFacts(valid);
+    if (facts.length < 3) return setMsg("You need at least 3 complete flashcards to build a quiz.");
+    onStart({ mode, title, questions: makeQuestions(facts, types, Math.min(count, facts.length)) });
+  }
+
+  const lastPage = deck.length; // the "Add card" tile is the final page
+  const step = (dir) => goTo(Math.max(0, Math.min(lastPage, active + dir)));
+
+  return (
     <div className="flex flex-col gap-4">
-      {/* Step 1 - upload */}
+      {/* Flashcards generated from the forged file */}
       <Step
         n="1"
-        title="Upload your study material"
-        right={<span className="text-[color:var(--t-ac)] text-[11px] bg-[var(--t-bg3)] py-1 px-2.5 border border-solid border-[color:var(--t-bd0)]">TXT, MD, PDF, DOCX, PPTX</span>}
+        title="Your flashcards"
+        right={
+          <div className="flex items-center gap-2">
+            <span className="text-[color:var(--t-ac)] text-[11px] bg-[var(--t-bg3)] py-1 px-2.5 border border-solid border-[color:var(--t-bd0)] max-w-[220px] truncate">
+              {title} {"\u2022"} {deck.length} cards
+            </span>
+            <button type="button" onClick={() => step(-1)} aria-label="Scroll left" className={`${btnGhost} !py-1 !px-2.5`}>{"\u2039"}</button>
+            <button type="button" onClick={() => step(1)} aria-label="Scroll right" className={`${btnGhost} !py-1 !px-2.5`}>{"\u203A"}</button>
+          </div>
+        }
       >
-        <input
-          ref={fileRef}
-          type="file"
-          accept={ACCEPT}
-          className="hidden"
-          onChange={(e) => {
-            readFile(e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
-
-        {fileInfo ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--t-bg2)] p-3.5 border border-solid border-[color:var(--t-bd0)]">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="w-10 h-10 shrink-0 flex items-center justify-center bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-ac)] text-lg">
-                {"\u25A4"}
-              </span>
-              <div className="min-w-0">
-                <p className="text-[color:var(--t-tx0)] text-sm font-bold truncate">{fileInfo.name}</p>
-                <p className="text-[color:var(--t-tx2)] text-[11px]">
-                  {formatSize(fileInfo.size)} {"\u2022"} {buildFacts(text).length} key facts found
-                </p>
-              </div>
-            </div>
-            <button type="button" onClick={clearFile} className="text-[color:var(--t-err)] text-xs font-bold hover:opacity-75">
-              Remove
-            </button>
-          </div>
-        ) : (
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragging(true);
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
-            className={`flex flex-col items-center text-center py-9 px-4 gap-2 border-2 border-dashed transition-all duration-150 ${
-              dragging
-                ? "bg-[color-mix(in_srgb,_var(--t-ac)_10%,_transparent)] border-[color:var(--t-ac)] scale-[1.01]"
-                : "bg-[var(--t-bg0)] border-[color:var(--t-bd1)]"
-            }`}
-          >
-            <span className="text-3xl text-[color:var(--t-ac)] leading-none">{"\u21EA"}</span>
-            <p className="text-[color:var(--t-tx0)] text-base font-bold">Drop a lecture, slides, or notes here</p>
-            <p className="text-[color:var(--t-tx2)] text-xs max-w-md">
-              We read the file and turn the key facts into questions automatically. You choose how to practice in the next step.
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
-              <button type="button" onClick={() => fileRef.current?.click()} className={btnPrimary}>
-                {reading ? "Reading\u2026" : "Choose file"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setText(DEMO_TEXT);
-                  setFileInfo({ name: "Sample_Algorithms_Notes.txt", size: DEMO_TEXT.length, demo: false });
-                }}
-                className={btnGhost}
-              >
-                Use sample notes
-              </button>
-            </div>
-          </div>
-        )}
-
-        {fileInfo?.demo && (
+        {demo && (
           <p className="text-[color:var(--t-warn)] text-[11px] leading-snug">
-            Reading PDF, Word and PowerPoint files needs the AI backend, which isn't connected yet. Sample notes are used so you can try every mode.
+            Reading PDF, Word and PowerPoint files needs the AI backend, which isn't connected yet. Sample notes were used so you can try everything.
           </p>
         )}
+        {generating ? (
+          <div className="flex items-center gap-2 py-10 justify-center text-[color:var(--t-tx1)] text-xs">
+            <Spinner /> Generating flashcards from {title}{"\u2026"}
+          </div>
+        ) : error ? (
+          <p role="alert" className="text-[color:var(--t-err)] text-xs py-6">{error}</p>
+        ) : (
+          <>
+            <div
+              ref={scroller}
+              onScroll={onScroll}
+              tabIndex={0}
+              aria-label="Flashcards, scroll sideways"
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
+                if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
+              }}
+              className="qa-hide-scroll relative flex gap-4 overflow-x-auto snap-x snap-mandatory py-5 outline-none"
+              style={{
+                paddingInline: `calc(50% - ${CARD_W} / 2)`,
+                scrollBehavior: "smooth",
+                WebkitMaskImage: "linear-gradient(to right, transparent, #000 14%, #000 86%, transparent)",
+                maskImage: "linear-gradient(to right, transparent, #000 14%, #000 86%, transparent)",
+              }}
+            >
+              {deck.map((c, i) => (
+                <div
+                  key={c.id}
+                  data-page
+                  className="qa-page shrink-0 snap-center flex"
+                  style={{ width: CARD_W }}
+                  // Side cards turn into the centre first, so a stray tap never edits the wrong card.
+                  onClickCapture={(e) => {
+                    if (i !== active) {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      goTo(i);
+                    }
+                  }}
+                >
+                  <div className="w-full">
+                    <CardTile
+                      c={c}
+                      n={i + 1}
+                      onSave={(next) => setDeck((d) => d.map((x) => (x.id === c.id ? next : x)))}
+                      onDelete={() => setDeck((d) => d.filter((x) => x.id !== c.id))}
+                    />
+                  </div>
+                </div>
+              ))}
+              <div data-page className="qa-page shrink-0 snap-center flex" style={{ width: CARD_W }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeck((d) => [...d, { id: `c_new_${Date.now()}`, front: "", back: "" }]);
+                    setTimeout(() => goTo(deck.length), 60);
+                  }}
+                  className="w-full min-h-[250px] flex flex-col items-center justify-center gap-1 border-2 border-dashed border-[color:var(--t-bd1)] text-[color:var(--t-tx2)] hover:text-[color:var(--t-ac)] hover:border-[color:var(--t-ac)] transition-colors duration-150"
+                >
+                  <span className="text-3xl leading-none">+</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wide">Add card</span>
+                </button>
+              </div>
+            </div>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider uppercase">Or paste your notes</span>
-          <textarea
-            value={fileInfo ? "" : text}
-            disabled={!!fileInfo}
-            onChange={(e) => setText(e.target.value)}
-            rows={4}
-            placeholder={fileInfo ? "Remove the uploaded file to paste notes instead." : "Paste lecture notes, a summary, or a reviewer here\u2026"}
-            className="w-full resize-y bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2.5 px-3 outline-none placeholder:text-[color:var(--t-tx2)] focus:border-[color:var(--t-ac)] disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-        </label>
+            {/* page counter + progress, like the page number of a book */}
+            <div className="flex items-center gap-3 px-1">
+              <span className="text-[color:var(--t-tx1)] text-[11px] font-bold tabular-nums whitespace-nowrap">
+                {active >= deck.length ? "New card" : `Card ${active + 1} of ${deck.length}`}
+              </span>
+              <div className="flex-1 h-1 bg-[var(--t-bg3)] overflow-hidden">
+                <div
+                  className="h-full bg-[var(--t-ac)] transition-all duration-300"
+                  style={{ width: `${((Math.min(active, deck.length - 1) + 1) / Math.max(deck.length, 1)) * 100}%` }}
+                />
+              </div>
+            </div>
+            <p className="text-[color:var(--t-tx2)] text-[11px]">Swipe, scroll, use the arrows, or tap a blurred card to bring it into focus. Edit any card; quizzes and boss battles use your edited deck.</p>
+          </>
+        )}
       </Step>
 
-      {/* Step 2 - mode + options */}
-      <div className={hasContent ? "" : "opacity-50 pointer-events-none"} aria-disabled={!hasContent}>
+      {/* Practice picker */}
+      <div className={generating || error || !deck.length ? "opacity-50 pointer-events-none" : ""}>
         <Step n="2" title="Choose how you want to practice">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {MODES.map((m) => {
@@ -372,16 +447,14 @@ function SetupView({ onStart }) {
                   type="button"
                   onClick={() => setMode(m.key)}
                   aria-pressed={active}
-                  className={`flex flex-col items-start text-left gap-1.5 p-4 border border-solid transition-all duration-150 active:scale-[0.99] ${
-                    active
-                      ? "bg-[var(--t-bg3)] border-[color:var(--t-ac)]"
-                      : "bg-[var(--t-bg2)] border-[color:var(--t-bd0)] hover:border-[color:var(--t-bd1)]"
+                  className={`flex flex-col items-start text-left gap-2 p-5 border border-solid transition-all duration-150 active:scale-[0.99] ${
+                    active ? "bg-[var(--t-bg3)] border-[color:var(--t-ac)]" : "bg-[var(--t-bg2)] border-[color:var(--t-bd0)] hover:border-[color:var(--t-bd1)]"
                   }`}
-                  style={active ? { boxShadow: "0px 0px 14px color-mix(in srgb, var(--t-ac) 25%, transparent)" } : undefined}
+                  style={active ? { boxShadow: "0px 0px 18px color-mix(in srgb, var(--t-ac) 30%, transparent)" } : undefined}
                 >
-                  <span className="text-xl leading-none" style={{ color: active ? "var(--t-ac)" : "var(--t-tx2)" }}>{m.icon}</span>
-                  <span className={`text-sm font-bold ${active ? "text-[color:var(--t-ac)]" : "text-[color:var(--t-tx0)]"}`}>{m.title}</span>
-                  <span className="text-[color:var(--t-tx2)] text-[11px] leading-snug">{m.desc}</span>
+                  <span className="text-3xl leading-none" style={{ color: active ? "var(--t-ac)" : "var(--t-tx2)" }}>{m.icon}</span>
+                  <span className={`text-base font-bold ${active ? "text-[color:var(--t-ac)]" : "text-[color:var(--t-tx0)]"}`}>{m.title}</span>
+                  <span className="text-[color:var(--t-tx2)] text-xs leading-snug">{m.desc}</span>
                 </button>
               );
             })}
@@ -400,18 +473,10 @@ function SetupView({ onStart }) {
                       onClick={() => toggleType(t.key)}
                       aria-pressed={on}
                       className={`flex items-start gap-2.5 text-left p-3 border border-solid transition-all duration-150 ${
-                        on
-                          ? "bg-[color-mix(in_srgb,_var(--t-ac)_10%,_transparent)] border-[color:var(--t-ac)]"
-                          : "bg-[var(--t-bg2)] border-[color:var(--t-bd0)] hover:border-[color:var(--t-bd1)]"
+                        on ? "bg-[color-mix(in_srgb,_var(--t-ac)_10%,_transparent)] border-[color:var(--t-ac)]" : "bg-[var(--t-bg2)] border-[color:var(--t-bd0)] hover:border-[color:var(--t-bd1)]"
                       }`}
                     >
-                      <span
-                        className={`mt-0.5 w-4 h-4 shrink-0 flex items-center justify-center border border-solid text-[10px] font-bold ${
-                          on
-                            ? "bg-[var(--t-ac)] border-[color:var(--t-ac)] text-[color:var(--t-onac)]"
-                            : "border-[color:var(--t-bd1)] text-transparent"
-                        }`}
-                      >
+                      <span className={`mt-0.5 w-4 h-4 shrink-0 flex items-center justify-center border border-solid text-[10px] font-bold ${on ? "bg-[var(--t-ac)] border-[color:var(--t-ac)] text-[color:var(--t-onac)]" : "border-[color:var(--t-bd1)] text-transparent"}`}>
                         {"\u2713"}
                       </span>
                       <span className="flex flex-col gap-0.5">
@@ -422,47 +487,31 @@ function SetupView({ onStart }) {
                   );
                 })}
               </div>
+              <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider uppercase mt-1">Number of questions</span>
+              <div className="flex gap-2">
+                {COUNTS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCount(c)}
+                    aria-pressed={count === c}
+                    className={`w-16 py-2 text-sm font-bold border border-solid transition-all duration-150 active:scale-95 ${
+                      count === c
+                        ? "bg-[color-mix(in_srgb,_var(--t-warn)_18%,_transparent)] border-[color:var(--t-warn)] text-[color:var(--t-warn)]"
+                        : "bg-[var(--t-bg2)] border-[color:var(--t-bd0)] text-[color:var(--t-tx1)] hover:border-[color:var(--t-bd1)]"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
-          <div className="flex flex-col gap-2">
-            <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider uppercase">
-              {mode === "cards" ? "Number of cards" : "Number of questions"}
-            </span>
-            <div className="flex gap-2">
-              {COUNTS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setCount(c)}
-                  aria-pressed={count === c}
-                  className={`w-16 py-2 text-sm font-bold border border-solid transition-all duration-150 active:scale-95 ${
-                    count === c
-                      ? "bg-[color-mix(in_srgb,_var(--t-warn)_18%,_transparent)] border-[color:var(--t-warn)] text-[color:var(--t-warn)]"
-                      : "bg-[var(--t-bg2)] border-[color:var(--t-bd0)] text-[color:var(--t-tx1)] hover:border-[color:var(--t-bd1)]"
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
+          {msg && <p role="alert" className="text-[color:var(--t-err)] text-xs">{msg}</p>}
 
-          {error && (
-            <p role="alert" className="text-[color:var(--t-err)] text-xs">
-              {error}
-            </p>
-          )}
-
-          <button type="button" onClick={generate} disabled={!hasContent || generating} className={`${btnPrimary} self-start flex items-center gap-2`}>
-            {generating && <Spinner />}
-            {generating
-              ? "Generating\u2026"
-              : mode === "cards"
-              ? "Generate flashcards"
-              : mode === "boss"
-              ? "Summon the boss"
-              : "Generate quiz"}
+          <button type="button" onClick={start} className={`${btnPrimary} self-start`}>
+            {mode === "cards" ? "Study flashcards" : mode === "boss" ? "Summon the boss" : "Start quiz"}
           </button>
         </Step>
       </div>
@@ -930,10 +979,35 @@ function ResultView({ session, onRetry, onNew, onReviewCards, onBack, where }) {
 
 /* ------------------------------ main component ------------------------- */
 
-function QuizArena({ where = "Dashboard", onBack }) {
+function QuizArena({ where = "Dashboard", onBack, file }) {
+  // file: { name, size, text } handed over by the host page (e.g. Personalized -> Forge Quiz).
+  const demo = !file?.text;
+  const title = file?.name || "Sample_Algorithms_Notes.txt";
+  const [deck, setDeck] = useState([]);
+  const [generating, setGenerating] = useState(true);
+  const [genError, setGenError] = useState("");
+
+  // Generate the flashcards as soon as Quiz Arena opens.
+  useEffect(() => {
+    setGenerating(true);
+    setGenError("");
+    const t = setTimeout(() => {
+      const facts = buildFacts(file?.text || DEMO_TEXT);
+      if (facts.length < 3) {
+        setDeck([]);
+        setGenError("Not enough content to build flashcards. Try a longer file with full sentences.");
+      } else {
+        const stamp = Date.now();
+        setDeck(facts.slice(0, 20).map((f, i) => ({ id: `c${i}_${stamp}`, front: blankOut(f.sentence, f.term), back: f.term })));
+      }
+      setGenerating(false);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [file?.name, file?.text]);
+
   const [setup, setSetup] = useState(null); // what was generated, kept so "Retry" can reuse it
   const [session, setSession] = useState(null);
-  const [view, setView] = useState("setup"); // "setup" | "play"
+  const [view, setView] = useState("deck"); // "deck" | "play"
 
   function beginSession(cfg) {
     if (cfg.mode === "cards") {
@@ -980,13 +1054,18 @@ function QuizArena({ where = "Dashboard", onBack }) {
   function newFile() {
     setSession(null);
     setSetup(null);
-    setView("setup");
+    setView("deck");
   }
 
   const inPlay = view === "play" && session;
 
   return (
-    <div className="p-4 sm:p-6 lg:px-10">
+    // Full-screen layer: covers whatever navigation bar / top bar the host page has,
+    // so the only way out is the Back button below.
+    <div
+      className="fixed inset-0 z-[100] overflow-y-auto bg-[var(--t-bg1)] p-4 sm:p-6 lg:px-10"
+      style={{ backgroundImage: "var(--t-grad-main)" }}
+    >
       <style>{KEYFRAMES}</style>
       <div className="flex flex-col gap-4 max-w-4xl mx-auto">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -995,7 +1074,7 @@ function QuizArena({ where = "Dashboard", onBack }) {
             <p className="text-[color:var(--t-tx2)] text-xs">
               {inPlay
                 ? `${session.mode === "boss" ? "Boss Battle" : session.mode === "cards" ? "Flashcards" : "Quiz"} \u2022 ${session.title}`
-                : "Upload your notes and we'll turn them into practice."}
+                : "Edit your flashcards, then pick how to practice."}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1010,7 +1089,9 @@ function QuizArena({ where = "Dashboard", onBack }) {
           </div>
         </div>
 
-        {!inPlay && <SetupView onStart={beginSession} />}
+        {!inPlay && (
+          <DeckView title={title} demo={demo} deck={deck} generating={generating} error={genError} setDeck={setDeck} onStart={beginSession} />
+        )}
 
         {inPlay && session.done && (
           <ResultView session={session} onRetry={retry} onNew={newFile} onReviewCards={reviewCards} onBack={onBack} where={where} />

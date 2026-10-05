@@ -98,28 +98,29 @@ function Login() {
 
       <div className="flex items-center gap-3 mt-6 mb-4">
         <span className="flex-1 h-px bg-edge" />
-        <span className="label">Select sign-up option</span>
+        <span className="label">or continue with</span>
         <span className="flex-1 h-px bg-edge" />
       </div>
 
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => navigate("/dashboard")}
-          className="btn flex-1 py-2.5 border border-lime/50 text-lime hover:bg-lime/10"
-        >
-          <img src={googleIcon} alt="" className="w-3.5 h-3.5" />
-          Google
-        </button>
-        <span className="label">or</span>
+      <button
+        type="button"
+        onClick={() => navigate("/dashboard")}
+        className="btn w-full py-2.5 border border-lime/50 text-lime hover:bg-lime/10"
+      >
+        <img src={googleIcon} alt="" className="w-3.5 h-3.5" />
+        Google
+      </button>
+
+      <p className="text-center text-mute text-[13px] tracking-wide mt-5">
+        Don't have an account?{" "}
         <button
           type="button"
           onClick={() => navigate("/register")}
-          className="btn flex-1 py-2.5 border border-gold/50 text-gold hover:bg-gold/10"
+          className="text-gold bg-transparent border-none p-0 cursor-pointer tracking-wide hover:underline"
         >
-          Create Account
+          Create account
         </button>
-      </div>
+      </p>
     </AuthCard>
   );
 }

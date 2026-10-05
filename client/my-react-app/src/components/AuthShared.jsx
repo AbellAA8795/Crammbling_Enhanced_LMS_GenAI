@@ -196,7 +196,7 @@ export function Field({
             inputMode={inputMode}
             maxLength={maxLength}
             autoComplete={autoComplete}
-            className={`w-full py-3.5 pl-4 ${isPassword || icon ? "pr-10" : "pr-4"} bg-deep border text-ink placeholder:text-faint text-[15px] transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${border}`}
+            className={`w-full py-3.5 pl-4 ${isPassword || icon ? "pr-10" : "pr-4"} bg-deep border text-ink placeholder:text-faint text-[15px] transition-colors duration-200 focus:outline-none autofill:shadow-[inset_0_0_0_1000px_var(--color-deep)] autofill:[-webkit-text-fill-color:var(--color-ink)] disabled:opacity-50 disabled:cursor-not-allowed ${border}`}
           />
           {isPassword ? (
             <PasswordToggle show={showPassword} onToggle={() => setShowPassword((v) => !v)} />
@@ -229,13 +229,29 @@ export const primaryButton = "btn btn-lime w-full mt-7 py-3.5 text-[13px]";
  * Email + verification code block, used by Forgot Password and the last
  * step of Registration. Front-end only: "Send code" just starts the UI
  * (cooldown + "code sent" message), and any 6-digit code passes.
+ *
+ * Pass `email` (already collected and validated earlier, e.g. Registration
+ * step 1) to hide the email input: the code is sent automatically on mount
+ * and only the verification code field + a "Resend" button are shown.
+ * Without `email` (Forgot Password) it behaves as before.
  */
-export function EmailVerifyForm({ submitLabel, onVerified, footer }) {
-  const [email, setEmail] = useState("");
+export function EmailVerifyForm({ email: presetEmail, submitLabel, onVerified, footer }) {
+  const hasPreset = Boolean(presetEmail);
+
+  const [typedEmail, setTypedEmail] = useState("");
   const [code, setCode] = useState("");
   const [touched, setTouched] = useState({ email: false, code: false });
-  const [codeSent, setCodeSent] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
+  const [codeSent, setCodeSent] = useState(hasPreset);
+  const [cooldown, setCooldown] = useState(hasPreset ? 30 : 0);
+
+  const email = hasPreset ? presetEmail : typedEmail;
+
+  // Preset email: send the first code automatically when this step opens.
+  useEffect(() => {
+    if (!hasPreset) return;
+    // TODO: call the API that emails a verification code to `presetEmail`.
+    // The server must repeat the domain allowlist check before sending.
+  }, [hasPreset, presetEmail]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -243,7 +259,7 @@ export function EmailVerifyForm({ submitLabel, onVerified, footer }) {
     return () => clearTimeout(t);
   }, [cooldown]);
 
-  const emailError = validateEmail(email);
+  const emailError = hasPreset ? "" : validateEmail(email);
 
   const codeError = !codeSent
     ? "Send a code to your email first."
@@ -277,34 +293,37 @@ export function EmailVerifyForm({ submitLabel, onVerified, footer }) {
 
   return (
     <form onSubmit={handleSubmit} noValidate>
-      <Field
-        first
-        id="verify-email"
-        label="Email"
-        type="email"
-        placeholder="name@gmail.com or school email"
-        value={email}
-        onChange={(e) => {
-          setEmail(e.target.value);
-          touch("email");
-        }}
-        onBlur={() => touch("email")}
-        error={touched.email ? emailError : ""}
-        valid={touched.email && !emailError}
-        autoComplete="email"
-        action={
-          <button
-            type="button"
-            onClick={handleSendCode}
-            disabled={cooldown > 0 || (touched.email && !!emailError)}
-            className="btn btn-cyan whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {sendLabel}
-          </button>
-        }
-      />
+      {!hasPreset && (
+        <Field
+          first
+          id="verify-email"
+          label="Email"
+          type="email"
+          placeholder="name@gmail.com or school email"
+          value={typedEmail}
+          onChange={(e) => {
+            setTypedEmail(e.target.value);
+            touch("email");
+          }}
+          onBlur={() => touch("email")}
+          error={touched.email ? emailError : ""}
+          valid={touched.email && !emailError}
+          autoComplete="email"
+          action={
+            <button
+              type="button"
+              onClick={handleSendCode}
+              disabled={cooldown > 0 || (touched.email && !!emailError)}
+              className="btn btn-cyan whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {sendLabel}
+            </button>
+          }
+        />
+      )}
 
       <Field
+        first={hasPreset}
         id="verify-code"
         label="Verification Code"
         placeholder="6-digit code"
@@ -318,11 +337,23 @@ export function EmailVerifyForm({ submitLabel, onVerified, footer }) {
           touch("code");
         }}
         onBlur={() => touch("code")}
-        error={touched.code && codeSent ? codeError : touched.code && !codeSent ? codeError : ""}
+        error={touched.code ? codeError : ""}
         valid={touched.code && !codeError}
+        action={
+          hasPreset ? (
+            <button
+              type="button"
+              onClick={handleSendCode}
+              disabled={cooldown > 0}
+              className="btn btn-cyan whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {sendLabel}
+            </button>
+          ) : undefined
+        }
         hint={
           codeSent
-            ? `Code sent to ${email}. Check your inbox.`
+            ? `We sent a 6-digit code to ${email}. Check your inbox.`
             : "We'll send a 6-digit code to your email."
         }
       />

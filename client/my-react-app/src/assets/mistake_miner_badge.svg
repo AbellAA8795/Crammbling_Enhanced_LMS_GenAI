@@ -1,0 +1,35 @@
+<svg viewBox="0 0 100 100" width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="minerMetal" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="50%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#78350f"/>
+    </radialGradient>
+    <linearGradient id="crystal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Deep Outer Ring -->
+  <circle cx="50" cy="50" r="46" fill="#180b03" stroke="#f59e0b" stroke-width="2"/>
+  <circle cx="50" cy="50" r="42" fill="url(#minerMetal)" filter="url(#dropShadow)"/>
+
+  <!-- Inner Dark Rock Vault -->
+  <circle cx="50" cy="50" r="30" fill="#1c1917" stroke="#44403c" stroke-width="2"/>
+
+  <!-- Glowing Emerald Geode (Found Insights) -->
+  <polygon points="50,28 61,42 54,64 46,64 39,42" fill="url(#crystal)" stroke="#6ee7b7" stroke-width="1.5" filter="url(#glow)"/>
+  <polygon points="50,28 55,42 50,60 45,42" fill="#a7f3d0" opacity="0.4"/>
+
+  <!-- Polished Steel Pickaxe Cracking Across -->
+  <path d="M26 32c14-8 34-8 48 0" fill="none" stroke="#f8fafc" stroke-width="6" stroke-linecap="round" filter="url(#dropShadow)"/>
+  <path d="M50 36L38 70" stroke="#451a03" stroke-width="6" stroke-linecap="round"/>
+</svg>

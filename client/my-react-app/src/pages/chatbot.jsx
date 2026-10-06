@@ -93,7 +93,6 @@ const NAV_ITEMS = [
     { key: "dashboard", label: "DASHBOARD", icon: NAV_IMG.dashboard, iconClass: "w-[18px] h-[15px]" },
     { key: "chatbot", label: "CHATBOT", icon: NAV_IMG.chatbot, iconClass: "w-[18px] h-[15px]" },
     { key: "group", label: "GROUP COLLAB", icon: NAV_IMG.group, iconClass: "w-5 h-2.5" },
-    { key: "quiz", label: "QUIZ ARENA", icon: NAV_IMG.quiz, iconClass: "w-4 h-4" },
     { key: "personalized", label: "PERSONALIZED", icon: NAV_IMG.personalized, iconClass: "w-[18px] h-[13px]" },
 ];
 
@@ -432,7 +431,6 @@ export default function Chatbot({ onNavigate } = {}) {
     function handleNavigate(key) {
         setMobileNavOpen(false);
         if (key === "chatbot") return setShowQuiz(false);
-        if (key === "quiz") return setShowQuiz(true);
         if (onNavigate) {
             onNavigate(key);
         } else {

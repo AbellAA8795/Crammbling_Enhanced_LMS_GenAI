@@ -47,7 +47,6 @@ const NAV_ITEMS = [
   { key: "dashboard", label: "DASHBOARD", icon: NAV_IMG.dashboard, iconClass: "w-[18px] h-[15px]", path: "/dashboard" },
   { key: "chatbot", label: "CHATBOT", icon: NAV_IMG.chatbot, iconClass: "w-[18px] h-[15px]", path: "/chatbot" },
   { key: "group", label: "GROUP COLLAB", icon: NAV_IMG.group, iconClass: "w-5 h-2.5", path: "/group-collab" },
-  { key: "quiz", label: "QUIZ ARENA", icon: NAV_IMG.quiz, iconClass: "w-4 h-4", path: "/quiz-arena" },
   { key: "personalized", label: "PERSONALIZED", icon: NAV_IMG.personalized, iconClass: "w-[18px] h-[13px]", path: "/personalized" },
 ];
 
@@ -333,7 +332,6 @@ function Dashboard() {
   const handleNavigate = (item) => {
     setMobileNavOpen(false);
     if (item.key === "dashboard") return setShowQuiz(false);
-    if (item.key === "quiz") return setShowQuiz(true);
     navigate(item.path);
   };
 

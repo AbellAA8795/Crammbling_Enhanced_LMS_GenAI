@@ -1084,7 +1084,7 @@ function QuizArena({ where = "Dashboard", onBack, file }) {
               </button>
             )}
             <button type="button" onClick={onBack} className={btnGhost}>
-              {"\u2190"} Back to {where}
+              {"\u2190"} Back to {where === "Quiz Forge" ? "Quiz Forge" : where}
             </button>
           </div>
         </div>

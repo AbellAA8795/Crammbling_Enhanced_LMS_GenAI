@@ -6,7 +6,7 @@ import ForgotPassword from './pages/ForgotPassword.jsx';
 import Chatbot from './pages/chatbot.jsx';
 import Personalized from './pages/personalized.jsx';
 import GroupCollab from './pages/group_collab.jsx';
-
+import QuizArena from './pages/QuizArena.jsx';
 // The chatbot / group collab / personalized pages call onNavigate(key) with
 // these keys from their sidebars. Each key maps to a route.
 const PATHS = {
@@ -38,17 +38,9 @@ function PersonalizedPage() {
   );
 }
 
-// Placeholder until the Quiz Arena page exists.
 function QuizArenaPage() {
   const navigate = useNavigate();
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-deep text-ink font-display">
-      <p className="label">Quiz Arena is coming soon</p>
-      <button type="button" className="btn btn-cyan" onClick={() => navigate('/dashboard')}>
-        Back to Dashboard
-      </button>
-    </div>
-  );
+  return <QuizArena where="Quiz Forge" onBack={() => navigate('/personalized')} />;
 }
 
 function App() {

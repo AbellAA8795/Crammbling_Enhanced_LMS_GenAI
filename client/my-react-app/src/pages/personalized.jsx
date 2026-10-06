@@ -209,9 +209,15 @@ const QUIZ_FORGE_STATS = [
   },
 ];
 
+const INITIAL_FORGE_FOLDERS = [
+  { id: "fo1", name: "CS240" },
+  { id: "fo2", name: "Discrete Math" },
+];
+
 const INITIAL_FORGE_FILES = [
   {
     id: "f1",
+    folderId: "fo1",
     name: "Data_Structures_Midterm_Mastery.pdf",
     icon: IMG.qfFile1,
     chunks: 42,
@@ -220,6 +226,7 @@ const INITIAL_FORGE_FILES = [
   },
   {
     id: "f2",
+    folderId: "fo1",
     name: "Algo_Lecture_5_Graph_Traversals.pdf",
     icon: IMG.qfFile2,
     chunks: 24,
@@ -228,6 +235,7 @@ const INITIAL_FORGE_FILES = [
   },
   {
     id: "f3",
+    folderId: "fo2",
     name: "Discrete_Math_Logic_Gates.docx",
     icon: IMG.qfFile3,
     chunks: 18,
@@ -358,6 +366,9 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
   const [openEventMenuId, setOpenEventMenuId] = useState(null);
   const [forgeFiles, setForgeFiles] = useState(INITIAL_FORGE_FILES);
   const [forgeStatusMap, setForgeStatusMap] = useState({});
+  const [forgeFolders, setForgeFolders] = useState(INITIAL_FORGE_FOLDERS);
+  const [activeFolder, setActiveFolder] = useState("all"); // "all" | "unfiled" | a folder id
+  const [arenaFile, setArenaFile] = useState(null); // file handed to Quiz Arena by "Forge Quiz"
   const [isDragging, setIsDragging] = useState(false);
   const [driveSyncing, setDriveSyncing] = useState(false);
   const [showRepoLink, setShowRepoLink] = useState(false);
@@ -446,19 +457,25 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     const icons = [IMG.qfFile1, IMG.qfFile2, IMG.qfFile3];
     const newEntries = filesArr.map((f, i) => ({
       id: `f${Date.now()}_${i}`,
+      folderId: forgeFolders.some((fo) => fo.id === activeFolder) ? activeFolder : null,
       name: f.name,
       icon: icons[i % icons.length],
       chunks: Math.max(6, Math.round(f.size / 20000)),
       size: formatSize(f.size),
       status: "Indexing…",
+      rawSize: f.size,
+      text: null,
     }));
     setForgeFiles((prev) => [...newEntries, ...prev]);
-    newEntries.forEach((entry) => {
-      setTimeout(() => {
-        setForgeFiles((prev) =>
-          prev.map((it) => (it.id === entry.id ? { ...it, status: "Indexed" } : it))
-        );
-      }, 1400);
+    // Read the file right away and save its text for Quiz Arena. Plain-text files are
+    // read for real; PDF/Word/PowerPoint need the AI backend, so Quiz Arena uses sample notes.
+    filesArr.forEach((f, i) => {
+      const id = newEntries[i].id;
+      const isText = ["txt", "md", "markdown", "csv"].includes(f.name.split(".").pop().toLowerCase());
+      const reading = isText ? f.text().catch(() => null) : Promise.resolve(null);
+      Promise.all([reading, new Promise((r) => setTimeout(r, 350))]).then(([text]) => {
+        setForgeFiles((prev) => prev.map((it) => (it.id === id ? { ...it, text, status: "Indexed" } : it)));
+      });
     });
   }
 
@@ -475,12 +492,37 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 
   function forgeQuiz(id) {
     if (forgeStatusMap[id] === "forging") return;
-    setForgeStatusMap((prev) => ({ ...prev, [id]: "forging" }));
-    setTimeout(() => {
-      setForgeStatusMap((prev) => ({ ...prev, [id]: "idle" }));
-      // Quiz Arena's only entrance: a finished "Forge Quiz"
-      setActiveNav("quiz");
-    }, 1200);
+    const f = forgeFiles.find((x) => x.id === id);
+    if (!f) return;
+    // Quiz Arena's only entrance: "Forge Quiz". The arena generates the flashcards itself.
+    setArenaFile({ name: f.name, size: f.rawSize, text: f.text });
+    setActiveNav("quiz");
+  }
+
+  // ---- filing system ----
+  function createFolder(name) {
+    const n = name.trim();
+    if (!n) return;
+    const id = `fo${Date.now()}`;
+    setForgeFolders((prev) => [...prev, { id, name: n }]);
+    setActiveFolder(id);
+  }
+
+  function renameFolder(id, name) {
+    const n = name.trim();
+    if (!n) return;
+    setForgeFolders((prev) => prev.map((fo) => (fo.id === id ? { ...fo, name: n } : fo)));
+  }
+
+  // Deleting a folder never deletes files: they just become unfiled.
+  function deleteFolder(id) {
+    setForgeFolders((prev) => prev.filter((fo) => fo.id !== id));
+    setForgeFiles((prev) => prev.map((it) => (it.folderId === id ? { ...it, folderId: null } : it)));
+    setActiveFolder((cur) => (cur === id ? "all" : cur));
+  }
+
+  function moveFile(fileId, folderId) {
+    setForgeFiles((prev) => prev.map((it) => (it.id === fileId ? { ...it, folderId: folderId || null } : it)));
   }
 
   function syncDrive() {
@@ -753,8 +795,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 
               <nav className="flex flex-col self-stretch px-3 gap-1">
                 {NAV_ITEMS.map((item) => {
-                  // Quiz Arena has no nav entry; while it is open, keep PERSONALIZED highlighted
-                  const active = activeNav === item.key || (item.key === "personalized" && activeNav === "quiz");
+                  const active = activeNav === item.key;
                   return (
                     <button
                       key={item.key}
@@ -896,7 +937,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                   // QuizArena brings its own side padding (same as this container),
                   // so cancel this container's padding to avoid doubling it.
                   <div className="-mx-4 sm:-mx-6 lg:-mx-10 self-stretch">
-                    <QuizArena where="Personalized" onBack={() => { setActiveNav("personalized"); setActiveSubTab("quizforge"); }} />
+                    <QuizArena where="Personalized" file={arenaFile} onBack={() => { setActiveNav("personalized"); setActiveSubTab("quizforge"); }} />
                   </div>
                 ) : activeNav !== "personalized" ? (
                   <ComingSoon nav={NAV_ITEMS.find((n) => n.key === activeNav)?.label} onBack={() => setActiveNav("personalized")} />
@@ -1307,6 +1348,13 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                         files={forgeFiles}
                         forgeStatusMap={forgeStatusMap}
                         onForge={forgeQuiz}
+                        folders={forgeFolders}
+                        activeFolder={activeFolder}
+                        setActiveFolder={setActiveFolder}
+                        onCreateFolder={createFolder}
+                        onRenameFolder={renameFolder}
+                        onDeleteFolder={deleteFolder}
+                        onMoveFile={moveFile}
                         isDragging={isDragging}
                         setIsDragging={setIsDragging}
                         fileInputRef={fileInputRef}
@@ -1370,7 +1418,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
           </div>
         </div>
 
-        {/* Settings drawer — shared by every page (and Quiz Arena) */}
+        {/* Settings drawer — shared by every page */}
         <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} theme={theme} onThemeChange={setTheme} />
 
         {/* Add event modal */}
@@ -1630,6 +1678,13 @@ function QuizForgePanel({
   files,
   forgeStatusMap,
   onForge,
+  folders,
+  activeFolder,
+  setActiveFolder,
+  onCreateFolder,
+  onRenameFolder,
+  onDeleteFolder,
+  onMoveFile,
   isDragging,
   setIsDragging,
   fileInputRef,
@@ -1644,6 +1699,60 @@ function QuizForgePanel({
   onAddRepoLink,
   repoLinks,
 }) {
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [search, setSearch] = useState("");
+  const [dropTarget, setDropTarget] = useState(null);
+
+  const currentFolder = folders.find((fo) => fo.id === activeFolder);
+  const countIn = (id) => files.filter((f) => (id === "all" ? true : id === "unfiled" ? !f.folderId : f.folderId === id)).length;
+  const visibleFiles = files.filter((f) => {
+    const inFolder = activeFolder === "all" ? true : activeFolder === "unfiled" ? !f.folderId : f.folderId === activeFolder;
+    return inFolder && f.name.toLowerCase().includes(search.trim().toLowerCase());
+  });
+
+  const chipCls = (on, over) =>
+    `flex items-center gap-1.5 py-1.5 px-3 text-xs font-bold border border-solid transition-all duration-150 active:scale-95 ${over
+      ? "bg-[color-mix(in_srgb,_var(--t-ac)_20%,_transparent)] border-[color:var(--t-ac)] text-[color:var(--t-ac)]"
+      : on
+        ? "bg-[var(--t-bg3)] border-[color:var(--t-ac)] text-[color:var(--t-ac)]"
+        : "bg-[var(--t-bg2)] border-[color:var(--t-bd0)] text-[color:var(--t-tx1)] hover:border-[color:var(--t-bd1)]"
+    }`;
+
+  // Chips accept dragged file rows, so a file can be filed by dropping it on a folder.
+  const chipDrop = (target) => ({
+    onDragOver: (e) => {
+      if (e.dataTransfer.types.includes("text/forge-file")) {
+        e.preventDefault();
+        setDropTarget(target);
+      }
+    },
+    onDragLeave: () => setDropTarget((t) => (t === target ? null : t)),
+    onDrop: (e) => {
+      const id = e.dataTransfer.getData("text/forge-file");
+      setDropTarget(null);
+      if (id && target !== "all") {
+        e.preventDefault();
+        onMoveFile(id, target === "unfiled" ? null : target);
+      }
+    },
+  });
+
+  function submitNewFolder(e) {
+    e.preventDefault();
+    onCreateFolder(newFolderName);
+    setNewFolderName("");
+    setNewFolderOpen(false);
+  }
+
+  function submitRename(e) {
+    e.preventDefault();
+    onRenameFolder(activeFolder, renameValue);
+    setRenaming(false);
+  }
+
   return (
     <div className="flex flex-col self-stretch gap-6">
       {/* Stat cards */}
@@ -1765,14 +1874,101 @@ function QuizForgePanel({
           </button>
         </div>
 
+        {/* Folder bar */}
+        <div className="flex flex-col self-stretch gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => setActiveFolder("all")} aria-pressed={activeFolder === "all"} className={chipCls(activeFolder === "all", false)}>
+              All files <span className="text-[color:var(--t-tx2)] font-normal">{countIn("all")}</span>
+            </button>
+            {folders.map((fo) => (
+              <button
+                key={fo.id}
+                type="button"
+                onClick={() => { setActiveFolder(fo.id); setRenaming(false); }}
+                aria-pressed={activeFolder === fo.id}
+                className={chipCls(activeFolder === fo.id, dropTarget === fo.id)}
+                {...chipDrop(fo.id)}
+              >
+                <span aria-hidden="true">{activeFolder === fo.id ? "\u25BE" : "\u25B8"}</span>
+                {fo.name} <span className="text-[color:var(--t-tx2)] font-normal">{countIn(fo.id)}</span>
+              </button>
+            ))}
+            <button type="button" onClick={() => setActiveFolder("unfiled")} aria-pressed={activeFolder === "unfiled"} className={chipCls(activeFolder === "unfiled", dropTarget === "unfiled")} {...chipDrop("unfiled")}>
+              Unfiled <span className="text-[color:var(--t-tx2)] font-normal">{countIn("unfiled")}</span>
+            </button>
+            {newFolderOpen ? (
+              <form onSubmit={submitNewFolder} className="flex items-center gap-1.5">
+                <input
+                  autoFocus
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Escape" && setNewFolderOpen(false)}
+                  placeholder="Folder name"
+                  maxLength={40}
+                  className="w-36 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-1.5 px-2.5 outline-none focus:border-[color:var(--t-ac)]"
+                />
+                <button type="submit" className="text-[color:var(--t-ok2)] text-xs font-bold hover:opacity-75">Create</button>
+                <button type="button" onClick={() => setNewFolderOpen(false)} className="text-[color:var(--t-tx2)] text-xs hover:opacity-75">Cancel</button>
+              </form>
+            ) : (
+              <button type="button" onClick={() => setNewFolderOpen(true)} className="py-1.5 px-3 text-xs font-bold border border-dashed border-[color:var(--t-bd1)] text-[color:var(--t-tx2)] hover:text-[color:var(--t-ac)] hover:border-[color:var(--t-ac)] transition-colors duration-150">
+                + New folder
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {currentFolder ? (
+              renaming ? (
+                <form onSubmit={submitRename} className="flex items-center gap-1.5">
+                  <input
+                    autoFocus
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onKeyDown={(e) => e.key === "Escape" && setRenaming(false)}
+                    maxLength={40}
+                    className="w-40 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-1.5 px-2.5 outline-none focus:border-[color:var(--t-ac)]"
+                  />
+                  <button type="submit" className="text-[color:var(--t-ok2)] text-xs font-bold hover:opacity-75">Save</button>
+                  <button type="button" onClick={() => setRenaming(false)} className="text-[color:var(--t-tx2)] text-xs hover:opacity-75">Cancel</button>
+                </form>
+              ) : (
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-[color:var(--t-tx1)]">Folder: <b className="text-[color:var(--t-tx0)]">{currentFolder.name}</b></span>
+                  <button type="button" onClick={() => { setRenameValue(currentFolder.name); setRenaming(true); }} className="text-[color:var(--t-ac)] font-bold hover:opacity-75">Rename</button>
+                  <button type="button" onClick={() => onDeleteFolder(currentFolder.id)} className="text-[color:var(--t-err)] font-bold hover:opacity-75" title="Files inside become unfiled">Delete folder</button>
+                </div>
+              )
+            ) : (
+              <span className="text-[color:var(--t-tx2)] text-xs">
+                {activeFolder === "unfiled" ? "Files not in any folder" : "Drag a file onto a folder, or use its Move menu"}
+              </span>
+            )}
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search files"
+              aria-label="Search files"
+              className="w-40 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-1.5 px-2.5 outline-none focus:border-[color:var(--t-ac)]"
+            />
+          </div>
+        </div>
+
         <div className="flex flex-col self-stretch">
-          {files.map((file) => {
+          {visibleFiles.length === 0 && (
+            <p className="text-[color:var(--t-tx2)] text-xs text-center py-8 border border-dashed border-[color:var(--t-bd0)] mb-3">
+              {search.trim() ? "No files match your search." : currentFolder ? "This folder is empty. Upload a file while it's open, or move one in." : "Nothing here yet."}
+            </p>
+          )}
+          {visibleFiles.map((file) => {
             const forgeState = forgeStatusMap[file.id] || "idle";
             const indexing = file.status !== "Indexed";
             return (
               <div
                 key={file.id}
-                className="flex flex-wrap sm:flex-nowrap justify-between items-center gap-3 self-stretch bg-[var(--t-bg2)] p-4 sm:p-[15px] mb-3 border border-solid border-[color:var(--t-bd0)]"
+                draggable
+                onDragStart={(e) => e.dataTransfer.setData("text/forge-file", file.id)}
+                className="flex flex-wrap sm:flex-nowrap justify-between items-center gap-3 self-stretch bg-[var(--t-bg2)] p-4 sm:p-[15px] mb-3 border border-solid border-[color:var(--t-bd0)] cursor-grab active:cursor-grabbing"
               >
                 <div className="flex items-center min-w-0 flex-1 gap-3">
                   <img src={file.icon} className="w-10 h-10 object-fill shrink-0" />
@@ -1788,10 +1984,29 @@ function QuizForgePanel({
                       <span className={`text-[11px] ${indexing ? "text-[color:var(--t-warn)]" : "text-[color:var(--t-ok3)]"}`}>
                         {file.status}
                       </span>
+                      {activeFolder === "all" && (
+                        <>
+                          <span className="text-[color:var(--t-bd0)] text-[11px]">•</span>
+                          <span className="text-[color:var(--t-tx2)] text-[11px]">
+                            {folders.find((fo) => fo.id === file.folderId)?.name || "Unfiled"}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-[9px]">
+                  <select
+                    value={file.folderId || ""}
+                    onChange={(e) => onMoveFile(file.id, e.target.value)}
+                    aria-label={`Move ${file.name} to a folder`}
+                    className="max-w-[120px] bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx1)] text-[11px] py-1.5 px-2 outline-none focus:border-[color:var(--t-ac)] cursor-pointer"
+                  >
+                    <option value="">Unfiled</option>
+                    {folders.map((fo) => (
+                      <option key={fo.id} value={fo.id}>{fo.name}</option>
+                    ))}
+                  </select>
                   <div className="flex flex-col shrink-0 items-start bg-[var(--t-bg0)] py-1 px-[9px] border border-solid border-[color:color-mix(in_srgb,_var(--t-ok2)_30%,_transparent)]">
                     <span className="text-[color:var(--t-ok3)] text-[11px]">{indexing ? "SYNCING" : "READY"}</span>
                   </div>

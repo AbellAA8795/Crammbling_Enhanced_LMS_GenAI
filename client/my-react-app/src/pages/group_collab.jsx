@@ -51,7 +51,6 @@ const NAV_ITEMS = [
     { key: "dashboard", label: "DASHBOARD", icon: IMG.dashboard, iconClass: "w-[18px] h-[15px]" },
     { key: "chatbot", label: "CHATBOT", icon: IMG.chatbot, iconClass: "w-[18px] h-[15px]" },
     { key: "group", label: "GROUP COLLAB", icon: IMG.group, iconClass: "w-5 h-2.5" },
-    { key: "quiz", label: "QUIZ ARENA", icon: IMG.quiz, iconClass: "w-4 h-4" },
     { key: "personalized", label: "PERSONALIZED", icon: IMG.personalized, iconClass: "w-[18px] h-[13px]" },
 ];
 
@@ -1257,7 +1256,6 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
     function handleNavClick(key) {
         setMobileNavOpen(false);
         if (key === "group") return setShowQuiz(false);
-        if (key === "quiz") return setShowQuiz(true);
         if (onNavigate) {
             onNavigate(key);
         } else if (key === "chatbot") {

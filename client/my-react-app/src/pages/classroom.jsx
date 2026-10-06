@@ -1,4 +1,3 @@
-// Classroom.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Dashboard from "./Dashboard";
@@ -9,11 +8,8 @@ import QuizArena from "./QuizArena";
 import { useTheme, themeStyle, withAlpha, CloseIcon, MenuIcon } from "./Theme";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import Settings from "../components/Settings";
+import {ProfileButton, SidebarProfileButton } from "../components/ProfileSystem";
 
-/* ------------------------------------------------------------------ */
-/*  Tiny inline icon set (kept dependency-free, same style as the      */
-/*  Icon object in chatbot.jsx).                                       */
-/* ------------------------------------------------------------------ */
 const Icon = {
     Plus: (p) => (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}>
@@ -115,13 +111,8 @@ const Icon = {
     ),
 };
 
-/* ------------------------------------------------------------------ */
-/*  Static assets — same icon set the other pages use.                 */
-/* ------------------------------------------------------------------ */
 const NAV_ASSET = (id) => `https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/${id}_expires_30_days.png`;
 
-// Graduation cap for the CLASSROOM sidebar entry, drawn inline so we don't
-// need a new hosted asset.
 const CLASSROOM_ICON =
     "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='15' viewBox='0 0 24 24' fill='none' stroke='%232CD4D9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M22 10 12 5 2 10l10 5 10-5z'/><path d='M6 12v5c3 3 9 3 12 0v-5'/></svg>";
 
@@ -147,20 +138,10 @@ const NAV_ITEMS = [
     { key: "personalized", label: "PERSONALIZED", icon: NAV_IMG.personalized, iconClass: "w-[18px] h-[13px]" },
 ];
 
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                             */
-/* ------------------------------------------------------------------ */
 const CURRENT_USER = { id: "you", name: "You", email: "you@univ.edu" };
 
 const CLASS_COLORS = [
-    "#1967d2", // blue
-    "#188038", // green
-    "#d93025", // red
-    "#e37400", // orange
-    "#9334e6", // purple
-    "#00838f", // teal
-    "#c5221f", // deep red
-    "#3949ab", // indigo
+    "#1967d2", "#188038", "#d93025", "#e37400", "#9334e6", "#00838f", "#c5221f", "#3949ab",
 ];
 
 function colorForString(s) {
@@ -191,9 +172,6 @@ function toISODate(d) {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Sample data                                                         */
-/* ------------------------------------------------------------------ */
 const INITIAL_CLASSES = [
     {
         id: "cls_cs240",
@@ -436,7 +414,6 @@ const INITIAL_CLASSES = [
         ],
     },
     {
-        // A class the user co-teaches, so the "Create" flow is demonstrable.
         id: "cls_study",
         name: "Peer Study Hall",
         section: "Open Section",
@@ -481,9 +458,6 @@ const INITIAL_CLASSES = [
     },
 ];
 
-/* ------------------------------------------------------------------ */
-/*  Small shared UI                                                    */
-/* ------------------------------------------------------------------ */
 function Badge({ color, children }) {
     return (
         <span
@@ -509,9 +483,6 @@ function classworkTypeLabel(type) {
     return "Assignment";
 }
 
-/* ------------------------------------------------------------------ */
-/*  Sidebar (same shape as chatbot / group_collab / personalized)      */
-/* ------------------------------------------------------------------ */
 function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings, onLogout }) {
     return (
         <div
@@ -571,6 +542,7 @@ function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings, onLogo
             </div>
 
             <div className="flex flex-col self-stretch bg-[color-mix(in_srgb,_var(--t-bg2)_45%,_transparent)] p-3 gap-1">
+                <SidebarProfileButton />
                 <button
                     onClick={onOpenSettings}
                     className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]"
@@ -590,9 +562,6 @@ function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings, onLogo
     );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Class banner                                                       */
-/* ------------------------------------------------------------------ */
 function ClassBanner({ color, name, section, tall = false }) {
     return (
         <div
@@ -616,9 +585,6 @@ function ClassBanner({ color, name, section, tall = false }) {
     );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Class card (grid view)                                             */
-/* ------------------------------------------------------------------ */
 function ClassCard({ cls, onOpen }) {
     return (
         <button
@@ -648,9 +614,6 @@ function ClassCard({ cls, onOpen }) {
     );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Create / Join class modals                                         */
-/* ------------------------------------------------------------------ */
 function CreateClassModal({ onClose, onCreate }) {
     const [name, setName] = useState("");
     const [section, setSection] = useState("");
@@ -782,9 +745,6 @@ function JoinClassModal({ onClose, onJoin }) {
     );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Turn-in modal                                                      */
-/* ------------------------------------------------------------------ */
 function TurnInModal({ cls, item, onClose, onTurnIn }) {
     const [note, setNote] = useState("");
     const [attached, setAttached] = useState(false);
@@ -857,9 +817,6 @@ function TurnInModal({ cls, item, onClose, onTurnIn }) {
     );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Create post modal (teacher-only)                                   */
-/* ------------------------------------------------------------------ */
 function CreatePostModal({ cls, onClose, onCreate }) {
     const [type, setType] = useState("announcement");
     const [text, setText] = useState("");
@@ -999,9 +956,6 @@ function CreatePostModal({ cls, onClose, onCreate }) {
     );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Stream post                                                        */
-/* ------------------------------------------------------------------ */
 function StreamPost({ post, classwork, isTeacher, onAddComment }) {
     const [comment, setComment] = useState("");
     const [showComments, setShowComments] = useState((post.comments || []).length > 0);
@@ -1110,9 +1064,6 @@ function StreamPost({ post, classwork, isTeacher, onAddComment }) {
     );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Classwork row                                                      */
-/* ------------------------------------------------------------------ */
 function ClassworkRow({ item, onOpen, onTurnIn }) {
     const done = !!item.submitted;
     const graded = item.grade != null;
@@ -1169,9 +1120,6 @@ function ClassworkRow({ item, onOpen, onTurnIn }) {
     );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Class detail view with tabs                                        */
-/* ------------------------------------------------------------------ */
 function ClassDetail({
     cls,
     tab,
@@ -1185,7 +1133,6 @@ function ClassDetail({
 }) {
     const isTeacher = cls.teachers.some((t) => t.id === CURRENT_USER.id);
 
-    // --- Stream tab
     const renderStream = () => (
         <div className="flex flex-col gap-3 max-w-3xl">
             {isTeacher && (
@@ -1224,7 +1171,6 @@ function ClassDetail({
         </div>
     );
 
-    // --- Classwork tab: group by topic
     const renderClasswork = () => {
         const byTopic = {};
         cls.classwork.forEach((item) => {
@@ -1270,7 +1216,6 @@ function ClassDetail({
         );
     };
 
-    // --- People tab
     const renderPeople = () => (
         <div className="flex flex-col gap-6 max-w-2xl">
             <section className="flex flex-col gap-2">
@@ -1321,7 +1266,6 @@ function ClassDetail({
         </div>
     );
 
-    // --- Grades tab
     const renderGrades = () => {
         const graded = cls.classwork.filter((c) => c.grade != null);
         const totalPoints = graded.reduce((s, c) => s + (c.points || 0), 0);
@@ -1405,7 +1349,6 @@ function ClassDetail({
 
     return (
         <div className="flex-1 min-h-0 overflow-y-auto">
-            {/* Banner header */}
             <div className="relative">
                 <ClassBanner color={cls.color} name={cls.name} section={cls.section} tall />
                 <button
@@ -1428,7 +1371,6 @@ function ClassDetail({
                 </div>
             </div>
 
-            {/* Meta strip */}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 sm:px-8 py-3 border-b border-solid border-[color:var(--t-bd0)] bg-[var(--t-bg1)]">
                 <span className="text-[color:var(--t-tx1)] text-xs">
                     <span className="text-[color:var(--t-tx2)]">Room · </span>
@@ -1448,7 +1390,6 @@ function ClassDetail({
                 </span>
             </div>
 
-            {/* Tabs */}
             <div className="flex items-center gap-1 overflow-x-auto border-b border-solid border-[color:var(--t-bd0)] bg-[var(--t-bg1)] px-4 sm:px-8">
                 {TABS.map((t) => {
                     const active = tab === t.key;
@@ -1468,7 +1409,6 @@ function ClassDetail({
                 })}
             </div>
 
-            {/* Tab content */}
             <div className="px-4 sm:px-8 py-6">
                 {tab === "stream" && renderStream()}
                 {tab === "classwork" && renderClasswork()}
@@ -1479,9 +1419,6 @@ function ClassDetail({
     );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Class list (grid) + To-do panel                                    */
-/* ------------------------------------------------------------------ */
 function ClassList({ classes, onOpen, onCreateClass, onJoinClass }) {
     const todo = useMemo(() => {
         const items = [];
@@ -1573,10 +1510,6 @@ function ClassList({ classes, onOpen, onCreateClass, onJoinClass }) {
     );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Error boundary — a crash inside the page shows a message instead   */
-/*  of unmounting everything (which looks like a black screen).        */
-/* ------------------------------------------------------------------ */
 class PageErrorBoundary extends React.Component {
     constructor(props) {
         super(props);
@@ -1630,16 +1563,13 @@ class PageErrorBoundary extends React.Component {
     }
 }
 
-/* ------------------------------------------------------------------ */
-/*  Main component                                                     */
-/* ------------------------------------------------------------------ */
 function ClassroomPage({ onNavigate } = {}) {
     const navigate = useNavigate();
     const [theme, setTheme, rootThemeStyle] = useTheme();
 
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const [navCollapsed, setNavCollapsed] = useState(false);
-    const [fallbackPage, setFallbackPage] = useState(null); // only used when onNavigate isn't passed
+    const [fallbackPage, setFallbackPage] = useState(null);
 
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -1653,7 +1583,7 @@ function ClassroomPage({ onNavigate } = {}) {
     const [showCreateClass, setShowCreateClass] = useState(false);
     const [showJoinClass, setShowJoinClass] = useState(false);
     const [showCreatePost, setShowCreatePost] = useState(false);
-    const [turnInTarget, setTurnInTarget] = useState(null); // { classId, itemId }
+    const [turnInTarget, setTurnInTarget] = useState(null);
     const [copiedCode, setCopiedCode] = useState(false);
 
     const activeClass = classes.find((c) => c.id === activeClassId) || null;
@@ -1704,7 +1634,6 @@ function ClassroomPage({ onNavigate } = {}) {
 
     function handleConfirmLogout() {
         setShowLogoutConfirm(false);
-        // TODO: clear auth/session state here once real auth is wired up
         navigate("/");
     }
 
@@ -1830,7 +1759,6 @@ function ClassroomPage({ onNavigate } = {}) {
         setCopiedCode(true);
     }
 
-    /* ---- fallback navigation (only when no onNavigate prop was passed) ---- */
     if (!onNavigate && fallbackPage === "dashboard") return <Dashboard />;
     if (!onNavigate && fallbackPage === "chatbot") {
         return <Chatbot onNavigate={(key) => setFallbackPage(key === "classroom" ? null : key)} />;
@@ -1852,7 +1780,6 @@ function ClassroomPage({ onNavigate } = {}) {
 
     return (
         <div style={rootThemeStyle || themeStyle(theme)} className="flex h-screen w-full bg-[var(--t-bg1)] text-[color:var(--t-tx0)] overflow-hidden">
-            {/* Desktop sidebar */}
             <div
                 className="hidden md:flex h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
                 style={{ width: navCollapsed ? 0 : 256 }}
@@ -1866,7 +1793,6 @@ function ClassroomPage({ onNavigate } = {}) {
                 />
             </div>
 
-            {/* Desktop drawer handle */}
             <button
                 onClick={() => setNavCollapsed((v) => !v)}
                 aria-label={navCollapsed ? "Open navigation bar" : "Push navigation bar aside"}
@@ -1888,7 +1814,6 @@ function ClassroomPage({ onNavigate } = {}) {
                 </svg>
             </button>
 
-            {/* Mobile sidebar overlay */}
             {mobileNavOpen && (
                 <div className="fixed inset-0 z-50 flex md:hidden">
                     <Sidebar
@@ -1912,7 +1837,6 @@ function ClassroomPage({ onNavigate } = {}) {
                 style={{ backgroundImage: "var(--t-grad-main)" }}
                 className="flex-1 flex flex-col min-w-0 bg-[var(--t-bg1)]"
             >
-                {/* Top bar */}
                 <div className="flex flex-wrap justify-between items-center gap-3 bg-[color-mix(in_srgb,_var(--t-bg0)_40%,_transparent)] py-3 px-4 sm:px-8">
                     <div className="flex items-center gap-3">
                         <button
@@ -1965,23 +1889,11 @@ function ClassroomPage({ onNavigate } = {}) {
                             )}
                         </button>
 
-                        <button
-                            onClick={() => setSettingsOpen(true)}
-                            className="flex flex-col shrink-0 items-start px-1 sm:px-2"
-                            aria-label="Profile / Settings"
-                        >
-                            <div
-                                className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"
-                                style={{ boxShadow: "0px 1px 2px #0000000D" }}
-                            >
-                                <span className="text-[color:var(--t-onac)] text-sm font-bold">CP</span>
-                            </div>
-                        </button>
+                        <ProfileButton />
                     </div>
                 </div>
 
                 <PageErrorBoundary>
-                    {/* Quiz Arena placeholder */}
                     {showQuiz ? (
                         <div className="flex-1 min-h-0 overflow-y-auto">
                             <QuizArena where="Classroom" onBack={() => setShowQuiz(false)} />
@@ -2015,17 +1927,14 @@ function ClassroomPage({ onNavigate } = {}) {
                 </PageErrorBoundary>
             </div>
 
-            {/* Settings drawer — shared by every page */}
             {settingsOpen && (
                 <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} theme={theme} onThemeChange={setTheme} />
             )}
 
-            {/* Logout confirmation — same popup as the Dashboard */}
             {showLogoutConfirm && (
                 <LogoutConfirmModal onConfirm={handleConfirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
             )}
 
-            {/* Modals */}
             {showCreateClass && <CreateClassModal onClose={() => setShowCreateClass(false)} onCreate={createClass} />}
             {showJoinClass && <JoinClassModal onClose={() => setShowJoinClass(false)} onJoin={joinClass} />}
             {showCreatePost && activeClass && (
@@ -2047,8 +1956,6 @@ function ClassroomPage({ onNavigate } = {}) {
     );
 }
 
-/* Exported wrapper: catches ANY render error in the page (sidebar, settings, modals…)
-   and shows it on screen instead of leaving a blank dark page. */
 export default function Classroom(props) {
     return (
         <PageErrorBoundary fullScreen>

@@ -6,6 +6,7 @@ import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import Settings from "../components/Settings";
 import QuizArena from "./QuizArena";
 import { useTheme, CloseIcon } from "./Theme";
+import { ProfileButton, SidebarProfileButton } from "../components/ProfileSystem";
 
 import firstCramBadge from "../assets/first_cram_badge.svg";
 import quizRookieBadge from "../assets/quiz_rookie_badge.svg";
@@ -28,11 +29,8 @@ import mistakeMinerBadge from "../assets/mistake_miner_badge.svg";
 import quizStreakBadge from "../assets/quiz_streak_badge.svg";
 import quizMarathonBadge from "../assets/quiz_marathon_badge.svg";
 
-// Same icon art, labels and layout as the Chatbot / Group Collab / Personalized sidebar.
 const NAV_ASSET = (id) => `https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/${id}_expires_30_days.png`;
 
-// Graduation cap for the CLASSROOM sidebar entry, drawn inline so we don't
-// need a new hosted asset. Same style as the other pages' nav icons.
 const CLASSROOM_ICON =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='15' viewBox='0 0 24 24' fill='none' stroke='%232CD4D9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M22 10 12 5 2 10l10 5 10-5z'/><path d='M6 12v5c3 3 9 3 12 0v-5'/></svg>";
 
@@ -56,7 +54,6 @@ const NAV_ITEMS = [
   { key: "personalized", label: "PERSONALIZED", icon: NAV_IMG.personalized, iconClass: "w-[18px] h-[13px]", path: "/personalized" },
 ];
 
-// The other pages use the plain sans-serif font, so the Dashboard does too.
 const SANS = 'ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif';
 
 const FILTERS = ["This Week", "This Month", "All Time"];
@@ -92,7 +89,6 @@ const WEEKLY_ACTIVITY = [
   { day: "Sun", xp: 180 },
 ];
 
-// `unlocked` is placeholder data. Replace with real stats from the backend later.
 const ACHIEVEMENTS = [
   { id: "first-cram", name: "First Cram", mission: "Complete your first AI-generated quiz.", quote: "Every legend starts with one question.", badge: firstCramBadge, unlocked: true },
   { id: "quiz-rookie", name: "Quiz Rookie", mission: "Complete 10 quizzes.", quote: "You\u2019re warming up. The questions are starting to fear you.", badge: quizRookieBadge, unlocked: true },
@@ -207,14 +203,12 @@ function AchievementsSection() {
         </span>
       </div>
 
-      {/* The list fills whatever height is left, so Analytics always ends level with the Leaderboard */}
       <div className="relative flex-1 min-h-[300px] xl:min-h-[160px] border border-edge bg-inset">
         <ul className="absolute inset-0 p-2 flex flex-col gap-2 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:var(--t-bd0,#2e2521)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-edge">
           {ACHIEVEMENTS.map((a) => (
             <li
               key={a.id}
-              className={`flex items-center gap-3 px-2.5 py-2 border ${a.unlocked ? "border-lime/30 bg-deep" : "border-edge bg-deep"
-                }`}
+              className={`flex items-center gap-3 px-2.5 py-2 border ${a.unlocked ? "border-lime/30 bg-deep" : "border-edge bg-deep"}`}
             >
               <img
                 src={a.badge}
@@ -303,6 +297,7 @@ function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings, onLogo
       </div>
 
       <div className="flex flex-col self-stretch bg-[color-mix(in_srgb,_var(--t-bg2)_45%,_transparent)] p-3 gap-1">
+        <SidebarProfileButton />
         <button type="button" onClick={onOpenSettings} className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]">
           <img src={NAV_IMG.settings} alt="" className="w-[15px] h-[15px] mx-3 object-fill" />
           <span className="text-[color:var(--t-tx1)] text-[11px]">SETTINGS</span>
@@ -318,12 +313,12 @@ function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings, onLogo
 
 function Dashboard() {
   const navigate = useNavigate();
-  const [theme, setTheme, themeVars] = useTheme(); // shared with chatbot, group collab, personalized
+  const [theme, setTheme, themeVars] = useTheme();
   const [showSettings, setShowSettings] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [showQuiz, setShowQuiz] = useState(false); // Quiz Arena placeholder shown inside the page
+  const [showQuiz, setShowQuiz] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [navCollapsed, setNavCollapsed] = useState(false); // desktop: push the sidebar aside
+  const [navCollapsed, setNavCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const rootStyle = { ...themeVars, "--font-display": SANS, "--font-label": SANS };
   const [leaderboardFilter, setLeaderboardFilter] = useState(FILTERS[0]);
@@ -342,13 +337,11 @@ function Dashboard() {
 
   const handleConfirmLogout = () => {
     setShowLogoutConfirm(false);
-    // TODO: clear auth/session state here once real auth is wired up
     navigate("/");
   };
 
   return (
     <div style={rootStyle} className="flex h-screen w-full bg-[var(--t-bg1)] text-ink overflow-hidden">
-      {/* desktop sidebar: collapsible drawer */}
       <div
         className="hidden md:flex h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
         style={{ width: navCollapsed ? 0 : 256 }}
@@ -375,7 +368,6 @@ function Dashboard() {
         </svg>
       </button>
 
-      {/* mobile sidebar overlay */}
       {mobileNavOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
           <Sidebar
@@ -390,7 +382,6 @@ function Dashboard() {
       )}
 
       <div style={{ backgroundImage: "var(--t-grad-main)" }} className="flex-1 flex flex-col min-w-0 bg-[var(--t-bg1)]">
-        {/* top bar */}
         <div className="flex flex-wrap justify-between items-center gap-3 bg-[color-mix(in_srgb,_var(--t-bg0)_40%,_transparent)] py-3 px-4 sm:px-8">
           <div className="flex items-center gap-3">
             <button
@@ -407,7 +398,6 @@ function Dashboard() {
               </svg>
             </button>
           </div>
-          {/* Dashboard shows only notifications + profile (streak and XP are already on the player card) */}
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <button type="button" className="relative shrink-0" onClick={() => setNotifOpen((v) => !v)} aria-label="Notifications">
               <img src={NAV_IMG.avatar} alt="" className="w-8 h-8 object-fill" />
@@ -419,33 +409,18 @@ function Dashboard() {
               )}
             </button>
 
-            <button
-              type="button"
-              onClick={() => setShowSettings(true)}
-              className="flex flex-col shrink-0 items-start px-1 sm:px-2"
-              aria-label="Profile / Settings"
-            >
-              <div
-                className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"
-                style={{ boxShadow: "0px 1px 2px #0000000D" }}
-              >
-                <span className="text-[color:var(--t-onac)] text-sm font-bold">CP</span>
-              </div>
-            </button>
+            <ProfileButton />
           </div>
         </div>
 
-        {/* Quiz Arena placeholder (shown inside the page, sidebar and top bar stay) */}
         {showQuiz && (
           <main className="flex-1 min-h-0 overflow-y-auto">
             <QuizArena where="Dashboard" onBack={() => setShowQuiz(false)} />
           </main>
         )}
 
-        {/* Main (hidden, not unmounted, while Quiz Arena is open so quiz history state is kept) */}
         <main className={`${showQuiz ? "hidden" : ""} flex-1 min-h-0 p-6 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:var(--t-bd0,#2e2521)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-edge`}>
           <div className="flex flex-col gap-6">
-            {/* Player card */}
             <section className="panel p-5">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
@@ -501,7 +476,6 @@ function Dashboard() {
             </section>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch">
-              {/* Leaderboard */}
               <Panel
                 icon={"\u26C6"}
                 title="Class Leaderboard"
@@ -525,8 +499,7 @@ function Dashboard() {
                     return (
                       <div
                         key={entry.rank}
-                        className={`flex items-center justify-between px-3 py-2 border ${isYou ? "border-cyan/40 bg-cyan/10" : "border-edge bg-inset"
-                          }`}
+                        className={`flex items-center justify-between px-3 py-2 border ${isYou ? "border-cyan/40 bg-cyan/10" : "border-edge bg-inset"}`}
                       >
                         <div className="flex items-center gap-2.5">
                           <span className="w-7 h-7 border border-edge bg-deep flex items-center justify-center font-label text-[11px] font-bold text-mute">
@@ -549,7 +522,6 @@ function Dashboard() {
                 </div>
               </Panel>
 
-              {/* Analytics */}
               <Panel
                 icon={"\u25A4"}
                 title="Analytics"
@@ -566,8 +538,7 @@ function Dashboard() {
                   {ANALYTICS_STATS.map((stat, i) => (
                     <div
                       key={stat.label}
-                      className={`border border-edge bg-inset px-4 py-3 ${i === ANALYTICS_STATS.length - 1 && ANALYTICS_STATS.length % 2 ? "col-span-2" : ""
-                        }`}
+                      className={`border border-edge bg-inset px-4 py-3 ${i === ANALYTICS_STATS.length - 1 && ANALYTICS_STATS.length % 2 ? "col-span-2" : ""}`}
                     >
                       <p className={`font-display text-[22px] font-bold leading-none ${stat.color}`}>
                         {stat.value}
@@ -604,7 +575,6 @@ function Dashboard() {
         </main>
       </div>
 
-      {/* Settings drawer — shared by every page (and Quiz Arena) */}
       <Settings open={showSettings} onClose={() => setShowSettings(false)} theme={theme} onThemeChange={setTheme} />
 
       {showLogoutConfirm && (

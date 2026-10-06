@@ -7,9 +7,8 @@ import QuizArena from "./QuizArena";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import Settings from "../components/Settings";
 import { useTheme, withAlpha, CloseIcon, MenuIcon } from "./Theme";
-/* ---------------------------------------------------------
-   Static assets (kept identical to the original design)
---------------------------------------------------------- */
+import { ProfileButton, SidebarProfileButton } from "../components/ProfileSystem";
+
 const IMG = {
   logo: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/ec7p6crg_expires_30_days.png",
   dashboard: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/5fuik1xz_expires_30_days.png",
@@ -72,9 +71,7 @@ const MONTH_NAMES = [
   "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER",
 ];
 
-// Fixed "today" so the demo data (Algo Bounds Review, CS240 Midterm, etc.)
-// lines up exactly like the original static design.
-const TODAY = new Date(2027, 2, 19); // March 19, 2027
+const TODAY = new Date(2027, 2, 19);
 const keyFor = (y, m, d) => `${y}-${m}-${d}`;
 
 const TYPE_STYLES = {
@@ -83,13 +80,11 @@ const TYPE_STYLES = {
   group: { dot: "var(--t-ok)", bg: "var(--t-ok)", text: "var(--t-onok)" },
 };
 
-// Badge color is driven by the column/status a quest sits in, so a quest's
-// badge automatically re-colors itself as it's moved through the sprint.
 const BADGE_COLOR_BY_COLUMN = {
-  backlog: "var(--t-err)", // red
-  active: "var(--t-ac2)", // cyan (unchanged)
-  review: "var(--t-warn)", // yellow
-  done: "var(--t-ok2)", // green
+  backlog: "var(--t-err)",
+  active: "var(--t-ac2)",
+  review: "var(--t-warn)",
+  done: "var(--t-ok2)",
 };
 
 const SPRINT_STATUS_OPTIONS = [
@@ -148,8 +143,6 @@ const INITIAL_UPCOMING = [
   },
 ];
 
-// Graduation cap for the CLASSROOM sidebar entry, drawn inline so we don't
-// need a new hosted asset (same icon the Dashboard and Classroom use).
 const CLASSROOM_ICON =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='15' viewBox='0 0 24 24' fill='none' stroke='%232CD4D9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M22 10 12 5 2 10l10 5 10-5z'/><path d='M6 12v5c3 3 9 3 12 0v-5'/></svg>";
 
@@ -292,9 +285,10 @@ const INITIAL_SPRINT_COLUMNS = [
     ],
   },
 ];
+
 function buildMonthGrid(year, month) {
   const firstOfMonth = new Date(year, month, 1);
-  const startOffset = (firstOfMonth.getDay() + 6) % 7; // Monday = 0
+  const startOffset = (firstOfMonth.getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const totalCells = startOffset + daysInMonth;
   const totalWeeks = Math.ceil(totalCells / 7);
@@ -341,22 +335,19 @@ function formatDateLabel(d) {
   return `${MONTH_NAMES[d.getMonth()].slice(0, 3)} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
-/* ---------------------------------------------------------
-   Main component
---------------------------------------------------------- */
 export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToGroup, onNavigateToDashboard } = {}) {
   const navigate = useNavigate();
-  const [theme, setTheme, rootThemeStyle] = useTheme(); // shared with chatbot + group collab
+  const [theme, setTheme, rootThemeStyle] = useTheme();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [navCollapsed, setNavCollapsed] = useState(false); // desktop drawer: pushed to the side
+  const [navCollapsed, setNavCollapsed] = useState(false);
   const [activeNav, setActiveNav] = useState("personalized");
   const [activeSubTab, setActiveSubTab] = useState("calendar");
   const [subjectFilter, setSubjectFilter] = useState("All Subjects");
   const [filterOpen, setFilterOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [viewDate, setViewDate] = useState(new Date(2027, 2, 1)); // month being viewed
-  const [selectedDate, setSelectedDate] = useState(null); // date picked on the calendar grid
+  const [viewDate, setViewDate] = useState(new Date(2027, 2, 1));
+  const [selectedDate, setSelectedDate] = useState(null);
   const [events, setEvents] = useState(INITIAL_EVENTS);
   const [upcoming, setUpcoming] = useState(INITIAL_UPCOMING);
   const [completed, setCompleted] = useState({});
@@ -373,8 +364,8 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
   const [forgeFiles, setForgeFiles] = useState(INITIAL_FORGE_FILES);
   const [forgeStatusMap, setForgeStatusMap] = useState({});
   const [forgeFolders, setForgeFolders] = useState(INITIAL_FORGE_FOLDERS);
-  const [activeFolder, setActiveFolder] = useState(null); // null = My Library (root), else the open folder id
-  const [arenaFile, setArenaFile] = useState(null); // file handed to Quiz Arena by "Forge Quiz"
+  const [activeFolder, setActiveFolder] = useState(null);
+  const [arenaFile, setArenaFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [driveSyncing, setDriveSyncing] = useState(false);
   const [showRepoLink, setShowRepoLink] = useState(false);
@@ -398,7 +389,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 
   const fileInputRef = useRef(null);
 
-  /* Esc clears/closes open panels */
   useEffect(() => {
     function onKeyDown(e) {
       if (e.key === "Escape") {
@@ -455,8 +445,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     return Math.max(1, Math.round(bytes / 1024)) + " KB";
   }
 
-  // Drops/selections are only simulated locally (per the brief, nothing needs
-  // to persist yet) — files get a fake "Indexing…" pass, then flip to "Indexed".
   function addFilesToForge(fileList) {
     const filesArr = Array.from(fileList || []);
     if (!filesArr.length) return;
@@ -473,8 +461,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
       text: null,
     }));
     setForgeFiles((prev) => [...newEntries, ...prev]);
-    // Read the file right away and save its text for Quiz Arena. Plain-text files are
-    // read for real; PDF/Word/PowerPoint need the AI backend, so Quiz Arena uses sample notes.
     filesArr.forEach((f, i) => {
       const id = newEntries[i].id;
       const isText = ["txt", "md", "markdown", "csv"].includes(f.name.split(".").pop().toLowerCase());
@@ -500,12 +486,10 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     if (forgeStatusMap[id] === "forging") return;
     const f = forgeFiles.find((x) => x.id === id);
     if (!f) return;
-    // Quiz Arena's only entrance: "Forge Quiz". The arena generates the flashcards itself.
     setArenaFile({ name: f.name, size: f.rawSize, text: f.text });
     setActiveNav("quiz");
   }
 
-  // ---- filing system ----
   function createFolder(name) {
     const n = name.trim();
     if (!n) return;
@@ -519,7 +503,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     setForgeFolders((prev) => prev.map((fo) => (fo.id === id ? { ...fo, name: n } : fo)));
   }
 
-  // Deleting a folder never deletes files: they just become unfiled.
   function deleteFolder(id) {
     setForgeFolders((prev) => prev.filter((fo) => fo.id !== id));
     setForgeFiles((prev) => prev.map((it) => (it.folderId === id ? { ...it, folderId: null } : it)));
@@ -544,7 +527,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     setShowRepoLink(false);
   }
 
-  /* ---------------- Sprint board (drag & drop) ---------------- */
   function handleCardDragStart(e, colId, cardId) {
     setDraggedCard({ colId, cardId });
     e.dataTransfer.effectAllowed = "move";
@@ -682,8 +664,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     const id = `u${Date.now()}`;
     const colorMap = { review: "var(--t-ac)", exam: "var(--t-err)", group: "var(--t-ok)" };
     const statusMap = { review: "SCHEDULED", exam: "URGENT", group: "GROUP" };
-    // Fall back to the calendar's selected day, then to TODAY, if the
-    // date field was ever left empty.
     const chosenDate = parseDateFromInput(newEvent.date) || selectedDate || TODAY;
     const evYear = chosenDate.getFullYear();
     const evMonth = chosenDate.getMonth();
@@ -708,7 +688,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
       ...prev,
       { id, year: evYear, month: evMonth, day: evDay, label: newEvent.label, type: newEvent.type },
     ]);
-    // New calendar events also land as a quest in the Sprint Board backlog.
     addCardToColumn("backlog", newEvent.label, {
       subject: newEvent.subject.toUpperCase(),
       meta: dateLabel,
@@ -726,13 +705,9 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 
   function handleConfirmLogout() {
     setShowLogoutConfirm(false);
-    // TODO: clear auth/session state here once real auth is wired up
     navigate("/");
   }
 
-  // Self-sufficient fallback: if nothing external is controlling navigation
-  // (onNavigateToChatbot not passed in), swap the whole page for the target page
-  // instead of nesting it inside this page's own sidebar/topbar.
   if (activeNav === "dashboard" && !onNavigateToDashboard) {
     return <Dashboard />;
   }
@@ -760,7 +735,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
       `}</style>
       <div className="self-stretch bg-[var(--t-bg0)] min-h-screen relative">
         <div className="flex items-start self-stretch relative">
-          {/* Mobile sidebar backdrop */}
           {mobileNavOpen && (
             <div
               className="fixed inset-0 bg-black/60 z-40 lg:hidden"
@@ -768,7 +742,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
             />
           )}
 
-          {/* ---------------- SIDEBAR ---------------- */}
           <div
             style={{ backgroundImage: "var(--t-grad-side)" }}
             className={`bg-[var(--t-bg0)] w-64 shrink-0 z-50 flex flex-col h-screen
@@ -817,8 +790,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                           setActiveNav("group");
                           onNavigateToGroup();
                         } else if (item.key === "classroom") {
-                          // Classroom is a real route (/classroom) — leave this page
-                          // for it instead of showing the "coming soon" placeholder.
                           setActiveNav("classroom");
                           navigate("/classroom");
                         } else {
@@ -849,6 +820,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
             </div>
 
             <div className="flex flex-col self-stretch bg-[color-mix(in_srgb,_var(--t-bg2)_45%,_transparent)] p-3 gap-1">
+              <SidebarProfileButton />
               <button
                 onClick={() => setSettingsOpen(true)}
                 className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]"
@@ -866,7 +838,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
             </div>
           </div>
 
-          {/* Desktop drawer handle — pushes the navigation bar to the side and back */}
           <button
             onClick={() => setNavCollapsed((v) => !v)}
             aria-label={navCollapsed ? "Open navigation bar" : "Push navigation bar aside"}
@@ -879,9 +850,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
             </svg>
           </button>
 
-          {/* ---------------- MAIN ---------------- */}
           <div style={{ backgroundImage: "var(--t-grad-main)" }} className={`flex-1 bg-[var(--t-bg1)] pb-16 min-w-0 transition-[margin] duration-300 ease-out ${navCollapsed ? "lg:ml-0" : "lg:ml-64"}`}>
-            {/* Top bar */}
             <div className="sticky top-0 z-30 backdrop-blur flex flex-wrap justify-between items-center gap-3 self-stretch bg-[color-mix(in_srgb,_var(--t-bg0)_40%,_transparent)] py-3 px-4 sm:px-6 mb-8 lg:mb-[72px]">
               <div className="flex flex-1 min-w-0 items-center gap-3 sm:gap-4">
                 <button
@@ -918,34 +887,19 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                   )}
                 </button>
 
-                <button
-                  onClick={() => setSettingsOpen(true)}
-                  className="flex flex-col shrink-0 items-start px-1 sm:px-2"
-                  aria-label="Profile / Settings"
-                >
-                  <div
-                    className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"
-                    style={{ boxShadow: "0px 1px 2px #0000000D" }}
-                  >
-                    <span className="text-[color:var(--t-onac)] text-sm font-bold">CP</span>
-                  </div>
-                </button>
+                <ProfileButton />
               </div>
             </div>
 
-            {/* Content */}
             <div className="self-stretch relative">
               <div
                 className="self-stretch absolute top-[-56px] lg:top-[-72px] right-0 left-0 pb-[1px]"
                 style={{ background: "linear-gradient(180deg, var(--t-bg2), color-mix(in srgb, var(--t-bg3) 55%, var(--t-bg2)), var(--t-bg1))" }}
               >
-
               </div>
 
               <div className="flex flex-col self-stretch px-4 sm:px-6 lg:px-10 gap-6">
                 {activeNav === "quiz" ? (
-                  // QuizArena brings its own side padding (same as this container),
-                  // so cancel this container's padding to avoid doubling it.
                   <div className="-mx-4 sm:-mx-6 lg:-mx-10 self-stretch">
                     <QuizArena where="Personalized" file={arenaFile} onBack={() => { setActiveNav("personalized"); setActiveSubTab("quizforge"); }} />
                   </div>
@@ -953,7 +907,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                   <ComingSoon nav={NAV_ITEMS.find((n) => n.key === activeNav)?.label} onBack={() => setActiveNav("personalized")} />
                 ) : (
                   <>
-                    {/* Hero card */}
                     <div
                       className="flex flex-col self-stretch bg-[#FFFFFF00] p-4 sm:p-[25px] gap-4"
                       style={{ boxShadow: "0px 8px 10px #0000001A" }}
@@ -1006,7 +959,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                       </div>
                     </div>
 
-                    {/* Sub tabs + filter */}
                     <div className="flex flex-wrap justify-between items-center gap-3 self-stretch">
                       <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
                         {SUBTABS.map((tab) => {
@@ -1056,7 +1008,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 
                     {activeSubTab === "calendar" && (
                       <div className="flex flex-col self-stretch gap-6">
-                        {/* Calendar card */}
                         <div
                           className="flex flex-col self-stretch bg-[var(--t-bg1)] p-4 sm:p-[21px] gap-4 border border-solid border-[color:var(--t-bd0)]"
                           style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
@@ -1216,7 +1167,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                           </div>
                         </div>
 
-                        {/* Upcoming events card */}
                         <div
                           className="flex flex-col self-stretch bg-[var(--t-bg1)] p-4 sm:p-[21px] gap-4 border border-solid border-[color:var(--t-bd0)]"
                           style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
@@ -1428,10 +1378,8 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
           </div>
         </div>
 
-        {/* Settings drawer — shared by every page */}
         <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} theme={theme} onThemeChange={setTheme} />
 
-        {/* Add event modal */}
         {showAddEvent && (
           <NewEventModal
             newEvent={newEvent}
@@ -1441,7 +1389,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
           />
         )}
 
-        {/* Logout confirmation — same popup as the Dashboard */}
         {showLogoutConfirm && (
           <LogoutConfirmModal onConfirm={handleConfirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
         )}
@@ -1518,7 +1465,6 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
       >
         <div className="h-0.5 w-full" style={{ background: `linear-gradient(90deg, ${typeDef.color}, var(--t-warn), ${typeDef.color})` }} />
 
-        {/* header */}
         <div className="flex justify-between items-start px-5 pt-4 pb-3">
           <div className="flex items-center gap-3">
             <div
@@ -1539,7 +1485,6 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
           </button>
         </div>
 
-        {/* progress bar */}
         <div className="px-5 pb-4">
           <div className="relative h-1.5 bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] overflow-hidden">
             <div
@@ -1563,13 +1508,11 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
         </div>
 
         <div className="flex flex-col gap-4 px-5 pb-5">
-          {/* Title */}
           <label className="flex flex-col gap-1.5">
             <Label ok={checks[0]}>Title</Label>
             <input autoFocus value={newEvent.label} onChange={(e) => set({ label: e.target.value })} placeholder="e.g. Linear Algebra Review" className={field} />
           </label>
 
-          {/* Type */}
           <div className="flex flex-col gap-1.5">
             <span className="text-[color:var(--t-mtx)] text-[10px] font-bold tracking-wider text-left uppercase">Type</span>
             <div className="grid grid-cols-3 gap-1.5">
@@ -1596,7 +1539,6 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
             </div>
           </div>
 
-          {/* Date + quick picks */}
           <div className="flex flex-col gap-1.5">
             <Label ok={checks[1]}>Date</Label>
             <input type="date" value={newEvent.date} onChange={(e) => set({ date: e.target.value })} className={`${field} pz-date`} />
@@ -1629,7 +1571,6 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
             </div>
           </div>
 
-          {/* Subject */}
           <label className="flex flex-col gap-1.5">
             <Label ok={checks[2]}>Subject</Label>
             <input value={newEvent.subject} onChange={(e) => set({ subject: e.target.value })} placeholder="e.g. CS240" className={field} />
@@ -1640,7 +1581,6 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
             )}
           </label>
 
-          {/* Details */}
           <label className="flex flex-col gap-1.5">
             <Label ok={checks[3]} optional>Details</Label>
             <input value={newEvent.meta} onChange={(e) => set({ meta: e.target.value })} placeholder="e.g. 15:00 • Room 3" className={field} />
@@ -1730,7 +1670,7 @@ function QuizForgePanel({
   const [renameValue, setRenameValue] = useState("");
   const [search, setSearch] = useState("");
   const [dropTarget, setDropTarget] = useState(null);
-  const [menu, setMenu] = useState(null); // { kind: "folder" | "file", id }
+  const [menu, setMenu] = useState(null);
 
   const q = search.trim().toLowerCase();
   const current = folders.find((fo) => fo.id === activeFolder) || null;
@@ -1738,8 +1678,6 @@ function QuizForgePanel({
   const countIn = (id) => files.filter((f) => f.folderId === id).length;
   const totalChunks = files.reduce((sum, f) => sum + f.chunks, 0);
 
-  // Drive-style scope: root shows folders + loose files, a folder shows only its own files,
-  // and searching looks through everything.
   const shown = files.filter((f) => {
     const inScope = q ? true : current ? f.folderId === current.id : !f.folderId;
     return inScope && f.name.toLowerCase().includes(q);
@@ -1749,7 +1687,6 @@ function QuizForgePanel({
   const isFileDrag = (e) => e.dataTransfer.types.includes("Files");
   const isMoveDrag = (e) => e.dataTransfer.types.includes("text/forge-file");
 
-  // A folder tile / breadcrumb that accepts a dragged file row.
   const moveTarget = (key, folderId) => ({
     onDragOver: (e) => {
       if (isMoveDrag(e)) {
@@ -1785,7 +1722,6 @@ function QuizForgePanel({
 
   return (
     <div className="flex flex-col self-stretch gap-5">
-      {/* Summary strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)]">
         {QUIZ_FORGE_STATS.map((stat, i) => {
           const isTomes = stat.label === "INGESTED TOMES";
@@ -1808,7 +1744,6 @@ function QuizForgePanel({
         })}
       </div>
 
-      {/* Library */}
       <div
         className="relative flex flex-col self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)]"
         onDragOver={(e) => {
@@ -1826,7 +1761,6 @@ function QuizForgePanel({
       >
         <input ref={fileInputRef} type="file" multiple className="hidden" onChange={onFileInputChange} />
 
-        {/* Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-solid border-[color:var(--t-bd0)]">
           <nav aria-label="Folder path" className="flex items-center gap-1.5 text-sm min-w-0">
             <button
@@ -1879,7 +1813,6 @@ function QuizForgePanel({
         </div>
 
         <div className="flex flex-col gap-5 p-4 min-h-[260px]">
-          {/* Folders */}
           {showFolders && (folders.length > 0 || newFolderOpen) && (
             <section aria-label="Folders" className="flex flex-col gap-2">
               <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider">FOLDERS</span>
@@ -1958,7 +1891,6 @@ function QuizForgePanel({
             </section>
           )}
 
-          {/* Files */}
           <section aria-label="Files" className="flex flex-col gap-2">
             {(shown.length > 0 || showFolders) && (
               <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider">
@@ -2048,7 +1980,6 @@ function QuizForgePanel({
             )}
           </section>
 
-          {/* Linked sources */}
           {(repoLinks.length > 0 || showFolders) && (
             <section aria-label="Linked sources" className="flex flex-col gap-2 pt-1 border-t border-solid border-[color:var(--t-bd0)]">
               {repoLinks.map((link, i) => (
@@ -2079,7 +2010,6 @@ function QuizForgePanel({
           )}
         </div>
 
-        {/* Drop overlay for files dragged in from the computer */}
         {isDragging && (
           <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-[color-mix(in_srgb,_var(--t-ac)_14%,_var(--t-bg1))] border-2 border-dashed border-[color:var(--t-ac)]">
             <span className="text-[color:var(--t-ac)] text-sm font-bold">Drop to upload to {current?.name || "My Library"}</span>
@@ -2301,7 +2231,6 @@ function SprintBoardPanel({
 
   return (
     <div className="flex flex-col self-stretch gap-4">
-      {/* Sprint status bar */}
       <div
         className="flex flex-wrap justify-between items-center gap-4 self-stretch bg-[var(--t-bg3)] p-4"
         style={{ boxShadow: "0px 1px 2px #0000000D" }}
@@ -2344,7 +2273,6 @@ function SprintBoardPanel({
         </div>
       </div>
 
-      {/* Filter / group-by row */}
       <div className="flex flex-wrap items-center justify-between gap-3 self-stretch bg-[var(--t-bg0)] p-2" style={{ boxShadow: "0px 2px 4px #0000000D" }}>
         <div className="relative shrink-0">
           <button
@@ -2386,7 +2314,6 @@ function SprintBoardPanel({
         </button>
       </div>
 
-      {/* Board */}
       {view === "kanban" ? (
         <div className="grid self-stretch gap-3 pb-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))" }}>
           {filteredColumns.map((col) => (
@@ -2569,7 +2496,6 @@ function SprintBoardPanel({
         </div>
       )}
 
-      {/* Bottom summary bar */}
       <div className="flex flex-wrap justify-between items-center gap-4 self-stretch bg-[var(--t-bg2)] p-4">
         <div className="flex flex-wrap shrink-0 items-center gap-x-6 gap-y-2">
           <div className="flex shrink-0 items-center gap-1.5">
@@ -2600,7 +2526,6 @@ function SprintBoardPanel({
         </div>
       </div>
 
-      {/* Sprint logs modal */}
       {showSprintLogs && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowSprintLogs(false)} />
@@ -2622,7 +2547,6 @@ function SprintBoardPanel({
         </div>
       )}
 
-      {/* Quick task modal */}
       {showQuickTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowQuickTask(false)} />

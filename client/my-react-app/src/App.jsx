@@ -8,8 +8,11 @@ import Personalized from './pages/personalized.jsx';
 import GroupCollab from './pages/group_collab.jsx';
 import QuizArena from './pages/QuizArena.jsx';
 import Classroom from './pages/classroom.jsx';
-// The chatbot / group collab / personalized pages call onNavigate(key) with
-// these keys from their sidebars. Each key maps to a route.
+
+// 👇 1. Import useTheme
+import { useTheme } from './pages/Theme';
+import { ProfileProvider, ProfileHost } from './components/ProfileSystem';
+
 const PATHS = {
   dashboard: '/dashboard',
   classroom: '/classroom',
@@ -45,27 +48,36 @@ function QuizArenaPage() {
   return <QuizArena where="Quiz Forge" onBack={() => navigate('/personalized')} />;
 }
 
-// classroom.jsx drives its own sidebar navigation through onNavigate(key),
-// so hand it the same key→route map the other pages use.
 function ClassroomPage() {
   const navigate = useNavigate();
   return <Classroom onNavigate={(key) => navigate(PATHS[key] ?? '/dashboard')} />;
 }
 
 function App() {
+  // 👇 2. Get the theme variables
+  const [, , rootThemeStyle] = useTheme();
+
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/register" element={<Registration />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/classroom" element={<ClassroomPage />} />
-        <Route path="/chatbot" element={<ChatbotPage />} />
-        <Route path="/group-collab" element={<GroupCollabPage />} />
-        <Route path="/personalized" element={<PersonalizedPage />} />
-        <Route path="/quiz-arena" element={<QuizArenaPage />} />
-      </Routes>
+      <ProfileProvider>
+        {/* 👇 3. Wrap everything in the theme div */}
+        <div style={rootThemeStyle} className="min-h-screen bg-[var(--t-bg0)] text-[color:var(--t-tx0)]">
+          <Routes>
+            <Route path="/" element={<Login />} />
+            <Route path="/register" element={<Registration />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/classroom" element={<ClassroomPage />} />
+            <Route path="/chatbot" element={<ChatbotPage />} />
+            <Route path="/group-collab" element={<GroupCollabPage />} />
+            <Route path="/personalized" element={<PersonalizedPage />} />
+            <Route path="/quiz-arena" element={<QuizArenaPage />} />
+          </Routes>
+          
+          {/* ProfileHost is now INSIDE the theme div */}
+          <ProfileHost groups={[]} />
+        </div>
+      </ProfileProvider>
     </BrowserRouter>
   );
 }

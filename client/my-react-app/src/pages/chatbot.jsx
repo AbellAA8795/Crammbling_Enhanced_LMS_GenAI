@@ -7,10 +7,8 @@ import { useTheme } from "./Theme";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import Settings from "../components/Settings";
 import QuizArena from "./QuizArena";
+import { ProfileButton, SidebarProfileButton } from "../components/ProfileSystem";
 
-/* ------------------------------------------------------------------ */
-/*  Tiny inline icon set (keeps this file dependency-free)             */
-/* ------------------------------------------------------------------ */
 const Icon = {
     Menu: (p) => (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}>
@@ -69,10 +67,6 @@ const Icon = {
     ),
 };
 
-/* ------------------------------------------------------------------ */
-/*  Nav data — pulled from the exact same asset host/ids as             */
-/*  personalized.jsx's NAV_ITEMS, so the icon art is pixel-identical.   */
-/* ------------------------------------------------------------------ */
 const NAV_ASSET = (id) => `https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/${id}_expires_30_days.png`;
 
 const NAV_IMG = {
@@ -89,8 +83,6 @@ const NAV_IMG = {
     avatar: NAV_ASSET("24khomt6"),
 };
 
-// Graduation cap for the CLASSROOM sidebar entry, drawn inline so we don't
-// need a new hosted asset (same icon the Dashboard and Classroom use).
 const CLASSROOM_ICON =
     "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='15' viewBox='0 0 24 24' fill='none' stroke='%232CD4D9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M22 10 12 5 2 10l10 5 10-5z'/><path d='M6 12v5c3 3 9 3 12 0v-5'/></svg>";
 
@@ -104,13 +96,9 @@ const NAV_ITEMS = [
 
 const ASSET = (id) => `https://storage.googleapis.com/tagjs-prod.appspot.com/v1/tD9ysWtmXJ/${id}_expires_30_days.png`;
 
-/* ------------------------------------------------------------------ */
-/*  Sidebar — scrollable, responsive, drives page navigation           */
-/* ------------------------------------------------------------------ */
 function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings, onLogout }) {
     return (
         <div style={{ backgroundImage: "var(--t-grad-side)" }} className="flex flex-col h-full bg-[var(--t-bg0)] w-64 shrink-0">
-            {/* mobile close button — matches personalized's top-of-drawer close */}
             <div className="flex justify-end md:hidden px-3 pt-3">
                 <button onClick={onCloseMobile} aria-label="Close menu">
                     <Icon.Close className="w-4 h-4 text-[color:var(--t-tx1)]" />
@@ -118,7 +106,6 @@ function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings, onLogo
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto">
-                {/* header / brand */}
                 <div className="flex items-center self-stretch bg-[color-mix(in_srgb,_var(--t-bg2)_45%,_transparent)] py-[13px]">
                     <img src={NAV_IMG.logo} className="w-9 h-9 ml-4 mr-3 object-fill" />
                     <div className="w-[127px]">
@@ -164,8 +151,8 @@ function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings, onLogo
                 </nav>
             </div>
 
-            {/* footer */}
             <div className="flex flex-col self-stretch bg-[color-mix(in_srgb,_var(--t-bg2)_45%,_transparent)] p-3 gap-1">
+                <SidebarProfileButton />
                 <button onClick={onOpenSettings} className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]">
                     <img src={NAV_IMG.settings} className="w-[15px] h-[15px] mx-3 object-fill" />
                     <span className="text-[color:var(--t-tx1)] text-[11px]">SETTINGS</span>
@@ -179,16 +166,12 @@ function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings, onLogo
     );
 }
 
-/* ------------------------------------------------------------------ */
-/*  History drawer — lists previous conversations                      */
-/* ------------------------------------------------------------------ */
 function HistoryDrawer({ open, conversations, activeId, onSelect, onDelete, onNewChat, onClose }) {
     return (
         <>
             {open && <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />}
             <div
-                className={`fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-[var(--t-bg1)] border-r border-[color:var(--t-bg4)] z-50 flex flex-col transition-transform duration-200 ${open ? "translate-x-0" : "-translate-x-full"
-                    }`}
+                className={`fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-[var(--t-bg1)] border-r border-[color:var(--t-bg4)] z-50 flex flex-col transition-transform duration-200 ${open ? "translate-x-0" : "-translate-x-full"}`}
             >
                 <div className="flex items-center justify-between px-4 py-4 border-b border-[color:var(--t-bg4)] shrink-0">
                     <span className="text-[color:var(--t-tx0)] text-sm font-bold">CONVERSATION LOG</span>
@@ -215,13 +198,11 @@ function HistoryDrawer({ open, conversations, activeId, onSelect, onDelete, onNe
                         <div
                             key={c.id}
                             onClick={() => onSelect(c.id)}
-                            className={`group flex items-center justify-between gap-2 px-3 py-2.5 cursor-pointer ${c.id === activeId ? "bg-[var(--t-bg4)]" : "hover:bg-[var(--t-bg2)]"
-                                }`}
+                            className={`group flex items-center justify-between gap-2 px-3 py-2.5 cursor-pointer ${c.id === activeId ? "bg-[var(--t-bg4)]" : "hover:bg-[var(--t-bg2)]"}`}
                         >
                             <div className="min-w-0">
                                 <p
-                                    className={`text-xs font-bold truncate ${c.id === activeId ? "text-[color:var(--t-ac2)]" : "text-[color:var(--t-tx0)]"
-                                        }`}
+                                    className={`text-xs font-bold truncate ${c.id === activeId ? "text-[color:var(--t-ac2)]" : "text-[color:var(--t-tx0)]"}`}
                                 >
                                     {c.title}
                                 </p>
@@ -245,9 +226,6 @@ function HistoryDrawer({ open, conversations, activeId, onSelect, onDelete, onNe
     );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Chat message bubble                                                 */
-/* ------------------------------------------------------------------ */
 function Message({ msg }) {
     const isUser = msg.role === "user";
     return (
@@ -291,9 +269,6 @@ function Message({ msg }) {
     );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Main chatbot page                                                   */
-/* ------------------------------------------------------------------ */
 const SEED_MESSAGES = [
     { role: "user", text: "How does DFS detect cycles in a directed graph?" },
     {
@@ -313,20 +288,20 @@ function makeConversation(title, seed = []) {
 
 export default function Chatbot({ onNavigate } = {}) {
     const navigate = useNavigate();
-    const [theme, setTheme, rootThemeStyle] = useTheme(); // shared with personalized + group collab
+    const [theme, setTheme, rootThemeStyle] = useTheme();
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-    const [showQuiz, setShowQuiz] = useState(false); // Quiz Arena placeholder shown inside the page
+    const [showQuiz, setShowQuiz] = useState(false);
     const [notifOpen, setNotifOpen] = useState(false);
-    const [page, setPage] = useState("chatbot"); // "chatbot" | "personalized"
-    const [fallbackPage, setFallbackPage] = useState(null); // "personalized" | "group" | null — used only when no onNavigate prop is passed
+    const [page, setPage] = useState("chatbot");
+    const [fallbackPage, setFallbackPage] = useState(null);
     const [conversations, setConversations] = useState(() => [
         makeConversation("DFS cycle detection in graphs", SEED_MESSAGES),
     ]);
     const [activeId, setActiveId] = useState(() => conversations[0].id);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
-    const [navCollapsed, setNavCollapsed] = useState(false); // desktop drawer: pushed to the side
+    const [navCollapsed, setNavCollapsed] = useState(false);
     const [input, setInput] = useState("");
     const [pendingFiles, setPendingFiles] = useState([]);
     const [isThinking, setIsThinking] = useState(false);
@@ -385,14 +360,12 @@ export default function Chatbot({ onNavigate } = {}) {
 
     function simulateAssistantReply(userText) {
         setIsThinking(true);
-        // NOTE: replace this with a real call to your AI backend / API.
         setTimeout(() => {
             updateActiveMessages((msgs) => [
                 ...msgs,
                 {
                     role: "assistant",
-                    text: `Here's a starting point on "${userText.slice(0, 60)}${userText.length > 60 ? "…" : ""
-                        }" — reply coming soon with more details and references.`,
+                    text: `Here's a starting point on "${userText.slice(0, 60)}${userText.length > 60 ? "…" : ""}" — reply coming soon with more details and references.`,
                 },
             ]);
             setIsThinking(false);
@@ -403,7 +376,6 @@ export default function Chatbot({ onNavigate } = {}) {
         const trimmed = input.trim();
         if (!trimmed && pendingFiles.length === 0) return;
 
-        // first message in an empty/untitled conversation becomes its title
         setConversations((prev) =>
             prev.map((c) =>
                 c.id === activeId && c.messages.length === 0 && trimmed
@@ -440,17 +412,14 @@ export default function Chatbot({ onNavigate } = {}) {
         if (onNavigate) {
             onNavigate(key);
         } else if (key === "classroom") {
-            // Classroom is a real route, so jump straight to it (the other keys
-            // still swap pages in place when no onNavigate prop was passed).
             navigate("/classroom");
         } else {
-            setFallbackPage(key); // "dashboard" | "personalized" | "group"
+            setFallbackPage(key);
         }
     }
 
     function handleConfirmLogout() {
         setShowLogoutConfirm(false);
-        // TODO: clear auth/session state here once real auth is wired up
         navigate("/");
     }
 
@@ -485,9 +454,7 @@ export default function Chatbot({ onNavigate } = {}) {
 
     return (
         <div style={rootThemeStyle} className="flex h-screen w-full bg-[var(--t-bg1)] overflow-hidden">
-            {/* desktop sidebar — collapsible drawer */}
-            <div
-                className="hidden md:flex h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
+            <div className="hidden md:flex h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
                 style={{ width: navCollapsed ? 0 : 256 }}
             >
                 <Sidebar
@@ -499,7 +466,6 @@ export default function Chatbot({ onNavigate } = {}) {
                 />
             </div>
 
-            {/* Desktop drawer handle — pushes the navigation bar to the side and back */}
             <button
                 onClick={() => setNavCollapsed((v) => !v)}
                 aria-label={navCollapsed ? "Open navigation bar" : "Push navigation bar aside"}
@@ -512,7 +478,6 @@ export default function Chatbot({ onNavigate } = {}) {
                 </svg>
             </button>
 
-            {/* mobile sidebar overlay */}
             {mobileNavOpen && (
                 <div className="fixed inset-0 z-50 flex md:hidden">
                     <Sidebar
@@ -526,10 +491,8 @@ export default function Chatbot({ onNavigate } = {}) {
                 </div>
             )}
 
-            {/* Settings drawer — shared by every page (and Quiz Arena) */}
             <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} theme={theme} onThemeChange={setTheme} />
 
-            {/* Logout confirmation — same popup as the Dashboard */}
             {showLogoutConfirm && (
                 <LogoutConfirmModal onConfirm={handleConfirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
             )}
@@ -548,7 +511,6 @@ export default function Chatbot({ onNavigate } = {}) {
             />
 
             <div style={{ backgroundImage: "var(--t-grad-main)" }} className="flex-1 flex flex-col min-w-0 bg-[var(--t-bg1)]">
-                {/* top bar */}
                 <div className="flex flex-wrap justify-between items-center gap-3 bg-[color-mix(in_srgb,_var(--t-bg0)_40%,_transparent)] py-3 px-4 sm:px-8">
                     <div className="flex items-center gap-3">
                         <button
@@ -581,7 +543,6 @@ export default function Chatbot({ onNavigate } = {}) {
                             </>
                         )}
                     </div>
-                    {/* Same streak / XP / notifications / profile cluster as Group Collab and Personalized */}
                     <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                         <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:var(--t-bd0)]">
                             <img src={NAV_IMG.streak} className="w-3 h-3.5 object-fill" />
@@ -601,15 +562,7 @@ export default function Chatbot({ onNavigate } = {}) {
                                 </div>
                             )}
                         </button>
-
-                        <button onClick={() => setSettingsOpen(true)} className="flex flex-col shrink-0 items-start px-1 sm:px-2" aria-label="Profile / Settings">
-                            <div
-                                className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"
-                                style={{ boxShadow: "0px 1px 2px #0000000D" }}
-                            >
-                                <span className="text-[color:var(--t-onac)] text-sm font-bold">CP</span>
-                            </div>
-                        </button>
+                        <ProfileButton />
                     </div>
                 </div>
 
@@ -619,7 +572,6 @@ export default function Chatbot({ onNavigate } = {}) {
                     </div>
                 ) : (
                     <>
-                        {/* chat header strip */}
                         <div className="flex flex-wrap justify-between items-center gap-2 px-4 sm:px-8 py-3 border-b border-[color:var(--t-bg2)]">
                             <div className="flex items-center gap-2">
                                 <div className="flex items-center bg-[var(--t-bg0)] py-1 px-4 gap-2">
@@ -639,7 +591,6 @@ export default function Chatbot({ onNavigate } = {}) {
                             </button>
                         </div>
 
-                        {/* messages */}
                         <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-6">
                             <div className="flex flex-col gap-6 max-w-[900px] mx-auto">
                                 {active.messages.length === 0 && (
@@ -681,7 +632,6 @@ export default function Chatbot({ onNavigate } = {}) {
                             </div>
                         </div>
 
-                        {/* composer */}
                         <div className="px-4 sm:px-8 pb-4 sm:pb-6 pt-2">
                             <div className="max-w-[900px] mx-auto">
                                 {pendingFiles.length > 0 && (

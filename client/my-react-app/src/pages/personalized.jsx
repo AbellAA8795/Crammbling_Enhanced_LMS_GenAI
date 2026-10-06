@@ -148,8 +148,14 @@ const INITIAL_UPCOMING = [
   },
 ];
 
+// Graduation cap for the CLASSROOM sidebar entry, drawn inline so we don't
+// need a new hosted asset (same icon the Dashboard and Classroom use).
+const CLASSROOM_ICON =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='15' viewBox='0 0 24 24' fill='none' stroke='%232CD4D9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M22 10 12 5 2 10l10 5 10-5z'/><path d='M6 12v5c3 3 9 3 12 0v-5'/></svg>";
+
 const NAV_ITEMS = [
   { key: "dashboard", label: "DASHBOARD", icon: IMG.dashboard, iconClass: "w-[18px] h-[15px]" },
+  { key: "classroom", label: "CLASSROOM", icon: CLASSROOM_ICON, iconClass: "w-[18px] h-[15px]" },
   { key: "chatbot", label: "CHATBOT", icon: IMG.chatbot, iconClass: "w-[18px] h-[15px]" },
   { key: "group", label: "GROUP COLLAB", icon: IMG.group, iconClass: "w-5 h-2.5" },
   { key: "personalized", label: "PERSONALIZED", icon: IMG.personalized, iconClass: "w-[18px] h-[13px]" },
@@ -810,6 +816,11 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                         } else if (item.key === "group" && onNavigateToGroup) {
                           setActiveNav("group");
                           onNavigateToGroup();
+                        } else if (item.key === "classroom") {
+                          // Classroom is a real route (/classroom) — leave this page
+                          // for it instead of showing the "coming soon" placeholder.
+                          setActiveNav("classroom");
+                          navigate("/classroom");
                         } else {
                           setActiveNav(item.key);
                         }

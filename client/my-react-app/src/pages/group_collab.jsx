@@ -8,26 +8,7 @@ import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import Settings from "../components/Settings";
 import QuizArena from "./QuizArena";
 
-/* ---------------------------------------------------------
-   GROUP COLLAB
-   Two kinds of group chat:
-   - "normal"    (a squad): creator becomes ADMIN, any admin can
-                  promote other members to admin, everyone can
-                  send files, add members, and create tasks
-                  (tasks optionally sync to the Study Sprint Board).
-   - "classroom" (a class): creator becomes TEACHER automatically,
-                  only the teacher adds members, grades submitted
-                  tasks, and posts lesson materials.
-   Members can be added via Account ID, Username, or Gmail.
-   Files / Tasks / Materials / Grades / Members now live in a single
-   tabbed pop-up card instead of being stacked inline on the page.
-   Right-clicking a group chat opens a quick-access context menu.
---------------------------------------------------------- */
 
-/* ---------------------------------------------------------
-   Same asset set as chatbot.jsx / personalized.jsx, so the
-   shell (sidebar, topbar, nav icons) matches pixel-for-pixel.
---------------------------------------------------------- */
 const IMG = {
     logo: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/ec7p6crg_expires_30_days.png",
     dashboard: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/5fuik1xz_expires_30_days.png",
@@ -47,8 +28,14 @@ const IMG = {
         "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23BBC9C9' stroke-width='2' stroke-linecap='round'><line x1='4' y1='4' x2='20' y2='20'/><line x1='20' y1='4' x2='4' y2='20'/></svg>",
 };
 
+// Graduation cap for the CLASSROOM sidebar entry, drawn inline so we don't
+// need a new hosted asset (same icon the Dashboard and Classroom use).
+const CLASSROOM_ICON =
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='15' viewBox='0 0 24 24' fill='none' stroke='%232CD4D9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M22 10 12 5 2 10l10 5 10-5z'/><path d='M6 12v5c3 3 9 3 12 0v-5'/></svg>";
+
 const NAV_ITEMS = [
     { key: "dashboard", label: "DASHBOARD", icon: IMG.dashboard, iconClass: "w-[18px] h-[15px]" },
+    { key: "classroom", label: "CLASSROOM", icon: CLASSROOM_ICON, iconClass: "w-[18px] h-[15px]" },
     { key: "chatbot", label: "CHATBOT", icon: IMG.chatbot, iconClass: "w-[18px] h-[15px]" },
     { key: "group", label: "GROUP COLLAB", icon: IMG.group, iconClass: "w-5 h-2.5" },
     { key: "personalized", label: "PERSONALIZED", icon: IMG.personalized, iconClass: "w-[18px] h-[13px]" },
@@ -72,16 +59,18 @@ function initialsFor(name) {
         .toUpperCase();
 }
 
-/* Quick-access options for the right-click context menu — depends on GC type. */
+/* Quick-access options for the right-click context menu — depends on chat type. */
 function tabDefsFor(g) {
     if (!g) return [];
     if (g.type === "classroom") {
         return [
             { key: "tasks", label: "Assignments" },
             { key: "materials", label: "Materials" },
-            { key: "grades", label: "Grades" },
             { key: "members", label: "Members" },
         ];
+    }
+    if (g.type === "dm") {
+        return [{ key: "members", label: "Members" }];
     }
     return [
         { key: "tasks", label: "Tasks" },
@@ -94,7 +83,7 @@ const INITIAL_GROUPS = [
     {
         id: "g1",
         name: "Algorithm Study Squad",
-        type: "normal",
+        type: "squad",
         color: "var(--t-ac)",
         members: [
             { id: "you", name: "You", role: "admin" },
@@ -112,20 +101,19 @@ const INITIAL_GROUPS = [
     },
     {
         id: "g2",
-        name: "CS240 — Prof. Santos",
+        name: "CS240 — Study Group",
         type: "classroom",
         color: "var(--t-ok)",
-        teacherId: "you",
         members: [
-            { id: "you", name: "You", role: "teacher" },
-            { id: "s2", name: "Maya K.", role: "student" },
-            { id: "s3", name: "Alex Chen", role: "student" },
+            { id: "you", name: "You", role: "member" },
+            { id: "s2", name: "Maya K.", role: "member" },
+            { id: "s3", name: "Alex Chen", role: "member" },
         ],
         messages: [
             { id: "msg1", senderId: "you", senderName: "You", text: "Reminder: Midterm covers chapters 1-6.", time: "08:00" },
         ],
         materials: [
-            { id: "mat1", title: "Chapter 5 Slides — Graph Traversals", kind: "Slides", addedBy: "You" },
+            { id: "mat1", title: "Chapter 5 Slides — Graph Traversals", kind: "Slides", addedBy: "Course Materials" },
         ],
         tasks: [
             {
@@ -134,17 +122,15 @@ const INITIAL_GROUPS = [
                 desc: "Implement shortest path with a min-heap.",
                 due: "Mon, Mar 23",
                 points: 100,
-                submissions: [{ studentId: "s2", studentName: "Maya K.", submittedAt: "Mar 19", grade: null, feedback: "" }],
+                submissions: [{ studentId: "s2", studentName: "Maya K.", submittedAt: "Mar 19" }],
                 createdBy: "You",
             },
         ],
     },
     {
-        // Demo: what the UI looks like when "You" are a regular MEMBER
-        // (not the admin) of a normal squad — no "Make Admin" button shows.
         id: "g3",
         name: "Discrete Math Circle",
-        type: "normal",
+        type: "squad",
         color: "var(--t-warn)",
         members: [
             { id: "m4", name: "Priya N.", role: "admin" },
@@ -160,21 +146,31 @@ const INITIAL_GROUPS = [
         ],
     },
     {
-        // Demo: what the UI looks like when "You" are a STUDENT (not the
-        // teacher) in a classroom — no grading inputs, no "Add Member",
-        // and the Grades tab only shows your own graded work.
         id: "g4",
-        name: "MATH210 — Prof. Alvarez",
-        type: "classroom",
+        name: "Riley P.",
+        type: "dm",
         color: "var(--t-ac2)",
-        teacherId: "t1",
         members: [
-            { id: "t1", name: "Dr. Alvarez", role: "teacher" },
-            { id: "you", name: "You", role: "student" },
-            { id: "s4", name: "Riley P.", role: "student" },
+            { id: "you", name: "You", role: "member" },
+            { id: "s4", name: "Riley P.", role: "member" },
         ],
-        messages: [{ id: "msg4", senderId: "t1", senderName: "Dr. Alvarez", text: "Assignment 2 grades are posted.", time: "07:45" }],
-        materials: [{ id: "mat2", title: "Set Theory Review Deck", kind: "Slides", addedBy: "Dr. Alvarez" }],
+        messages: [
+            { id: "msg4", senderId: "s4", senderName: "Riley P.", text: "Hey, are you free to review the proofs later?", time: "11:20" },
+            { id: "msg5", senderId: "you", senderName: "You", text: "Yeah, after 6pm works.", time: "11:22" },
+        ],
+    },
+    {
+        id: "g5",
+        name: "MATH210 — Study Group",
+        type: "classroom",
+        color: "var(--t-ok2)",
+        members: [
+            { id: "you", name: "You", role: "member" },
+            { id: "s6", name: "Devon M.", role: "member" },
+            { id: "s7", name: "Riley P.", role: "member" },
+        ],
+        messages: [{ id: "msg6", senderId: "s6", senderName: "Devon M.", text: "Assignment 2 grades are posted.", time: "07:45" }],
+        materials: [{ id: "mat2", title: "Set Theory Review Deck", kind: "Slides", addedBy: "Course Materials" }],
         tasks: [
             {
                 id: "at2",
@@ -182,14 +178,18 @@ const INITIAL_GROUPS = [
                 desc: "Prove the given identities using set builder notation.",
                 due: "Fri, Mar 14",
                 points: 50,
-                submissions: [
-                    { studentId: "you", studentName: "You", submittedAt: "Mar 13", grade: 46, feedback: "Great work, minor notation slip on #4." },
-                    { studentId: "s4", studentName: "Riley P.", submittedAt: "Mar 14", grade: null, feedback: "" },
-                ],
-                createdBy: "Dr. Alvarez",
+                submissions: [{ studentId: "you", studentName: "You", submittedAt: "Mar 13" }],
+                createdBy: "Devon M.",
             },
         ],
     },
+];
+
+const FILTERS = [
+    { key: "all", label: "All" },
+    { key: "classroom", label: "Classrooms" },
+    { key: "dm", label: "1v1" },
+    { key: "squad", label: "Squads" },
 ];
 
 function Panel({ title, count, children, action }) {
@@ -279,6 +279,82 @@ function TabIcon({ type, className }) {
     }
 }
 
+/* Custom themed dropdown for the messages filter. */
+function FilterDropdown({ value, onChange }) {
+    const [open, setOpen] = useState(false);
+    const current = FILTERS.find((f) => f.key === value) || FILTERS[0];
+
+    return (
+        <div className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                aria-haspopup="listbox"
+                aria-expanded={open}
+                className="flex items-center justify-between w-full bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] py-1.5 pl-2.5 pr-2 text-[11px] font-bold text-[color:var(--t-tx1)] hover:border-[color:var(--t-ac)] hover:text-[color:var(--t-tx0)] transition-all duration-150 active:scale-[0.99]"
+            >
+                <span className="flex items-center gap-1.5 min-w-0">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-70">
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                    </svg>
+                    <span className="truncate">{current.label}</span>
+                </span>
+                <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="shrink-0 ml-1 transition-transform duration-200"
+                    style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+                >
+                    <polyline points="6 9 12 15 18 9" />
+                </svg>
+            </button>
+
+            {open && (
+                <>
+                    <div className="fixed inset-0 z-[5]" onClick={() => setOpen(false)} />
+                    <div
+                        role="listbox"
+                        className="absolute top-full left-0 right-0 z-10 mt-1 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] overflow-hidden"
+                        style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.5), 0 0 20px color-mix(in srgb, var(--t-glow) 20%, transparent)" }}
+                    >
+                        {FILTERS.map((f) => {
+                            const active = f.key === value;
+                            return (
+                                <button
+                                    key={f.key}
+                                    role="option"
+                                    aria-selected={active}
+                                    onClick={() => {
+                                        onChange(f.key);
+                                        setOpen(false);
+                                    }}
+                                    className={`flex items-center justify-between w-full text-left px-2.5 py-1.5 text-[11px] font-bold transition-colors duration-100 ${active
+                                        ? "bg-[var(--t-bg3)] text-[color:var(--t-ac)]"
+                                        : "text-[color:var(--t-tx1)] hover:bg-[var(--t-bg3)] hover:text-[color:var(--t-tx0)]"
+                                        }`}
+                                >
+                                    <span>{f.label}</span>
+                                    {active && (
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="20 6 9 17 4 12" />
+                                        </svg>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
 function AddMemberModal({ onClose, onAdd }) {
     const [method, setMethod] = useState("id");
     const [value, setValue] = useState("");
@@ -349,15 +425,24 @@ function AddMemberModal({ onClose, onAdd }) {
     );
 }
 
+/* Compact type picker — no more big descriptive cards. */
+const CHAT_TYPES = [
+    { id: "classroom", label: "Classroom", color: "var(--t-ok)" },
+    { id: "dm", label: "1v1", color: "var(--t-ac2)" },
+    { id: "squad", label: "Squad", color: "var(--t-ac)" },
+];
+
 function CreateGroupModal({ onClose, onCreate }) {
     const [name, setName] = useState("");
-    const [type, setType] = useState("normal");
+    const [type, setType] = useState("classroom");
 
     function submit(e) {
         e.preventDefault();
         if (!name.trim()) return;
         onCreate(name.trim(), type);
     }
+
+    const isDm = type === "dm";
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
@@ -368,61 +453,58 @@ function CreateGroupModal({ onClose, onCreate }) {
                 style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
             >
                 <div className="flex justify-between items-center mb-1">
-                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">NEW GROUP CHAT</span>
+                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">NEW MESSAGE</span>
                     <button type="button" onClick={onClose} className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors">
                         ×
                     </button>
                 </div>
 
+                <div className="flex flex-col gap-1.5">
+                    <span className="text-[color:var(--t-mtx)] text-[11px]">Type</span>
+                    <div className="flex gap-1.5">
+                        {CHAT_TYPES.map((t) => {
+                            const active = type === t.id;
+                            return (
+                                <button
+                                    type="button"
+                                    key={t.id}
+                                    onClick={() => setType(t.id)}
+                                    className="flex-1 text-[11px] font-bold py-2 border border-solid transition-all duration-150 active:scale-95"
+                                    style={{
+                                        backgroundColor: active ? withAlpha(t.color, "22") : "var(--t-in0)",
+                                        borderColor: active ? t.color : "var(--t-mbd)",
+                                        color: active ? t.color : "var(--t-mtx)",
+                                    }}
+                                >
+                                    {t.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
                 <label className="flex flex-col gap-1">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Group name</span>
+                    <span className="text-[color:var(--t-mtx)] text-[11px]">{isDm ? "Person's name" : "Name"}</span>
                     <input
                         autoFocus
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="e.g. Discrete Math Warband"
+                        placeholder={isDm ? "e.g. Riley P." : "e.g. Discrete Math Study Group"}
                         className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac)] transition-colors"
                     />
                 </label>
-
-                <div className="flex flex-col gap-1.5">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Type</span>
-                    <button
-                        type="button"
-                        onClick={() => setType("normal")}
-                        className={`flex flex-col items-start p-3 border border-solid text-left transition-all duration-150 ${type === "normal" ? "border-[color:var(--t-ac)] bg-[var(--t-in1)] shadow-[0_0_14px_color-mix(in_srgb,_var(--t-ac)_20%,_transparent)]" : "border-[color:var(--t-mbd)] bg-[var(--t-in0)] hover:border-[color:var(--t-ac2)]"
-                            }`}
-                    >
-                        <span className="text-[color:var(--t-ac)] text-xs font-bold">NORMAL SQUAD</span>
-                        <span className="text-[color:var(--t-mtx)] text-[11px] mt-0.5">
-                            You become admin. Anyone can add members, share files, and create tasks.
-                        </span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setType("classroom")}
-                        className={`flex flex-col items-start p-3 border border-solid text-left transition-all duration-150 ${type === "classroom" ? "border-[color:var(--t-ok)] bg-[var(--t-in1)] shadow-[0_0_14px_color-mix(in_srgb,_var(--t-ok)_20%,_transparent)]" : "border-[color:var(--t-mbd)] bg-[var(--t-in0)] hover:border-[color:var(--t-ac2)]"
-                            }`}
-                    >
-                        <span className="text-[color:var(--t-ok)] text-xs font-bold">CLASSROOM</span>
-                        <span className="text-[color:var(--t-mtx)] text-[11px] mt-0.5">
-                            You become the teacher. You add members, post materials, and grade tasks.
-                        </span>
-                    </button>
-                </div>
 
                 <button
                     type="submit"
                     className="mt-1 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2 hover:opacity-90 hover:shadow-[0_0_16px_color-mix(in_srgb,_var(--t-ac)_40%,_transparent)] transition-all duration-150 active:scale-[0.98]"
                 >
-                    CREATE GROUP CHAT
+                    CREATE
                 </button>
             </form>
         </div>
     );
 }
 
-const POINT_PRESETS = [10, 50, 100, 200];
 
 function toISODate(d) {
     const p = (n) => String(n).padStart(2, "0");
@@ -440,7 +522,7 @@ function daysUntil(iso) {
     return Math.round((new Date(`${iso}T00:00:00`) - today) / 86400000);
 }
 
-function NewTaskModal({ isClassroom, onClose, onCreate }) {
+function NewTaskModal({ isClassroom, onCreate }) {
     const [title, setTitle] = useState("");
     const [desc, setDesc] = useState("");
     const [due, setDue] = useState(""); // ISO yyyy-mm-dd from the date field
@@ -696,81 +778,17 @@ function NewTaskModal({ isClassroom, onClose, onCreate }) {
     );
 }
 
-function NewMaterialModal({ onClose, onCreate }) {
-    const [title, setTitle] = useState("");
-    const [kind, setKind] = useState("PDF");
-    const [link, setLink] = useState("");
-
-    function submit(e) {
-        e.preventDefault();
-        if (!title.trim()) return;
-        onCreate({ title: title.trim(), kind, link: link.trim() });
-    }
-
-    return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
-            <div className="absolute inset-0 bg-black/70" onClick={onClose} />
-            <form
-                onSubmit={submit}
-                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_90%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-5 w-full max-w-sm flex flex-col gap-3"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
-            >
-                <div className="flex justify-between items-center mb-1">
-                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">ADD LESSON MATERIAL</span>
-                    <button type="button" onClick={onClose} className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors">
-                        ×
-                    </button>
-                </div>
-                <label className="flex flex-col gap-1">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Title</span>
-                    <input
-                        autoFocus
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ok)] transition-colors"
-                    />
-                </label>
-                <label className="flex flex-col gap-1">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Type</span>
-                    <select
-                        value={kind}
-                        onChange={(e) => setKind(e.target.value)}
-                        className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ok)] transition-colors"
-                    >
-                        <option>PDF</option>
-                        <option>Slides</option>
-                        <option>Video</option>
-                        <option>Link</option>
-                    </select>
-                </label>
-                <label className="flex flex-col gap-1">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Link / filename</span>
-                    <input
-                        value={link}
-                        onChange={(e) => setLink(e.target.value)}
-                        placeholder="e.g. Chapter6_Slides.pdf"
-                        className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ok)] transition-colors"
-                    />
-                </label>
-                <button
-                    type="submit"
-                    className="mt-1 bg-[var(--t-ok)] text-[color:var(--t-onok)] text-xs font-bold py-2 hover:opacity-90 hover:shadow-[0_0_16px_color-mix(in_srgb,_var(--t-ok)_40%,_transparent)] transition-all duration-150 active:scale-[0.98]"
-                >
-                    ADD MATERIAL
-                </button>
-            </form>
-        </div>
-    );
-}
-
 /* ---------------------------------------------------------
-   Tabbed pop-up card: Tasks / Files / Materials / Grades / Members
+   Tabbed pop-up card: Tasks / Files / Materials / Members
    all live here now instead of being stacked on the page.
+   Grading + teacher controls removed — classrooms are
+   student-only and everyone has equal access. Materials
+   are read-only (no "Add Material" for students).
 --------------------------------------------------------- */
 function GroupDetailModal({
     group,
     isClassroom,
-    isTeacher,
+    isDm,
     canAddMembers,
     canCreateTask,
     tab,
@@ -778,14 +796,10 @@ function GroupDetailModal({
     tabDefs,
     onClose,
     onNewTask,
-    onNewMaterial,
     onAddMember,
     onSubmitTask,
     onPromote,
     isAdmin,
-    gradeDrafts,
-    setGradeDrafts,
-    onSaveGrade,
 }) {
     if (!group) return null;
     return (
@@ -798,7 +812,7 @@ function GroupDetailModal({
                 <div className="flex justify-between items-center p-4 border-b border-solid border-[color:var(--t-mbd)] shrink-0">
                     <div className="min-w-0">
                         <span className="text-[color:var(--t-tx0)] text-sm font-bold block truncate">{group.name}</span>
-                        <span className="text-[color:var(--t-mtx)] text-[11px]">{isClassroom ? "Classroom details" : "Squad details"}</span>
+                        <span className="text-[color:var(--t-mtx)] text-[11px]">{isDm ? "Direct message" : isClassroom ? "Classroom details" : "Squad details"}</span>
                     </div>
                     <button onClick={onClose} className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors" aria-label="Close">
                         ×
@@ -841,6 +855,7 @@ function GroupDetailModal({
                             {(group.tasks || []).length === 0 && <p className="text-[color:var(--t-mtx)] text-xs py-2">Nothing here yet.</p>}
                             {(group.tasks || []).map((t) => {
                                 const mySubmission = isClassroom && t.submissions?.find((s) => s.studentId === "you");
+                                const submittedCount = (t.submissions || []).length;
                                 return (
                                     <div
                                         key={t.id}
@@ -857,53 +872,48 @@ function GroupDetailModal({
                                         {t.desc && <span className="text-[color:var(--t-tx1)] text-xs">{t.desc}</span>}
                                         <span className="text-[color:var(--t-mtx)] text-[11px]">Due {t.due || "—"}</span>
 
-                                        {isClassroom && !isTeacher && (
-                                            <button
-                                                onClick={() => onSubmitTask(t.id)}
-                                                disabled={!!mySubmission}
-                                                className={`self-start text-[10px] font-bold py-1.5 px-3 mt-1 transition-all duration-150 active:scale-95 ${mySubmission ? "bg-[var(--t-in2)] text-[color:var(--t-mtx)] cursor-not-allowed" : "bg-[var(--t-ac2)] text-[color:var(--t-onac)] hover:opacity-90 hover:shadow-[0_0_14px_color-mix(in_srgb,_var(--t-ac2)_40%,_transparent)]"
-                                                    }`}
-                                            >
-                                                {mySubmission ? "✓ Submitted" : "Submit Task"}
-                                            </button>
-                                        )}
-
-                                        {isClassroom && isTeacher && (
-                                            <div className="flex flex-col gap-1.5 mt-1">
+                                        {isClassroom && (
+                                            <div className="flex flex-wrap items-center gap-2 mt-1">
                                                 <span className="text-[color:var(--t-mtx)] text-[10px] font-bold">
-                                                    {t.submissions.length} submission{t.submissions.length === 1 ? "" : "s"}
+                                                    {submittedCount} submitted
                                                 </span>
-                                                {t.submissions.map((s) => {
-                                                    const key = `${t.id}:${s.studentId}`;
-                                                    const draft = gradeDrafts[key] || { grade: s.grade ?? "", feedback: s.feedback || "" };
-                                                    return (
-                                                        <div key={s.studentId} className="flex flex-wrap items-center gap-2 bg-[var(--t-mbg)] p-2 border border-solid border-[color:var(--t-mbd)]">
-                                                            <span className="text-[color:var(--t-tx1)] text-xs flex-1 min-w-[80px]">{s.studentName}</span>
-                                                            {s.grade != null ? (
-                                                                <Badge color="var(--t-ok2)">
-                                                                    {s.grade}/{t.points}
-                                                                </Badge>
-                                                            ) : (
-                                                                <>
-                                                                    <input
-                                                                        type="number"
-                                                                        value={draft.grade}
-                                                                        onChange={(e) => setGradeDrafts((prev) => ({ ...prev, [key]: { ...draft, grade: e.target.value } }))}
-                                                                        placeholder="Grade"
-                                                                        className="w-16 bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-1 px-2 outline-none focus:border-[color:var(--t-ok2)] transition-colors"
-                                                                    />
-                                                                    <button
-                                                                        onClick={() => onSaveGrade(t.id, s.studentId)}
-                                                                        className="text-[color:var(--t-ok2)] text-[10px] font-bold py-1 px-2 hover:text-[color:var(--t-ok3)] hover:underline underline-offset-2 transition-colors"
-                                                                    >
-                                                                        Save
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                                {t.submissions.length === 0 && <span className="text-[color:var(--t-mtx)] text-[11px]">No submissions yet.</span>}
+
+                                                <button
+                                                    onClick={() => onSubmitTask(t.id)}
+                                                    disabled={!!mySubmission}
+                                                    className={`group/md relative overflow-hidden flex items-center gap-1 text-[9px] font-bold tracking-wide py-1 pl-1.5 pr-2 rounded-full border border-solid transition-all duration-200 active:scale-95 ${mySubmission
+                                                        ? "bg-[color-mix(in_srgb,_var(--t-ok)_14%,_transparent)] border-[color:color-mix(in_srgb,_var(--t-ok)_40%,_transparent)] text-[color:var(--t-ok2)] cursor-default"
+                                                        : "bg-[color-mix(in_srgb,_var(--t-ac2)_16%,_transparent)] border-[color:color-mix(in_srgb,_var(--t-ac2)_45%,_transparent)] text-[color:var(--t-ac2)] hover:bg-[var(--t-ac2)] hover:text-[color:var(--t-onac)] hover:border-[color:var(--t-ac2)] hover:shadow-[0_0_12px_color-mix(in_srgb,_var(--t-ac2)_50%,_transparent)]"
+                                                        }`}
+                                                >
+                                                    <span
+                                                        className={`flex items-center justify-center w-3 h-3 rounded-full border border-solid transition-all duration-200 ${mySubmission
+                                                            ? "bg-[var(--t-ok2)] border-[color:var(--t-ok2)] text-[color:var(--t-onac)]"
+                                                            : "bg-transparent border-[color:var(--t-ac2)] text-[color:var(--t-ac2)] group-hover/md:bg-[var(--t-onac)] group-hover/md:border-[color:var(--t-onac)] group-hover/md:text-[color:var(--t-ac2)]"
+                                                            }`}
+                                                    >
+                                                        <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                                                            <polyline points="20 6 9 17 4 12" />
+                                                        </svg>
+                                                    </span>
+
+                                                    <span>{mySubmission ? "Done" : "Mark Done"}</span>
+
+                                                    {!mySubmission && (
+                                                        <span
+                                                            className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 opacity-0 group-hover/md:opacity-100 group-hover/md:animate-[mdSweep_0.9s_ease-out]"
+                                                            style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)" }}
+                                                        />
+                                                    )}
+                                                </button>
+
+                                                {/* keyframes for the sweep — safe to leave inline, browsers dedupe */}
+                                                <style>{`
+            @keyframes mdSweep {
+                from { transform: translateX(0); }
+                to   { transform: translateX(400%); }
+            }
+        `}</style>
                                             </div>
                                         )}
                                     </div>
@@ -912,7 +922,7 @@ function GroupDetailModal({
                         </Panel>
                     )}
 
-                    {tab === "files" && !isClassroom && (
+                    {tab === "files" && !isClassroom && !isDm && (
                         <Panel title="SHARED FILES" count={group.files?.length || 0}>
                             {(group.files || []).length === 0 && (
                                 <p className="text-[color:var(--t-mtx)] text-xs py-2">No files shared yet — attach one from the composer below.</p>
@@ -932,17 +942,7 @@ function GroupDetailModal({
                     )}
 
                     {tab === "materials" && isClassroom && (
-                        <Panel
-                            title="LESSON MATERIALS"
-                            count={group.materials?.length || 0}
-                            action={
-                                isTeacher && (
-                                    <button onClick={onNewMaterial} className="text-[color:var(--t-ok)] text-[10px] font-bold hover:text-[color:var(--t-ok3)] hover:underline underline-offset-2 transition-colors">
-                                        + Add Material
-                                    </button>
-                                )
-                            }
-                        >
+                        <Panel title="LESSON MATERIALS" count={group.materials?.length || 0}>
                             {(group.materials || []).length === 0 && <p className="text-[color:var(--t-mtx)] text-xs py-2">No materials posted yet.</p>}
                             {(group.materials || []).map((m) => (
                                 <div
@@ -956,36 +956,6 @@ function GroupDetailModal({
                                     <span className="text-[color:var(--t-mtx)] text-[10px] shrink-0">{m.addedBy}</span>
                                 </div>
                             ))}
-                        </Panel>
-                    )}
-
-                    {tab === "grades" && isClassroom && (
-                        <Panel title="GRADES">
-                            {(group.tasks || []).length === 0 && <p className="text-[color:var(--t-mtx)] text-xs py-2">No graded work yet.</p>}
-                            <div className="flex flex-col gap-1.5">
-                                {(group.tasks || []).flatMap((t) =>
-                                    t.submissions
-                                        .filter((s) => isTeacher || s.studentId === "you")
-                                        .map((s) => (
-                                            <div
-                                                key={`${t.id}-${s.studentId}`}
-                                                className="flex justify-between items-center bg-[var(--t-in0)] p-2.5 border border-solid border-[color:var(--t-mbd)] transition-colors hover:border-[color:var(--t-mbd2)]"
-                                            >
-                                                <div className="min-w-0">
-                                                    <span className="text-[color:var(--t-tx1)] text-xs block truncate">{t.title}</span>
-                                                    {isTeacher && <span className="text-[color:var(--t-mtx)] text-[10px]">{s.studentName}</span>}
-                                                </div>
-                                                {s.grade != null ? (
-                                                    <Badge color="var(--t-ok2)">
-                                                        {s.grade}/{t.points}
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge color="var(--t-warn)">PENDING</Badge>
-                                                )}
-                                            </div>
-                                        ))
-                                )}
-                            </div>
                         </Panel>
                     )}
 
@@ -1008,8 +978,10 @@ function GroupDetailModal({
                                 >
                                     <span className="text-[color:var(--t-tx0)] text-xs">{m.name}</span>
                                     <div className="flex items-center gap-2">
-                                        <Badge color={m.role === "admin" || m.role === "teacher" ? "var(--t-ac)" : "var(--t-mtx)"}>{m.role.toUpperCase()}</Badge>
-                                        {!isClassroom && isAdmin && m.role !== "admin" && (
+                                        {!isClassroom && !isDm && (
+                                            <Badge color={m.role === "admin" ? "var(--t-ac)" : "var(--t-mtx)"}>{m.role.toUpperCase()}</Badge>
+                                        )}
+                                        {!isClassroom && !isDm && isAdmin && m.role !== "admin" && (
                                             <button
                                                 onClick={() => onPromote(m.id)}
                                                 className="group/adm flex items-center gap-1 text-[10px] font-bold py-0.5 px-2 border border-solid shrink-0 bg-[color-mix(in_srgb,_var(--t-warn)_20%,_transparent)] border-[color:color-mix(in_srgb,_var(--t-warn)_30%,_transparent)] text-[color:var(--t-warn)] hover:bg-[var(--t-warn)] hover:text-[color:var(--t-onwarn)] hover:border-[color:var(--t-warn)] hover:shadow-[0_0_12px_color-mix(in_srgb,_var(--t-warn)_40%,_transparent)] active:scale-95 transition-all duration-150"
@@ -1029,7 +1001,7 @@ function GroupDetailModal({
     );
 }
 
-/* Right-click quick-access menu on a group chat list item. */
+/* Right-click quick-access menu on a conversation list item. */
 function GroupContextMenu({ x, y, group, onClose, onOpenMessages, onOpenTab }) {
     const opts = tabDefsFor(group);
     const clampedX = Math.min(x, (typeof window !== "undefined" ? window.innerWidth : 1000) - 190);
@@ -1097,18 +1069,20 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
     const [showCreateGroup, setShowCreateGroup] = useState(false);
     const [showAddMember, setShowAddMember] = useState(false);
     const [showNewTask, setShowNewTask] = useState(false);
-    const [showNewMaterial, setShowNewMaterial] = useState(false);
-    const [gradeDrafts, setGradeDrafts] = useState({}); // `${taskId}:${studentId}` -> { grade, feedback }
-    const [openSections, setOpenSections] = useState({ classroom: true, normal: true }); // dropdown state for the group list
+    const [filter, setFilter] = useState("all"); // all | classroom | dm | squad
     const [contextMenu, setContextMenu] = useState(null); // { x, y, groupId } | null
 
     const activeGroup = groups.find((g) => g.id === activeGroupId) || null;
     const isClassroom = activeGroup?.type === "classroom";
+    const isDm = activeGroup?.type === "dm";
+    const isSquad = activeGroup?.type === "squad";
     const me = activeGroup?.members.find((m) => m.id === "you");
-    const isAdmin = me?.role === "admin";
-    const isTeacher = me?.role === "teacher";
-    const canAddMembers = activeGroup ? (isClassroom ? isTeacher : true) : false;
-    const canCreateTask = activeGroup ? (isClassroom ? isTeacher : true) : false;
+    const isAdmin = !!isSquad && me?.role === "admin";
+    // Classrooms have no teacher/student split — everyone can add members and post.
+    const canAddMembers = activeGroup ? !isDm : false;
+    const canCreateTask = !!isSquad; // only squads can create tasks now
+
+    const visibleGroups = useMemo(() => groups.filter((g) => filter === "all" || g.type === filter), [groups, filter]);
 
     /* Keyboard shortcut: "/" focuses search, Esc clears/closes things — same as personalized.jsx */
     useEffect(() => {
@@ -1136,17 +1110,29 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
 
     function createGroup(name, type) {
         const id = `g${Date.now()}`;
+        const you = { id: "you", name: "You", role: type === "squad" ? "admin" : "member" };
         const base = {
             id,
             name,
             type,
             color: colorForString(name),
-            members: [{ id: "you", name: "You", role: type === "classroom" ? "teacher" : "admin" }],
+            members: [you],
             messages: [],
         };
-        const fresh = type === "classroom" ? { ...base, teacherId: "you", materials: [], tasks: [] } : { ...base, files: [], tasks: [] };
+        let fresh;
+        if (type === "classroom") {
+            fresh = { ...base, materials: [], tasks: [] };
+        } else if (type === "dm") {
+            fresh = {
+                ...base,
+                members: [you, { id: `m${Date.now()}`, name, role: "member" }],
+            };
+        } else {
+            fresh = { ...base, files: [], tasks: [] };
+        }
         setGroups((prev) => [fresh, ...prev]);
         setActiveGroupId(id);
+        setFilter("all");
         setShowCreateGroup(false);
         setOpenPanel(null);
     }
@@ -1164,7 +1150,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
     function addMember(rawValue) {
         updateActiveGroup((g) => ({
             ...g,
-            members: [...g.members, { id: `m${Date.now()}`, name: rawValue, role: g.type === "classroom" ? "student" : "member" }],
+            members: [...g.members, { id: `m${Date.now()}`, name: rawValue, role: "member" }],
         }));
         setShowAddMember(false);
     }
@@ -1177,33 +1163,15 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
     }
 
     function createTask(fields) {
-        if (isClassroom) {
-            updateActiveGroup((g) => ({
-                ...g,
-                tasks: [
-                    ...(g.tasks || []),
-                    { id: `at${Date.now()}`, title: fields.title, desc: fields.desc, due: fields.due, points: fields.points, submissions: [], createdBy: "You" },
-                ],
-            }));
-        } else {
-            updateActiveGroup((g) => ({
-                ...g,
-                tasks: [
-                    ...(g.tasks || []),
-                    { id: `t${Date.now()}`, title: fields.title, desc: fields.desc, due: fields.due, badge: fields.badge || "SQUAD", createdBy: "You" },
-                ],
-            }));
-            onSyncTaskToSprintBoard?.(fields.title, { subject: (fields.badge || "SQUAD").toUpperCase(), meta: fields.due || activeGroup.name });
-        }
-        setShowNewTask(false);
-    }
-
-    function addMaterial(fields) {
         updateActiveGroup((g) => ({
             ...g,
-            materials: [...(g.materials || []), { id: `mat${Date.now()}`, title: fields.title, kind: fields.kind, link: fields.link, addedBy: "You" }],
+            tasks: [
+                ...(g.tasks || []),
+                { id: `t${Date.now()}`, title: fields.title, desc: fields.desc, due: fields.due, badge: fields.badge || "SQUAD", createdBy: "You" },
+            ],
         }));
-        setShowNewMaterial(false);
+        onSyncTaskToSprintBoard?.(fields.title, { subject: (fields.badge || "SQUAD").toUpperCase(), meta: fields.due || activeGroup.name });
+        setShowNewTask(false);
     }
 
     function submitTask(taskId) {
@@ -1214,23 +1182,10 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                     ? {
                         ...t,
                         submissions: [
-                            ...t.submissions.filter((s) => s.studentId !== "you"),
-                            { studentId: "you", studentName: "You", submittedAt: "Now", grade: null, feedback: "" },
+                            ...(t.submissions || []).filter((s) => s.studentId !== "you"),
+                            { studentId: "you", studentName: "You", submittedAt: "Now" },
                         ],
                     }
-                    : t
-            ),
-        }));
-    }
-
-    function saveGrade(taskId, studentId) {
-        const draft = gradeDrafts[`${taskId}:${studentId}`];
-        if (!draft) return;
-        updateActiveGroup((g) => ({
-            ...g,
-            tasks: g.tasks.map((t) =>
-                t.id === taskId
-                    ? { ...t, submissions: t.submissions.map((s) => (s.studentId === studentId ? { ...s, grade: draft.grade, feedback: draft.feedback || "" } : s)) }
                     : t
             ),
         }));
@@ -1242,22 +1197,28 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
             return [
                 { key: "tasks", label: "ASSIGNMENTS", count: activeGroup.tasks?.length || 0 },
                 { key: "materials", label: "MATERIALS", count: activeGroup.materials?.length || 0 },
-                { key: "grades", label: "GRADES" },
                 { key: "members", label: "MEMBERS", count: activeGroup.members.length },
             ];
+        }
+        if (isDm) {
+            return [{ key: "members", label: "MEMBERS", count: activeGroup.members.length }];
         }
         return [
             { key: "tasks", label: "TASKS", count: activeGroup.tasks?.length || 0 },
             { key: "files", label: "FILES", count: activeGroup.files?.length || 0 },
             { key: "members", label: "MEMBERS", count: activeGroup.members.length },
         ];
-    }, [activeGroup, isClassroom]);
+    }, [activeGroup, isClassroom, isDm]);
 
     function handleNavClick(key) {
         setMobileNavOpen(false);
         if (key === "group") return setShowQuiz(false);
         if (onNavigate) {
             onNavigate(key);
+        } else if (key === "classroom") {
+            // Classroom is a real route, so jump straight to it (the other keys
+            // still swap pages in place when no onNavigate prop was passed).
+            navigate("/classroom");
         } else if (key === "chatbot") {
             setFallbackPage("chatbot");
         } else if (key === "personalized") {
@@ -1418,7 +1379,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                             onChange={(e) => setSearchQuery(e.target.value)}
                                             onFocus={() => setSearchFocused(true)}
                                             onBlur={() => setSearchFocused(false)}
-                                            placeholder={searchFocused ? "Search group chats..." : "[ / ] Search group chats..."}
+                                            placeholder={searchFocused ? "Search messages..." : "[ / ] Search messages..."}
                                             className="bg-transparent outline-none text-[color:var(--t-tx0)] placeholder-[color:var(--t-tx2)] text-xs w-full min-w-0"
                                         />
                                     </div>
@@ -1462,121 +1423,85 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                         {/* Content (hidden, not unmounted, while Quiz Arena is open so chats are kept) */}
                         <div className={`${showQuiz ? "hidden" : "flex"} flex-col self-stretch px-4 sm:px-6 lg:px-10 py-4 gap-4`}>
                             <div className="flex flex-col sm:flex-row items-start self-stretch gap-4">
-                                {/* Group list */}
+                                {/* Messages list with dropdown filter */}
                                 <div
                                     className="flex flex-col w-full sm:w-64 shrink-0 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-3 gap-2"
                                     style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
                                 >
                                     <div className="flex justify-between items-center pb-1">
-                                        <span className="text-[color:var(--t-tx0)] text-xs font-bold">MY GROUP CHATS</span>
-                                        <span className="text-[color:var(--t-tx2)] text-[10px]">{groups.length}</span>
+                                        <span className="text-[color:var(--t-tx0)] text-xs font-bold">MY MESSAGES</span>
+                                        <span className="text-[color:var(--t-tx2)] text-[10px]">{visibleGroups.length}</span>
                                     </div>
                                     <button
                                         onClick={() => setShowCreateGroup(true)}
                                         className="flex justify-center items-center bg-[var(--t-bg3)] py-2 gap-1.5 border border-solid border-[color:var(--t-bd0)] hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-[0.98]"
                                     >
-                                        <span className="text-[color:var(--t-ac)] text-xs font-bold">+ NEW GROUP CHAT</span>
+                                        <span className="text-[color:var(--t-ac)] text-xs font-bold">+ NEW MESSAGE</span>
                                     </button>
 
-                                    <p className="text-[color:var(--t-bd1)] text-[10px] italic px-0.5">Right-click a chat for quick access.</p>
+                                    {/* Dropdown filter */}
+                                    <FilterDropdown value={filter} onChange={setFilter} />
 
-                                    <div className="flex flex-col gap-2 max-h-[420px] overflow-y-auto pr-0.5">
-                                        {[
-                                            { key: "classroom", label: "CLASSROOMS", color: "var(--t-ok)" },
-                                            { key: "normal", label: "SQUADS", color: "var(--t-ac)" },
-                                        ].map((section) => {
-                                            const items = groups.filter((g) => (section.key === "classroom" ? g.type === "classroom" : g.type !== "classroom"));
-                                            const open = openSections[section.key];
+                                    <p className="text-[color:var(--t-bd1)] text-[10px] italic px-0.5">Right-click a message for quick access.</p>
+
+                                    <div className="flex flex-col gap-1.5 max-h-[460px] overflow-y-auto pr-0.5">
+                                        {visibleGroups.length === 0 && (
+                                            <p className="text-[color:var(--t-tx2)] text-xs py-6 text-center">Nothing here yet.</p>
+                                        )}
+                                        {visibleGroups.map((g) => {
+                                            const active = g.id === activeGroupId;
+                                            const lastMsg = g.messages[g.messages.length - 1];
+                                            const myRole = g.members.find((m) => m.id === "you")?.role;
+                                            const showRole = g.type === "squad" && myRole;
                                             return (
-                                                <div key={section.key} className="flex flex-col gap-1">
-                                                    <button
-                                                        onClick={() => setOpenSections((s) => ({ ...s, [section.key]: !s[section.key] }))}
-                                                        aria-expanded={open}
-                                                        className="flex items-center gap-2 py-1.5 px-2 border border-solid bg-[var(--t-bg2)] border-[color:var(--t-bd0)] hover:border-[color:var(--t-bd1)] transition-all duration-150 active:scale-[0.99]"
-                                                        style={{ borderLeft: `3px solid ${section.color}` }}
+                                                <button
+                                                    key={g.id}
+                                                    onClick={() => {
+                                                        setActiveGroupId(g.id);
+                                                        setOpenPanel(null);
+                                                    }}
+                                                    onContextMenu={(e) => {
+                                                        e.preventDefault();
+                                                        setContextMenu({ x: e.clientX, y: e.clientY, groupId: g.id });
+                                                    }}
+                                                    className={`flex items-center gap-2.5 p-2 text-left border border-solid transition-all duration-150 ${active ? "bg-[var(--t-bg3)] border-[#00000000]" : "border-[#00000000] hover:bg-[var(--t-bg2)]"}`}
+                                                    style={active ? { boxShadow: `0px 0px 12px ${withAlpha(g.color, "33")}` } : undefined}
+                                                >
+                                                    <div
+                                                        className="w-8 h-8 shrink-0 flex items-center justify-center text-[10px] font-bold"
+                                                        style={{ backgroundColor: withAlpha(g.color, "33"), color: g.color, border: `1px solid ${withAlpha(g.color, "4D")}` }}
                                                     >
-                                                        <svg
-                                                            width="10"
-                                                            height="10"
-                                                            viewBox="0 0 24 24"
-                                                            fill="none"
-                                                            stroke={section.color}
-                                                            strokeWidth="3"
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            className="shrink-0 transition-transform duration-200"
-                                                            style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
-                                                        >
-                                                            <polyline points="9 18 15 12 9 6" />
-                                                        </svg>
-                                                        <span className="text-xs font-bold flex-1 text-left" style={{ color: section.color }}>
-                                                            {section.label}
-                                                        </span>
-                                                        <span className="text-[10px] font-bold px-1.5 py-px" style={{ backgroundColor: withAlpha(section.color, "22"), color: section.color }}>
-                                                            {items.length}
-                                                        </span>
-                                                    </button>
-
-                                                    {open && (
-                                                        <div className="flex flex-col gap-1.5 pl-1.5">
-                                                            {items.length === 0 && <p className="text-[color:var(--t-bd1)] text-[10px] italic py-1.5 px-2">Nothing here yet.</p>}
-                                                            {items.map((g) => {
-                                                                const active = g.id === activeGroupId;
-                                                                const lastMsg = g.messages[g.messages.length - 1];
-                                                                const myRole = g.members.find((m) => m.id === "you")?.role;
-                                                                const myRoleColor = myRole === "admin" || myRole === "teacher" ? "var(--t-ac)" : "var(--t-tx2)";
-                                                                return (
-                                                                    <button
-                                                                        key={g.id}
-                                                                        onClick={() => {
-                                                                            setActiveGroupId(g.id);
-                                                                            setOpenPanel(null);
-                                                                        }}
-                                                                        onContextMenu={(e) => {
-                                                                            e.preventDefault();
-                                                                            setContextMenu({ x: e.clientX, y: e.clientY, groupId: g.id });
-                                                                        }}
-                                                                        className={`flex items-center gap-2.5 p-2 text-left border border-solid transition-all duration-150 ${active ? "bg-[var(--t-bg3)] border-[#00000000]" : "border-[#00000000] hover:bg-[var(--t-bg2)]"}`}
-                                                                        style={active ? { boxShadow: `0px 0px 12px ${withAlpha(g.color, "33")}` } : undefined}
-                                                                    >
-                                                                        <div
-                                                                            className="w-8 h-8 shrink-0 flex items-center justify-center text-[10px] font-bold"
-                                                                            style={{ backgroundColor: withAlpha(g.color, "33"), color: g.color, border: `1px solid ${withAlpha(g.color, "4D")}` }}
-                                                                        >
-                                                                            {initialsFor(g.name)}
-                                                                        </div>
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <div className="flex items-center gap-1.5">
-                                                                                <span className="text-[color:var(--t-tx0)] text-xs font-bold truncate">{g.name}</span>
-                                                                                {myRole && (
-                                                                                    <span className="text-[9px] font-bold shrink-0" style={{ color: myRoleColor }}>
-                                                                                        · {myRole.toUpperCase()}
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                            <span className="text-[color:var(--t-tx2)] text-[10px] truncate block">{lastMsg ? lastMsg.text : "No messages yet"}</span>
-                                                                        </div>
-                                                                    </button>
-                                                                );
-                                                            })}
+                                                        {initialsFor(g.name)}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[color:var(--t-tx0)] text-xs font-bold truncate">{g.name}</span>
+                                                            {showRole && (
+                                                                <span
+                                                                    className="text-[9px] font-bold shrink-0"
+                                                                    style={{ color: myRole === "admin" ? "var(--t-ac)" : "var(--t-tx2)" }}
+                                                                >
+                                                                    · {myRole.toUpperCase()}
+                                                                </span>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                </div>
+                                                        <span className="text-[color:var(--t-tx2)] text-[10px] truncate block">{lastMsg ? lastMsg.text : "No messages yet"}</span>
+                                                    </div>
+                                                </button>
                                             );
                                         })}
-                                        {groups.length === 0 && <p className="text-[color:var(--t-tx2)] text-xs py-4 text-center">No group chats yet — create one above.</p>}
                                     </div>
                                 </div>
 
-                                {/* Active group */}
+                                {/* Active conversation */}
                                 <div className="flex-1 min-w-0 flex flex-col gap-3">
                                     {!activeGroup ? (
                                         <div
                                             className="flex flex-col items-center justify-center self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-10 gap-2"
                                             style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
                                         >
-                                            <span className="text-[color:var(--t-tx0)] text-sm font-bold">No group chat selected</span>
-                                            <p className="text-[color:var(--t-tx2)] text-xs">Create or pick a group chat from the list on the left.</p>
+                                            <span className="text-[color:var(--t-tx0)] text-sm font-bold">No message selected</span>
+                                            <p className="text-[color:var(--t-tx2)] text-xs">Create or pick a conversation from the list on the left.</p>
                                         </div>
                                     ) : (
                                         <>
@@ -1595,7 +1520,9 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                                     <div className="min-w-0">
                                                         <span className="text-[color:var(--t-tx0)] text-base font-bold truncate block">{activeGroup.name}</span>
                                                         <div className="flex items-center gap-1.5">
-                                                            <Badge color={isClassroom ? "var(--t-ok)" : "var(--t-ac)"}>{isClassroom ? "CLASSROOM" : "SQUAD"}</Badge>
+                                                            <Badge color={isClassroom ? "var(--t-ok)" : isDm ? "var(--t-ac2)" : "var(--t-ac)"}>
+                                                                {isClassroom ? "CLASSROOM" : isDm ? "1v1" : "SQUAD"}
+                                                            </Badge>
                                                             <span className="text-[color:var(--t-tx2)] text-[11px]">
                                                                 {activeGroup.members.length} member{activeGroup.members.length === 1 ? "" : "s"}
                                                             </span>
@@ -1645,7 +1572,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                                         placeholder={`Message ${activeGroup.name}...`}
                                                         className="flex-1 min-w-0 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac)]"
                                                     />
-                                                    {!isClassroom && (
+                                                    {isSquad && (
                                                         <button
                                                             type="button"
                                                             onClick={() =>
@@ -1681,7 +1608,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                 <GroupDetailModal
                     group={activeGroup}
                     isClassroom={isClassroom}
-                    isTeacher={isTeacher}
+                    isDm={isDm}
                     isAdmin={isAdmin}
                     canAddMembers={canAddMembers}
                     canCreateTask={canCreateTask}
@@ -1690,13 +1617,9 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                     tabDefs={tabDefs}
                     onClose={() => setOpenPanel(null)}
                     onNewTask={() => setShowNewTask(true)}
-                    onNewMaterial={() => setShowNewMaterial(true)}
                     onAddMember={() => setShowAddMember(true)}
                     onSubmitTask={submitTask}
                     onPromote={promoteToAdmin}
-                    gradeDrafts={gradeDrafts}
-                    setGradeDrafts={setGradeDrafts}
-                    onSaveGrade={saveGrade}
                 />
             )}
 
@@ -1718,8 +1641,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
 
             {showCreateGroup && <CreateGroupModal onClose={() => setShowCreateGroup(false)} onCreate={createGroup} />}
             {showAddMember && <AddMemberModal onClose={() => setShowAddMember(false)} onAdd={addMember} />}
-            {showNewTask && <NewTaskModal isClassroom={isClassroom} onClose={() => setShowNewTask(false)} onCreate={createTask} />}
-            {showNewMaterial && <NewMaterialModal onClose={() => setShowNewMaterial(false)} onCreate={addMaterial} />}
+            {showNewTask && <NewTaskModal onClose={() => setShowNewTask(false)} onCreate={createTask} />}
 
             {/* Logout confirmation — same popup as the Dashboard */}
             {showLogoutConfirm && (

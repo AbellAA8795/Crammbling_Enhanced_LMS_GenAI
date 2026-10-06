@@ -7,10 +7,12 @@ import Chatbot from './pages/chatbot.jsx';
 import Personalized from './pages/personalized.jsx';
 import GroupCollab from './pages/group_collab.jsx';
 import QuizArena from './pages/QuizArena.jsx';
+import Classroom from './pages/classroom.jsx';
 // The chatbot / group collab / personalized pages call onNavigate(key) with
 // these keys from their sidebars. Each key maps to a route.
 const PATHS = {
   dashboard: '/dashboard',
+  classroom: '/classroom',
   chatbot: '/chatbot',
   group: '/group-collab',
   personalized: '/personalized',
@@ -43,6 +45,13 @@ function QuizArenaPage() {
   return <QuizArena where="Quiz Forge" onBack={() => navigate('/personalized')} />;
 }
 
+// classroom.jsx drives its own sidebar navigation through onNavigate(key),
+// so hand it the same key→route map the other pages use.
+function ClassroomPage() {
+  const navigate = useNavigate();
+  return <Classroom onNavigate={(key) => navigate(PATHS[key] ?? '/dashboard')} />;
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -51,6 +60,7 @@ function App() {
         <Route path="/register" element={<Registration />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/classroom" element={<ClassroomPage />} />
         <Route path="/chatbot" element={<ChatbotPage />} />
         <Route path="/group-collab" element={<GroupCollabPage />} />
         <Route path="/personalized" element={<PersonalizedPage />} />

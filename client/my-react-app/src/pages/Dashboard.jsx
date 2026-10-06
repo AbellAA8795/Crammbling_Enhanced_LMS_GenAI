@@ -31,6 +31,11 @@ import quizMarathonBadge from "../assets/quiz_marathon_badge.svg";
 // Same icon art, labels and layout as the Chatbot / Group Collab / Personalized sidebar.
 const NAV_ASSET = (id) => `https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/${id}_expires_30_days.png`;
 
+// Graduation cap for the CLASSROOM sidebar entry, drawn inline so we don't
+// need a new hosted asset. Same style as the other pages' nav icons.
+const CLASSROOM_ICON =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='15' viewBox='0 0 24 24' fill='none' stroke='%232CD4D9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M22 10 12 5 2 10l10 5 10-5z'/><path d='M6 12v5c3 3 9 3 12 0v-5'/></svg>";
+
 const NAV_IMG = {
   logo: NAV_ASSET("ec7p6crg"),
   dashboard: NAV_ASSET("5fuik1xz"),
@@ -45,6 +50,7 @@ const NAV_IMG = {
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "DASHBOARD", icon: NAV_IMG.dashboard, iconClass: "w-[18px] h-[15px]", path: "/dashboard" },
+  { key: "classroom", label: "CLASSROOM", icon: CLASSROOM_ICON, iconClass: "w-[18px] h-[15px]", path: "/classroom" },
   { key: "chatbot", label: "CHATBOT", icon: NAV_IMG.chatbot, iconClass: "w-[18px] h-[15px]", path: "/chatbot" },
   { key: "group", label: "GROUP COLLAB", icon: NAV_IMG.group, iconClass: "w-5 h-2.5", path: "/group-collab" },
   { key: "personalized", label: "PERSONALIZED", icon: NAV_IMG.personalized, iconClass: "w-[18px] h-[13px]", path: "/personalized" },
@@ -207,9 +213,8 @@ function AchievementsSection() {
           {ACHIEVEMENTS.map((a) => (
             <li
               key={a.id}
-              className={`flex items-center gap-3 px-2.5 py-2 border ${
-                a.unlocked ? "border-lime/30 bg-deep" : "border-edge bg-deep"
-              }`}
+              className={`flex items-center gap-3 px-2.5 py-2 border ${a.unlocked ? "border-lime/30 bg-deep" : "border-edge bg-deep"
+                }`}
             >
               <img
                 src={a.badge}
@@ -351,7 +356,7 @@ function Dashboard() {
         <Sidebar
           activePage={activePage}
           onNavigate={handleNavigate}
-          onCloseMobile={() => {}}
+          onCloseMobile={() => { }}
           onOpenSettings={() => setShowSettings(true)}
           onLogout={() => setShowLogoutConfirm(true)}
         />
@@ -520,9 +525,8 @@ function Dashboard() {
                     return (
                       <div
                         key={entry.rank}
-                        className={`flex items-center justify-between px-3 py-2 border ${
-                          isYou ? "border-cyan/40 bg-cyan/10" : "border-edge bg-inset"
-                        }`}
+                        className={`flex items-center justify-between px-3 py-2 border ${isYou ? "border-cyan/40 bg-cyan/10" : "border-edge bg-inset"
+                          }`}
                       >
                         <div className="flex items-center gap-2.5">
                           <span className="w-7 h-7 border border-edge bg-deep flex items-center justify-center font-label text-[11px] font-bold text-mute">
@@ -562,9 +566,8 @@ function Dashboard() {
                   {ANALYTICS_STATS.map((stat, i) => (
                     <div
                       key={stat.label}
-                      className={`border border-edge bg-inset px-4 py-3 ${
-                        i === ANALYTICS_STATS.length - 1 && ANALYTICS_STATS.length % 2 ? "col-span-2" : ""
-                      }`}
+                      className={`border border-edge bg-inset px-4 py-3 ${i === ANALYTICS_STATS.length - 1 && ANALYTICS_STATS.length % 2 ? "col-span-2" : ""
+                        }`}
                     >
                       <p className={`font-display text-[22px] font-bold leading-none ${stat.color}`}>
                         {stat.value}

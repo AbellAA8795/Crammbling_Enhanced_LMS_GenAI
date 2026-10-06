@@ -367,7 +367,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
   const [forgeFiles, setForgeFiles] = useState(INITIAL_FORGE_FILES);
   const [forgeStatusMap, setForgeStatusMap] = useState({});
   const [forgeFolders, setForgeFolders] = useState(INITIAL_FORGE_FOLDERS);
-  const [activeFolder, setActiveFolder] = useState("all"); // "all" | "unfiled" | a folder id
+  const [activeFolder, setActiveFolder] = useState(null); // null = My Library (root), else the open folder id
   const [arenaFile, setArenaFile] = useState(null); // file handed to Quiz Arena by "Forge Quiz"
   const [isDragging, setIsDragging] = useState(false);
   const [driveSyncing, setDriveSyncing] = useState(false);
@@ -505,7 +505,6 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     if (!n) return;
     const id = `fo${Date.now()}`;
     setForgeFolders((prev) => [...prev, { id, name: n }]);
-    setActiveFolder(id);
   }
 
   function renameFolder(id, name) {
@@ -518,7 +517,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
   function deleteFolder(id) {
     setForgeFolders((prev) => prev.filter((fo) => fo.id !== id));
     setForgeFiles((prev) => prev.map((it) => (it.folderId === id ? { ...it, folderId: null } : it)));
-    setActiveFolder((cur) => (cur === id ? "all" : cur));
+    setActiveFolder((cur) => (cur === id ? null : cur));
   }
 
   function moveFile(fileId, folderId) {
@@ -1674,6 +1673,21 @@ function Spinner({ color = "var(--t-onac)" }) {
   );
 }
 
+function FolderIcon({ className = "w-6 h-6" }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z" />
+    </svg>
+  );
+}
+
+const menuPanelCls =
+  "absolute right-1 top-full z-30 min-w-[170px] flex flex-col py-1 bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd1)]";
+const menuItemCls =
+  "text-left text-xs text-[color:var(--t-tx1)] py-2 px-3 hover:bg-[var(--t-bg3)] hover:text-[color:var(--t-tx0)] transition-colors";
+const ghostBtnCls =
+  "flex items-center gap-2 bg-[var(--t-bg2)] py-2 px-3.5 text-xs font-bold text-[color:var(--t-tx0)] border border-solid border-[color:var(--t-bd0)] hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-95";
+
 function QuizForgePanel({
   files,
   forgeStatusMap,
@@ -1701,42 +1715,44 @@ function QuizForgePanel({
 }) {
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const [renaming, setRenaming] = useState(false);
+  const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const [search, setSearch] = useState("");
   const [dropTarget, setDropTarget] = useState(null);
+  const [menu, setMenu] = useState(null); // { kind: "folder" | "file", id }
 
-  const currentFolder = folders.find((fo) => fo.id === activeFolder);
-  const countIn = (id) => files.filter((f) => (id === "all" ? true : id === "unfiled" ? !f.folderId : f.folderId === id)).length;
-  const visibleFiles = files.filter((f) => {
-    const inFolder = activeFolder === "all" ? true : activeFolder === "unfiled" ? !f.folderId : f.folderId === activeFolder;
-    return inFolder && f.name.toLowerCase().includes(search.trim().toLowerCase());
+  const q = search.trim().toLowerCase();
+  const current = folders.find((fo) => fo.id === activeFolder) || null;
+  const folderName = (id) => folders.find((fo) => fo.id === id)?.name || "My Library";
+  const countIn = (id) => files.filter((f) => f.folderId === id).length;
+  const totalChunks = files.reduce((sum, f) => sum + f.chunks, 0);
+
+  // Drive-style scope: root shows folders + loose files, a folder shows only its own files,
+  // and searching looks through everything.
+  const shown = files.filter((f) => {
+    const inScope = q ? true : current ? f.folderId === current.id : !f.folderId;
+    return inScope && f.name.toLowerCase().includes(q);
   });
+  const showFolders = !current && !q;
 
-  const chipCls = (on, over) =>
-    `flex items-center gap-1.5 py-1.5 px-3 text-xs font-bold border border-solid transition-all duration-150 active:scale-95 ${over
-      ? "bg-[color-mix(in_srgb,_var(--t-ac)_20%,_transparent)] border-[color:var(--t-ac)] text-[color:var(--t-ac)]"
-      : on
-        ? "bg-[var(--t-bg3)] border-[color:var(--t-ac)] text-[color:var(--t-ac)]"
-        : "bg-[var(--t-bg2)] border-[color:var(--t-bd0)] text-[color:var(--t-tx1)] hover:border-[color:var(--t-bd1)]"
-    }`;
+  const isFileDrag = (e) => e.dataTransfer.types.includes("Files");
+  const isMoveDrag = (e) => e.dataTransfer.types.includes("text/forge-file");
 
-  // Chips accept dragged file rows, so a file can be filed by dropping it on a folder.
-  const chipDrop = (target) => ({
+  // A folder tile / breadcrumb that accepts a dragged file row.
+  const moveTarget = (key, folderId) => ({
     onDragOver: (e) => {
-      if (e.dataTransfer.types.includes("text/forge-file")) {
+      if (isMoveDrag(e)) {
         e.preventDefault();
-        setDropTarget(target);
+        setDropTarget(key);
       }
     },
-    onDragLeave: () => setDropTarget((t) => (t === target ? null : t)),
+    onDragLeave: () => setDropTarget((t) => (t === key ? null : t)),
     onDrop: (e) => {
-      const id = e.dataTransfer.getData("text/forge-file");
+      if (!isMoveDrag(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
       setDropTarget(null);
-      if (id && target !== "all") {
-        e.preventDefault();
-        onMoveFile(id, target === "unfiled" ? null : target);
-      }
+      onMoveFile(e.dataTransfer.getData("text/forge-file"), folderId);
     },
   });
 
@@ -1749,338 +1765,315 @@ function QuizForgePanel({
 
   function submitRename(e) {
     e.preventDefault();
-    onRenameFolder(activeFolder, renameValue);
-    setRenaming(false);
+    onRenameFolder(renamingId, renameValue);
+    setRenamingId(null);
   }
 
+  const inputCls =
+    "min-w-0 flex-1 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-2.5 outline-none focus:border-[color:var(--t-ac)]";
+
   return (
-    <div className="flex flex-col self-stretch gap-6">
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {QUIZ_FORGE_STATS.map((stat) => (
-          <div
-            key={stat.label}
-            title={stat.explain}
-            className="bg-[var(--t-bg1)] p-[15px] border border-solid border-[color:var(--t-bd0)] transition-transform duration-150 hover:-translate-y-0.5 cursor-help"
-          >
-            <div className="flex justify-between items-center self-stretch">
-              <div className="flex shrink-0 items-center gap-1.5">
-                <img src={stat.icon} className="w-[13px] h-[13px] object-fill" />
-                <span className="text-[color:var(--t-tx2)] text-xs">{stat.label}</span>
-              </div>
-              <div className="w-2 h-2 shrink-0" style={{ backgroundColor: stat.dot }} />
-            </div>
-            <div className="flex flex-wrap items-center self-stretch pt-2.5 gap-[9px]">
-              <span className="text-base font-bold" style={{ color: stat.titleColor }}>
-                {stat.title}
+    <div className="flex flex-col self-stretch gap-5">
+      {/* Summary strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)]">
+        {QUIZ_FORGE_STATS.map((stat, i) => {
+          const isTomes = stat.label === "INGESTED TOMES";
+          return (
+            <div
+              key={stat.label}
+              title={stat.explain}
+              className={`flex flex-col gap-1 p-4 cursor-help ${i > 0 ? "lg:border-l border-solid border-[color:var(--t-bd0)]" : ""} ${i % 2 === 1 ? "border-l lg:border-l" : ""} ${i > 1 ? "border-t lg:border-t-0 border-solid border-[color:var(--t-bd0)]" : ""}`}
+            >
+              <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider">{stat.label}</span>
+              <span className="text-sm font-bold truncate" style={{ color: stat.titleColor }}>
+                {isTomes ? `${files.length} ${files.length === 1 ? "Shard" : "Shards"}` : stat.title}
+                {stat.note && <span className="text-[color:var(--t-tx1)] text-[10px] font-normal ml-1.5">{stat.note}</span>}
               </span>
-              {stat.badge && (
-                <div
-                  className="flex flex-col shrink-0 items-start py-0.5 px-1.5"
-                  style={{ backgroundColor: stat.badgeBg }}
-                >
-                  <span className="text-[10px] font-bold" style={{ color: stat.badgeColor }}>
-                    {stat.badge}
-                  </span>
-                </div>
-              )}
-              {stat.note && <span className="text-[color:var(--t-tx1)] text-[10px]">{stat.note}</span>}
+              <span className="text-[color:var(--t-tx2)] text-[11px] truncate">
+                {isTomes ? `${totalChunks} chunks \u2022 ready to forge` : stat.sub}
+              </span>
             </div>
-            <div className="flex flex-col items-start self-stretch pt-1">
-              <span className="text-[color:var(--t-tx2)] text-[11px]">{stat.sub}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Ingestion vault */}
+      {/* Library */}
       <div
-        className="flex flex-col self-stretch bg-[var(--t-bg1)] p-4 sm:p-[21px] gap-4 border border-solid border-[color:var(--t-bd0)]"
-        style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
-      >
-        <div className="flex flex-wrap justify-between items-center gap-2 self-stretch">
-          <div className="flex shrink-0 items-center gap-2">
-            <div className="bg-[var(--t-ac)] w-2.5 h-2.5" />
-            <span className="text-[color:var(--t-tx0)] text-base font-bold">DOCUMENT INGESTION VAULT</span>
-          </div>
-          <span className="text-[color:var(--t-ac)] text-[11px] bg-[var(--t-bg3)] py-[5px] px-[11px] border border-solid border-[color:var(--t-bd0)]">
-            PDF, DOCX, MD (MAX 64MB)
-          </span>
-        </div>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={onFileInputChange}
-        />
-
-        <div
-          onDragOver={(e) => {
+        className="relative flex flex-col self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)]"
+        onDragOver={(e) => {
+          if (isFileDrag(e)) {
             e.preventDefault();
             setIsDragging(true);
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={onDrop}
-          className={`flex flex-col items-center self-stretch py-8 sm:py-[34px] px-4 border-2 border-solid transition-all duration-150 ${isDragging ? "bg-[color-mix(in_srgb,_var(--t-ac)_10%,_transparent)] border-[color:var(--t-ac)] scale-[1.01]" : "bg-[var(--t-bg0)] border-[color:var(--t-bd0)]"
-            }`}
-        >
-          <img src={IMG.qfDropIllustration} className="w-14 h-[68px] object-fill mb-2" />
-          <span className="text-[color:var(--t-tx0)] text-lg font-bold text-center">
-            Drop Lecture Slides, PDFs, or Syllabi to ingest
-          </span>
-          <p className="text-[color:var(--t-tx1)] text-xs text-center max-w-md pt-1 pb-5">
-            Autonomous RAG vector chunking extracts syllabus schedules, formulas, and terminology to
-            craft custom practice quizzes.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex shrink-0 items-center bg-[var(--t-ac)] py-3 px-[22px] gap-2 hover:opacity-90 transition-all duration-150 active:scale-95"
-            >
-              <img src={IMG.qfUpload} className="w-3 h-[15px] object-fill" />
-              <span className="text-[color:var(--t-onac)] text-xs font-bold">Upload Study Documents</span>
-            </button>
-            <button
-              onClick={onSyncDrive}
-              className="flex items-center bg-[var(--t-bg3)] py-3 px-[22px] gap-2 border border-solid border-[color:var(--t-bd0)] hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-95"
-            >
-              {driveSyncing ? <Spinner color="var(--t-tx0)" /> : <img src={IMG.qfDrive} className="w-[15px] h-[15px] object-fill" />}
-              <span className="text-[color:var(--t-tx0)] text-xs font-bold">
-                {driveSyncing ? "Syncing…" : "Sync Google Drive"}
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Ingested files list */}
-      <div
-        className="flex flex-col self-stretch bg-[var(--t-bg1)] p-4 sm:p-[21px] gap-4 border border-solid border-[color:var(--t-bd0)]"
-        style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
+          }
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) setIsDragging(false);
+        }}
+        onDrop={(e) => {
+          if (isFileDrag(e)) onDrop(e);
+        }}
       >
-        <div className="flex flex-wrap justify-between items-center gap-2 self-stretch">
-          <div className="flex flex-wrap shrink-0 items-center gap-2">
-            <div className="bg-[var(--t-ok2)] w-2.5 h-2.5" />
-            <span className="text-[color:var(--t-tx0)] text-base font-bold">INGESTED LORE &amp; SYLLABI SHARDS</span>
-            <span className="text-[color:var(--t-ok3)] text-xs font-bold bg-[#2B580080] py-0.5 px-2">
-              ({files.length} Files Synced)
-            </span>
-          </div>
-          <button className="flex shrink-0 items-center gap-1 hover:opacity-80 transition-all duration-150 active:scale-95">
-            <img src={IMG.qfReindex} className="w-2.5 h-2.5 object-fill" />
-            <span className="text-[color:var(--t-ac)] text-xs">Re-index All Chunks</span>
-          </button>
-        </div>
+        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={onFileInputChange} />
 
-        {/* Folder bar */}
-        <div className="flex flex-col self-stretch gap-2.5">
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-solid border-[color:var(--t-bd0)]">
+          <nav aria-label="Folder path" className="flex items-center gap-1.5 text-sm min-w-0">
+            <button
+              type="button"
+              onClick={() => { setActiveFolder(null); setSearch(""); }}
+              {...moveTarget("root", null)}
+              className={`py-1 px-2 font-bold transition-colors ${dropTarget === "root"
+                  ? "bg-[color-mix(in_srgb,_var(--t-ac)_20%,_transparent)] text-[color:var(--t-ac)]"
+                  : current
+                    ? "text-[color:var(--t-tx1)] hover:text-[color:var(--t-ac)]"
+                    : "text-[color:var(--t-tx0)]"
+                }`}
+            >
+              My Library
+            </button>
+            {current && (
+              <>
+                <span className="text-[color:var(--t-tx2)]" aria-hidden="true">/</span>
+                <span className="py-1 px-2 font-bold text-[color:var(--t-tx0)] truncate">{current.name}</span>
+              </>
+            )}
+          </nav>
+
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => setActiveFolder("all")} aria-pressed={activeFolder === "all"} className={chipCls(activeFolder === "all", false)}>
-              All files <span className="text-[color:var(--t-tx2)] font-normal">{countIn("all")}</span>
-            </button>
-            {folders.map((fo) => (
-              <button
-                key={fo.id}
-                type="button"
-                onClick={() => { setActiveFolder(fo.id); setRenaming(false); }}
-                aria-pressed={activeFolder === fo.id}
-                className={chipCls(activeFolder === fo.id, dropTarget === fo.id)}
-                {...chipDrop(fo.id)}
-              >
-                <span aria-hidden="true">{activeFolder === fo.id ? "\u25BE" : "\u25B8"}</span>
-                {fo.name} <span className="text-[color:var(--t-tx2)] font-normal">{countIn(fo.id)}</span>
-              </button>
-            ))}
-            <button type="button" onClick={() => setActiveFolder("unfiled")} aria-pressed={activeFolder === "unfiled"} className={chipCls(activeFolder === "unfiled", dropTarget === "unfiled")} {...chipDrop("unfiled")}>
-              Unfiled <span className="text-[color:var(--t-tx2)] font-normal">{countIn("unfiled")}</span>
-            </button>
-            {newFolderOpen ? (
-              <form onSubmit={submitNewFolder} className="flex items-center gap-1.5">
-                <input
-                  autoFocus
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Escape" && setNewFolderOpen(false)}
-                  placeholder="Folder name"
-                  maxLength={40}
-                  className="w-36 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-1.5 px-2.5 outline-none focus:border-[color:var(--t-ac)]"
-                />
-                <button type="submit" className="text-[color:var(--t-ok2)] text-xs font-bold hover:opacity-75">Create</button>
-                <button type="button" onClick={() => setNewFolderOpen(false)} className="text-[color:var(--t-tx2)] text-xs hover:opacity-75">Cancel</button>
-              </form>
-            ) : (
-              <button type="button" onClick={() => setNewFolderOpen(true)} className="py-1.5 px-3 text-xs font-bold border border-dashed border-[color:var(--t-bd1)] text-[color:var(--t-tx2)] hover:text-[color:var(--t-ac)] hover:border-[color:var(--t-ac)] transition-colors duration-150">
-                + New folder
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            {currentFolder ? (
-              renaming ? (
-                <form onSubmit={submitRename} className="flex items-center gap-1.5">
-                  <input
-                    autoFocus
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    onKeyDown={(e) => e.key === "Escape" && setRenaming(false)}
-                    maxLength={40}
-                    className="w-40 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-1.5 px-2.5 outline-none focus:border-[color:var(--t-ac)]"
-                  />
-                  <button type="submit" className="text-[color:var(--t-ok2)] text-xs font-bold hover:opacity-75">Save</button>
-                  <button type="button" onClick={() => setRenaming(false)} className="text-[color:var(--t-tx2)] text-xs hover:opacity-75">Cancel</button>
-                </form>
-              ) : (
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="text-[color:var(--t-tx1)]">Folder: <b className="text-[color:var(--t-tx0)]">{currentFolder.name}</b></span>
-                  <button type="button" onClick={() => { setRenameValue(currentFolder.name); setRenaming(true); }} className="text-[color:var(--t-ac)] font-bold hover:opacity-75">Rename</button>
-                  <button type="button" onClick={() => onDeleteFolder(currentFolder.id)} className="text-[color:var(--t-err)] font-bold hover:opacity-75" title="Files inside become unfiled">Delete folder</button>
-                </div>
-              )
-            ) : (
-              <span className="text-[color:var(--t-tx2)] text-xs">
-                {activeFolder === "unfiled" ? "Files not in any folder" : "Drag a file onto a folder, or use its Move menu"}
-              </span>
-            )}
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search files"
               aria-label="Search files"
-              className="w-40 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-1.5 px-2.5 outline-none focus:border-[color:var(--t-ac)]"
+              className={`${inputCls} !flex-none w-36`}
             />
+            {!current && (
+              <button type="button" onClick={() => setNewFolderOpen(true)} className={ghostBtnCls}>
+                <span className="text-[color:var(--t-ac)] text-sm leading-none">+</span> New folder
+              </button>
+            )}
+            <button type="button" onClick={onSyncDrive} className={ghostBtnCls}>
+              {driveSyncing ? <Spinner color="var(--t-tx0)" /> : <img src={IMG.qfDrive} className="w-[14px] h-[14px] object-fill" />}
+              {driveSyncing ? "Syncing\u2026" : "Sync Drive"}
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 bg-[var(--t-ac)] py-2 px-4 hover:opacity-90 transition-all duration-150 active:scale-95"
+            >
+              <img src={IMG.qfUpload} className="w-3 h-[14px] object-fill" />
+              <span className="text-[color:var(--t-onac)] text-xs font-bold">Upload</span>
+            </button>
           </div>
         </div>
 
-        <div className="flex flex-col self-stretch">
-          {visibleFiles.length === 0 && (
-            <p className="text-[color:var(--t-tx2)] text-xs text-center py-8 border border-dashed border-[color:var(--t-bd0)] mb-3">
-              {search.trim() ? "No files match your search." : currentFolder ? "This folder is empty. Upload a file while it's open, or move one in." : "Nothing here yet."}
-            </p>
-          )}
-          {visibleFiles.map((file) => {
-            const forgeState = forgeStatusMap[file.id] || "idle";
-            const indexing = file.status !== "Indexed";
-            return (
-              <div
-                key={file.id}
-                draggable
-                onDragStart={(e) => e.dataTransfer.setData("text/forge-file", file.id)}
-                className="flex flex-wrap sm:flex-nowrap justify-between items-center gap-3 self-stretch bg-[var(--t-bg2)] p-4 sm:p-[15px] mb-3 border border-solid border-[color:var(--t-bd0)] cursor-grab active:cursor-grabbing"
-              >
-                <div className="flex items-center min-w-0 flex-1 gap-3">
-                  <img src={file.icon} className="w-10 h-10 object-fill shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-col items-start self-stretch">
-                      <span className="text-[color:var(--t-tx0)] text-sm font-bold truncate w-full">{file.name}</span>
-                    </div>
-                    <div className="flex flex-wrap items-center self-stretch pt-0.5 gap-x-2">
-                      <span className="text-[color:var(--t-ok2)] text-[11px] font-bold">{file.chunks} Chunks</span>
-                      <span className="text-[color:var(--t-bd0)] text-[11px]">•</span>
-                      <span className="text-[color:var(--t-ac)] text-[11px]">{file.size}</span>
-                      <span className="text-[color:var(--t-bd0)] text-[11px]">•</span>
-                      <span className={`text-[11px] ${indexing ? "text-[color:var(--t-warn)]" : "text-[color:var(--t-ok3)]"}`}>
-                        {file.status}
-                      </span>
-                      {activeFolder === "all" && (
-                        <>
-                          <span className="text-[color:var(--t-bd0)] text-[11px]">•</span>
-                          <span className="text-[color:var(--t-tx2)] text-[11px]">
-                            {folders.find((fo) => fo.id === file.folderId)?.name || "Unfiled"}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-[9px]">
-                  <select
-                    value={file.folderId || ""}
-                    onChange={(e) => onMoveFile(file.id, e.target.value)}
-                    aria-label={`Move ${file.name} to a folder`}
-                    className="max-w-[120px] bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx1)] text-[11px] py-1.5 px-2 outline-none focus:border-[color:var(--t-ac)] cursor-pointer"
-                  >
-                    <option value="">Unfiled</option>
-                    {folders.map((fo) => (
-                      <option key={fo.id} value={fo.id}>{fo.name}</option>
-                    ))}
-                  </select>
-                  <div className="flex flex-col shrink-0 items-start bg-[var(--t-bg0)] py-1 px-[9px] border border-solid border-[color:color-mix(in_srgb,_var(--t-ok2)_30%,_transparent)]">
-                    <span className="text-[color:var(--t-ok3)] text-[11px]">{indexing ? "SYNCING" : "READY"}</span>
-                  </div>
-                  <button
-                    disabled={indexing}
-                    onClick={() => onForge(file.id)}
-                    className={`flex shrink-0 items-center py-2.5 px-[16px] gap-1.5 transition-all duration-150 active:scale-95 ${indexing
-                      ? "bg-[var(--t-bd0)] cursor-not-allowed opacity-60"
-                      : forgeState === "ready"
-                        ? "bg-[var(--t-ok2)]"
-                        : "bg-[var(--t-ac)] hover:opacity-90"
-                      }`}
-                  >
-                    {forgeState === "forging" ? (
-                      <Spinner />
+        <div className="flex flex-col gap-5 p-4 min-h-[260px]">
+          {/* Folders */}
+          {showFolders && (folders.length > 0 || newFolderOpen) && (
+            <section aria-label="Folders" className="flex flex-col gap-2">
+              <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider">FOLDERS</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {newFolderOpen && (
+                  <form onSubmit={submitNewFolder} className="flex items-center gap-2 p-3 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-ac)]">
+                    <FolderIcon className="w-6 h-6 shrink-0 text-[color:var(--t-ac)]" />
+                    <input
+                      autoFocus
+                      value={newFolderName}
+                      onChange={(e) => setNewFolderName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Escape" && (setNewFolderOpen(false), setNewFolderName(""))}
+                      onBlur={() => { if (!newFolderName.trim()) setNewFolderOpen(false); }}
+                      placeholder="Untitled folder"
+                      maxLength={40}
+                      className={inputCls}
+                    />
+                  </form>
+                )}
+                {folders.map((fo) => (
+                  <div key={fo.id} className="relative" {...moveTarget(fo.id, fo.id)}>
+                    {renamingId === fo.id ? (
+                      <form onSubmit={submitRename} className="flex items-center gap-2 p-3 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-ac)]">
+                        <FolderIcon className="w-6 h-6 shrink-0 text-[color:var(--t-ac)]" />
+                        <input
+                          autoFocus
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => e.key === "Escape" && setRenamingId(null)}
+                          onBlur={() => setRenamingId(null)}
+                          maxLength={40}
+                          className={inputCls}
+                        />
+                      </form>
                     ) : (
-                      <img src={IMG.qfForge} className="w-[13px] h-[13px] object-fill" />
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setActiveFolder(fo.id)}
+                          className={`w-full flex items-center gap-3 p-3 pr-9 text-left border border-solid transition-all duration-150 ${dropTarget === fo.id
+                              ? "bg-[color-mix(in_srgb,_var(--t-ac)_16%,_transparent)] border-[color:var(--t-ac)] scale-[1.02]"
+                              : "bg-[var(--t-bg2)] border-[color:var(--t-bd0)] hover:border-[color:var(--t-bd1)]"
+                            }`}
+                        >
+                          <FolderIcon className="w-6 h-6 shrink-0 text-[color:var(--t-ac)]" />
+                          <span className="flex flex-col min-w-0">
+                            <span className="text-[color:var(--t-tx0)] text-sm font-bold truncate">{fo.name}</span>
+                            <span className="text-[color:var(--t-tx2)] text-[11px]">{countIn(fo.id)} {countIn(fo.id) === 1 ? "file" : "files"}</span>
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Options for ${fo.name}`}
+                          onClick={() => setMenu(menu?.id === fo.id ? null : { kind: "folder", id: fo.id })}
+                          className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 text-[color:var(--t-tx2)] hover:text-[color:var(--t-tx0)] text-base leading-none"
+                        >
+                          {"\u22EE"}
+                        </button>
+                        {menu?.kind === "folder" && menu.id === fo.id && (
+                          <>
+                            <button type="button" aria-label="Close menu" className="fixed inset-0 z-20 cursor-default" onClick={() => setMenu(null)} />
+                            <div className={menuPanelCls} style={{ top: "calc(100% - 8px)" }}>
+                              <button type="button" className={menuItemCls} onClick={() => { setActiveFolder(fo.id); setMenu(null); }}>Open</button>
+                              <button type="button" className={menuItemCls} onClick={() => { setRenameValue(fo.name); setRenamingId(fo.id); setMenu(null); }}>Rename</button>
+                              <button type="button" className={`${menuItemCls} !text-[color:var(--t-err)]`} onClick={() => { onDeleteFolder(fo.id); setMenu(null); }}>
+                                Delete folder
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </>
                     )}
-                    <span className="text-[color:var(--t-onac)] text-xs font-bold whitespace-nowrap">
-                      {forgeState === "forging"
-                        ? "Forging…"
-                        : forgeState === "ready"
-                          ? "Quiz Ready ✓"
-                          : "Forge Quiz"}
-                    </span>
-                  </button>
-                </div>
+                  </div>
+                ))}
               </div>
-            );
-          })}
+            </section>
+          )}
 
-          {repoLinks.map((link, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-3 self-stretch bg-[var(--t-bg2)] p-[15px] mb-3 border border-solid border-[color:var(--t-bd0)]"
-            >
-              <img src={IMG.qfLink} className="w-4 h-4 object-fill shrink-0" />
-              <span className="text-[color:var(--t-tx1)] text-xs truncate">{link}</span>
-            </div>
-          ))}
+          {/* Files */}
+          <section aria-label="Files" className="flex flex-col gap-2">
+            {(shown.length > 0 || showFolders) && (
+              <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider">
+                {q ? "SEARCH RESULTS" : "FILES"}
+              </span>
+            )}
 
-          {showRepoLink ? (
-            <form onSubmit={onAddRepoLink} className="flex flex-wrap items-center gap-2 self-stretch bg-[var(--t-bg0)] p-3 border border-solid border-[color:var(--t-bd0)]">
-              <input
-                autoFocus
-                value={repoLinkValue}
-                onChange={(e) => setRepoLinkValue(e.target.value)}
-                placeholder="https://drive.google.com/..."
-                className="flex-1 min-w-[160px] bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac)]"
-              />
-              <button
-                type="submit"
-                className="bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2 px-4 hover:opacity-90 transition-all duration-150 active:scale-95"
-              >
-                Link
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowRepoLink(false)}
-                className="text-[color:var(--t-tx2)] text-xs py-2 px-2 hover:text-[color:var(--t-tx1)] transition-colors"
-              >
-                Cancel
-              </button>
-            </form>
-          ) : (
-            <button
-              onClick={() => setShowRepoLink(true)}
-              className="flex justify-center items-center self-stretch bg-[var(--t-bg0)] py-[13px] mt-1 gap-2 border border-solid border-[color:var(--t-bd0)] hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-[0.98]"
-            >
-              <img src={IMG.qfLink} className="w-[15px] h-[15px] object-fill" />
-              <span className="text-[color:var(--t-tx1)] text-xs">Link additional syllabus repository or notes</span>
-            </button>
+            {shown.length === 0 && (
+              <div className="flex flex-col items-center justify-center gap-1 py-10 text-center border border-dashed border-[color:var(--t-bd1)]">
+                <span className="text-[color:var(--t-tx0)] text-sm font-bold">
+                  {q ? "No files match your search" : current ? "This folder is empty" : "No loose files"}
+                </span>
+                <span className="text-[color:var(--t-tx2)] text-xs max-w-xs">
+                  {q
+                    ? "Try a different name."
+                    : current
+                      ? "Drag files here from My Library, or upload while this folder is open."
+                      : "Drop files anywhere in this panel, or press Upload."}
+                </span>
+              </div>
+            )}
+
+            {shown.map((file) => {
+              const forgeState = forgeStatusMap[file.id] || "idle";
+              const indexing = file.status !== "Indexed";
+              const moveOptions = [
+                ...(file.folderId ? [{ id: null, name: "My Library" }] : []),
+                ...folders.filter((fo) => fo.id !== file.folderId),
+              ];
+              return (
+                <div
+                  key={file.id}
+                  draggable
+                  onDragStart={(e) => e.dataTransfer.setData("text/forge-file", file.id)}
+                  className="relative flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 p-3 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] hover:border-[color:var(--t-bd1)] cursor-grab active:cursor-grabbing transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <img src={file.icon} className="w-9 h-9 object-fill shrink-0" draggable={false} />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[color:var(--t-tx0)] text-sm font-bold truncate">{file.name}</span>
+                      <span className="text-[color:var(--t-tx2)] text-[11px] truncate">
+                        {file.size} {"\u2022"} {file.chunks} chunks {"\u2022"}{" "}
+                        <span className={indexing ? "text-[color:var(--t-warn)]" : ""}>{indexing ? "Indexing\u2026" : "Ready"}</span>
+                        {q && file.folderId && <> {"\u2022"} in {folderName(file.folderId)}</>}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      disabled={indexing}
+                      onClick={() => onForge(file.id)}
+                      className={`flex items-center py-2 px-3.5 gap-1.5 transition-all duration-150 active:scale-95 ${indexing ? "bg-[var(--t-bd0)] cursor-not-allowed opacity-60" : "bg-[var(--t-ac)] hover:opacity-90"
+                        }`}
+                    >
+                      {forgeState === "forging" ? <Spinner /> : <img src={IMG.qfForge} className="w-[13px] h-[13px] object-fill" draggable={false} />}
+                      <span className="text-[color:var(--t-onac)] text-xs font-bold whitespace-nowrap">Forge Quiz</span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Options for ${file.name}`}
+                      onClick={() => setMenu(menu?.id === file.id ? null : { kind: "file", id: file.id })}
+                      className="w-7 h-7 text-[color:var(--t-tx2)] hover:text-[color:var(--t-tx0)] text-base leading-none"
+                    >
+                      {"\u22EE"}
+                    </button>
+                  </div>
+                  {menu?.kind === "file" && menu.id === file.id && (
+                    <>
+                      <button type="button" aria-label="Close menu" className="fixed inset-0 z-20 cursor-default" onClick={() => setMenu(null)} />
+                      <div className={menuPanelCls} style={{ top: "calc(100% - 6px)" }}>
+                        <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider py-1.5 px-3">MOVE TO</span>
+                        {moveOptions.length === 0 && <span className="text-[color:var(--t-tx2)] text-xs py-2 px-3">Create a folder first</span>}
+                        {moveOptions.map((fo) => (
+                          <button key={fo.id ?? "root"} type="button" className={menuItemCls} onClick={() => { onMoveFile(file.id, fo.id); setMenu(null); }}>
+                            {fo.name}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+
+            {showFolders && folders.length > 0 && shown.length > 0 && (
+              <p className="text-[color:var(--t-tx2)] text-[11px] pt-1">Tip: drag a file onto a folder to file it away.</p>
+            )}
+          </section>
+
+          {/* Linked sources */}
+          {(repoLinks.length > 0 || showFolders) && (
+            <section aria-label="Linked sources" className="flex flex-col gap-2 pt-1 border-t border-solid border-[color:var(--t-bd0)]">
+              {repoLinks.map((link, i) => (
+                <div key={i} className="flex items-center gap-2.5 py-1.5">
+                  <img src={IMG.qfLink} className="w-4 h-4 object-fill shrink-0" />
+                  <span className="text-[color:var(--t-tx1)] text-xs truncate">{link}</span>
+                </div>
+              ))}
+              {showRepoLink ? (
+                <form onSubmit={onAddRepoLink} className="flex flex-wrap items-center gap-2 pt-1">
+                  <input
+                    autoFocus
+                    value={repoLinkValue}
+                    onChange={(e) => setRepoLinkValue(e.target.value)}
+                    placeholder="https://drive.google.com/..."
+                    className={inputCls}
+                  />
+                  <button type="submit" className="bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2 px-4 hover:opacity-90 active:scale-95 transition-all duration-150">Link</button>
+                  <button type="button" onClick={() => setShowRepoLink(false)} className="text-[color:var(--t-tx2)] text-xs py-2 px-2 hover:text-[color:var(--t-tx1)]">Cancel</button>
+                </form>
+              ) : (
+                <button type="button" onClick={() => setShowRepoLink(true)} className="self-start flex items-center gap-2 text-[color:var(--t-tx1)] text-xs hover:text-[color:var(--t-ac)] transition-colors py-1">
+                  <img src={IMG.qfLink} className="w-[14px] h-[14px] object-fill" />
+                  Link a syllabus repository or notes
+                </button>
+              )}
+            </section>
           )}
         </div>
+
+        {/* Drop overlay for files dragged in from the computer */}
+        {isDragging && (
+          <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-[color-mix(in_srgb,_var(--t-ac)_14%,_var(--t-bg1))] border-2 border-dashed border-[color:var(--t-ac)]">
+            <span className="text-[color:var(--t-ac)] text-sm font-bold">Drop to upload to {current?.name || "My Library"}</span>
+          </div>
+        )}
       </div>
     </div>
   );

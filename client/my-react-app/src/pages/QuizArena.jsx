@@ -174,8 +174,8 @@ const KEYFRAMES = `
 @keyframes qaDmg { 0% { opacity: 0; transform: translateY(6px) } 20% { opacity: 1 } 100% { opacity: 0; transform: translateY(-34px) } }
 .qa-hide-scroll { scrollbar-width: none }
 .qa-hide-scroll::-webkit-scrollbar { display: none }
-.qa-page { will-change: transform, opacity }
-@media (prefers-reduced-motion: reduce) { .qa-anim { animation: none !important } }
+.qa-slide { transition: transform .55s cubic-bezier(.22,.8,.3,1), opacity .45s ease, filter .45s ease; will-change: transform, opacity }
+@media (prefers-reduced-motion: reduce) { .qa-anim { animation: none !important } .qa-slide { transition: none !important } }
 `;
 
 function Spinner() {
@@ -209,43 +209,42 @@ function Step({ n, title, children, right }) {
 const fieldCls =
   "w-full resize-y bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-2.5 outline-none focus:border-[color:var(--t-ac)]";
 
-function CardTile({ c, n, onSave, onDelete }) {
-  const [editing, setEditing] = useState(!c.front && !c.back);
-  const [front, setFront] = useState(c.front);
-  const [back, setBack] = useState(c.back);
-
-  function save() {
-    onSave({ ...c, front: front.trim(), back: back.trim() });
-    setEditing(false);
-  }
-
+function CardFace({ c, n, editing, focused, onChange, onDelete }) {
   return (
-    <div className={`${card} h-full flex flex-col gap-3 p-4`} style={cardShadow}>
+    <div
+      data-face
+      className="w-full h-full min-h-[270px] flex flex-col gap-4 p-5 rounded-2xl border-[1.5px] border-solid"
+      style={{
+        background: "color-mix(in srgb, var(--t-ac) 24%, var(--t-bg0))",
+        borderColor: focused ? "color-mix(in srgb, white 55%, var(--t-ac))" : "color-mix(in srgb, var(--t-ac) 45%, transparent)",
+        boxShadow: focused
+          ? "0 0 34px color-mix(in srgb, var(--t-ac) 55%, transparent), 0 0 72px color-mix(in srgb, var(--t-ok) 30%, transparent)"
+          : "none",
+        transition: "border-color .4s ease, box-shadow .4s ease",
+      }}
+    >
       <div className="flex items-center justify-between">
-        <span className="text-[color:var(--t-ac)] text-[11px] font-bold tracking-wider">CARD {n}</span>
-        <div className="flex items-center gap-3">
-          {editing ? (
-            <button type="button" onClick={save} className="text-[color:var(--t-ok)] text-[11px] font-bold hover:opacity-75">Save</button>
-          ) : (
-            <button type="button" onClick={() => setEditing(true)} className="text-[color:var(--t-ac)] text-[11px] font-bold hover:opacity-75">Edit</button>
-          )}
-          <button type="button" onClick={onDelete} className="text-[color:var(--t-err)] text-[11px] font-bold hover:opacity-75">Delete</button>
-        </div>
-      </div>
-      <div className="flex flex-col gap-1">
-        <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider uppercase">Front</span>
-        {editing ? (
-          <textarea rows={4} value={front} onChange={(e) => setFront(e.target.value)} className={fieldCls} placeholder="Question or prompt (use _____ for a blank)" />
-        ) : (
-          <p className="text-[color:var(--t-tx0)] text-sm leading-snug min-h-[84px]">{c.front}</p>
+        <span className="text-[color:var(--t-tx1)] text-[11px] font-bold tracking-widest">CARD {n}</span>
+        {editing && (
+          <button type="button" onClick={onDelete} className="text-[color:var(--t-err)] text-[11px] font-bold hover:opacity-75">
+            Delete
+          </button>
         )}
       </div>
-      <div className="flex flex-col gap-1 pt-3 border-t border-solid border-[color:var(--t-bd0)]">
-        <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider uppercase">Back</span>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-widest">TERM</span>
         {editing ? (
-          <input value={back} onChange={(e) => setBack(e.target.value)} className={fieldCls} placeholder="Answer" />
+          <input value={c.back} onChange={(e) => onChange({ ...c, back: e.target.value })} className={fieldCls} placeholder="Term (the answer)" />
         ) : (
-          <p className="text-[color:var(--t-ac)] text-base font-bold">{c.back}</p>
+          <p className="text-[color:var(--t-tx0)] text-xl font-bold leading-snug break-words">{c.back || "\u2014"}</p>
+        )}
+      </div>
+      <div className="flex flex-col gap-1.5 flex-1">
+        <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-widest">DEFINITION</span>
+        {editing ? (
+          <textarea rows={5} value={c.front} onChange={(e) => onChange({ ...c, front: e.target.value })} className={fieldCls} placeholder="Definition (use _____ where the term goes)" />
+        ) : (
+          <p className="text-[color:var(--t-tx1)] text-sm leading-relaxed break-words">{c.front || "\u2014"}</p>
         )}
       </div>
     </div>
@@ -257,60 +256,30 @@ function DeckView({ title, demo, deck, generating, error, setDeck, onStart }) {
   const [types, setTypes] = useState(["mcq", "ident", "tf"]);
   const [count, setCount] = useState(10);
   const [msg, setMsg] = useState("");
-  const scroller = useRef(null);
-  const raf = useRef(0);
   const [active, setActive] = useState(0);
-  const CARD_W = "min(320px, 78vw)";
+  const [editing, setEditing] = useState(false);
+  const swipeX = useRef(null);
+  const CARD_W = "min(340px, 74vw)";
 
-  /* Book-style flip: every card is tilted and dimmed by how far it is from the centre. */
-  function layout() {
-    const el = scroller.current;
-    if (!el) return;
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    const mid = el.scrollLeft + el.clientWidth / 2;
-    let best = 0;
-    let bestD = Infinity;
-    el.querySelectorAll("[data-page]").forEach((node, i) => {
-      const d = (node.offsetLeft + node.offsetWidth / 2 - mid) / node.offsetWidth;
-      if (Math.abs(d) < bestD) {
-        bestD = Math.abs(d);
-        best = i;
-      }
-      if (reduce) return;
-      const c = Math.max(-2, Math.min(2, d));
-      const a = Math.abs(c);
-      // Focus effect: the centred card is sharp, enlarged and glowing; the rest blur and dim
-      // smoothly with distance so only the card being read can be read.
-      const near = 1 - Math.min(a, 1); // 1 at the centre, 0 one card away
-      node.style.transform = `perspective(1000px) translateZ(${-a * 70}px) rotateY(${-c * 44}deg) scale(${1.04 - a * 0.1})`;
-      node.style.opacity = String(Math.max(0.3, 1 - a * 0.5));
-      node.style.filter = `blur(${(a * 4).toFixed(2)}px) brightness(${1 - a * 0.25})`;
-      node.style.boxShadow = `0 0 ${near * 30}px color-mix(in srgb, var(--t-ac) ${near * 35}%, transparent)`;
-      node.style.zIndex = String(10 - Math.round(a));
-    });
-    setActive(best);
-  }
-
-  function onScroll() {
-    cancelAnimationFrame(raf.current);
-    raf.current = requestAnimationFrame(layout);
-  }
-
-  function goTo(i) {
-    const el = scroller.current;
-    const node = el?.querySelectorAll("[data-page]")[i];
-    if (!node) return;
-    el.scrollTo({ left: node.offsetLeft + node.offsetWidth / 2 - el.clientWidth / 2, behavior: "smooth" });
-  }
+  // Carousel pages: every card, plus an "Add card" page while editing.
+  const pages = [...deck.map((c) => ({ kind: "card", c })), ...(editing ? [{ kind: "add" }] : [])];
+  const N = pages.length;
+  const wrap = (i) => ((i % N) + N) % N;
+  const goTo = (i) => N > 0 && setActive(wrap(i));
+  const step = (dir) => goTo(active + dir);
+  // Shortest signed distance from the active page, so the carousel loops around.
+  const offsetOf = (i) => {
+    let d = i - active;
+    if (N > 2) {
+      if (d > N / 2) d -= N;
+      if (d < -N / 2) d += N;
+    }
+    return d;
+  };
 
   useEffect(() => {
-    layout();
-    window.addEventListener("resize", layout);
-    return () => {
-      window.removeEventListener("resize", layout);
-      cancelAnimationFrame(raf.current);
-    };
-  }, [deck.length, generating, error]);
+    if (active > N - 1) setActive(Math.max(0, N - 1));
+  }, [N]);
 
   function toggleType(key) {
     setTypes((prev) => (prev.includes(key) ? (prev.length === 1 ? prev : prev.filter((k) => k !== key)) : [...prev, key]));
@@ -328,9 +297,6 @@ function DeckView({ title, demo, deck, generating, error, setDeck, onStart }) {
     onStart({ mode, title, questions: makeQuestions(facts, types, Math.min(count, facts.length)) });
   }
 
-  const lastPage = deck.length; // the "Add card" tile is the final page
-  const step = (dir) => goTo(Math.max(0, Math.min(lastPage, active + dir)));
-
   return (
     <div className="flex flex-col gap-4">
       {/* Flashcards generated from the forged file */}
@@ -338,12 +304,21 @@ function DeckView({ title, demo, deck, generating, error, setDeck, onStart }) {
         n="1"
         title="Your flashcards"
         right={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              disabled={generating || !!error}
+              onClick={() => {
+                if (editing) setDeck((d) => d.filter((x) => x.front.trim() || x.back.trim())); // drop untouched blank cards
+                setEditing((v) => !v);
+              }}
+              className={`text-[11px] font-bold py-1 px-1.5 transition-opacity hover:opacity-70 disabled:opacity-40 ${editing ? "text-[color:var(--t-ok)]" : "text-[color:var(--t-ac)]"}`}
+            >
+              {editing ? "Done editing" : "Edit flashcards"}
+            </button>
             <span className="text-[color:var(--t-ac)] text-[11px] bg-[var(--t-bg3)] py-1 px-2.5 border border-solid border-[color:var(--t-bd0)] max-w-[220px] truncate">
               {title} {"\u2022"} {deck.length} cards
             </span>
-            <button type="button" onClick={() => step(-1)} aria-label="Scroll left" className={`${btnGhost} !py-1 !px-2.5`}>{"\u2039"}</button>
-            <button type="button" onClick={() => step(1)} aria-label="Scroll right" className={`${btnGhost} !py-1 !px-2.5`}>{"\u203A"}</button>
           </div>
         }
       >
@@ -360,77 +335,129 @@ function DeckView({ title, demo, deck, generating, error, setDeck, onStart }) {
           <p role="alert" className="text-[color:var(--t-err)] text-xs py-6">{error}</p>
         ) : (
           <>
-            <div
-              ref={scroller}
-              onScroll={onScroll}
-              tabIndex={0}
-              aria-label="Flashcards, scroll sideways"
-              onKeyDown={(e) => {
-                if (e.target !== e.currentTarget) return;
-                if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
-                if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
-              }}
-              className="qa-hide-scroll relative flex gap-4 overflow-x-auto snap-x snap-mandatory py-5 outline-none"
-              style={{
-                paddingInline: `calc(50% - ${CARD_W} / 2)`,
-                scrollBehavior: "smooth",
-                WebkitMaskImage: "linear-gradient(to right, transparent, #000 14%, #000 86%, transparent)",
-                maskImage: "linear-gradient(to right, transparent, #000 14%, #000 86%, transparent)",
-              }}
-            >
-              {deck.map((c, i) => (
-                <div
-                  key={c.id}
-                  data-page
-                  className="qa-page shrink-0 snap-center flex"
-                  style={{ width: CARD_W }}
-                  // Side cards turn into the centre first, so a stray tap never edits the wrong card.
-                  onClickCapture={(e) => {
-                    if (i !== active) {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      goTo(i);
-                    }
-                  }}
-                >
-                  <div className="w-full">
-                    <CardTile
-                      c={c}
-                      n={i + 1}
-                      onSave={(next) => setDeck((d) => d.map((x) => (x.id === c.id ? next : x)))}
-                      onDelete={() => setDeck((d) => d.filter((x) => x.id !== c.id))}
-                    />
-                  </div>
-                </div>
-              ))}
-              <div data-page className="qa-page shrink-0 snap-center flex" style={{ width: CARD_W }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDeck((d) => [...d, { id: `c_new_${Date.now()}`, front: "", back: "" }]);
-                    setTimeout(() => goTo(deck.length), 60);
-                  }}
-                  className="w-full min-h-[250px] flex flex-col items-center justify-center gap-1 border-2 border-dashed border-[color:var(--t-bd1)] text-[color:var(--t-tx2)] hover:text-[color:var(--t-ac)] hover:border-[color:var(--t-ac)] transition-colors duration-150"
-                >
-                  <span className="text-3xl leading-none">+</span>
-                  <span className="text-[11px] font-bold uppercase tracking-wide">Add card</span>
-                </button>
+            <div className="relative">
+              <div
+                tabIndex={0}
+                aria-roledescription="carousel"
+                aria-label="Flashcards"
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
+                  if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
+                }}
+                onPointerDown={(e) => {
+                  if (e.target.closest("input, textarea, button")) return;
+                  swipeX.current = e.clientX;
+                }}
+                onPointerUp={(e) => {
+                  if (swipeX.current == null) return;
+                  const dx = e.clientX - swipeX.current;
+                  swipeX.current = null;
+                  if (Math.abs(dx) > 50) step(dx < 0 ? 1 : -1);
+                }}
+                onPointerCancel={() => { swipeX.current = null; }}
+                className="grid place-items-center overflow-hidden py-10 outline-none select-none"
+                style={{
+                  touchAction: "pan-y",
+                  WebkitMaskImage: "linear-gradient(to right, transparent, #000 10%, #000 90%, transparent)",
+                  maskImage: "linear-gradient(to right, transparent, #000 10%, #000 90%, transparent)",
+                }}
+              >
+                {pages.map((pg, i) => {
+                  const off = offsetOf(i);
+                  const a = Math.abs(off);
+                  const focused = off === 0;
+                  return (
+                    <div
+                      key={pg.kind === "card" ? pg.c.id : "add"}
+                      role="group"
+                      aria-roledescription="slide"
+                      aria-label={`${i + 1} of ${N}`}
+                      aria-hidden={!focused}
+                      className="qa-slide cursor-pointer"
+                      style={{
+                        gridArea: "1 / 1",
+                        width: CARD_W,
+                        zIndex: 10 - Math.min(a, 9),
+                        pointerEvents: a > 2 ? "none" : "auto",
+                        opacity: a === 0 ? 1 : a === 1 ? 0.75 : a === 2 ? 0.35 : 0,
+                        filter: `blur(${Math.min(a, 3) * 1.2}px) brightness(${1 - Math.min(a, 3) * 0.2})`,
+                        transform: `perspective(1200px) translateX(${off * 62}%) translateZ(${-Math.min(a, 3) * 90}px) rotateY(${-off * 20}deg) scale(${1 - Math.min(a, 3) * 0.1})`,
+                      }}
+                      // A side card first rotates to the front; only the front card can be edited.
+                      onClickCapture={(e) => {
+                        if (!focused) {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          goTo(i);
+                        }
+                      }}
+                    >
+                      {pg.kind === "card" ? (
+                        <CardFace
+                          c={pg.c}
+                          n={i + 1}
+                          editing={editing}
+                          focused={focused}
+                          onChange={(next) => setDeck((d) => d.map((x) => (x.id === pg.c.id ? next : x)))}
+                          onDelete={() => setDeck((d) => d.filter((x) => x.id !== pg.c.id))}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeck((d) => [...d, { id: `c_new_${Date.now()}`, front: "", back: "" }]);
+                            setActive(deck.length);
+                          }}
+                          className="w-full h-full min-h-[270px] flex flex-col items-center justify-center gap-1 rounded-2xl border-[1.5px] border-dashed border-[color:var(--t-bd1)] text-[color:var(--t-tx2)] hover:text-[color:var(--t-ac)] hover:border-[color:var(--t-ac)] transition-colors duration-150"
+                        >
+                          <span className="text-3xl leading-none">+</span>
+                          <span className="text-[11px] font-bold uppercase tracking-wide">Add card</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
+
+              {N > 1 && (
+                <>
+                  {[-1, 1].map((dir) => (
+                    <button
+                      key={dir}
+                      type="button"
+                      onClick={() => step(dir)}
+                      aria-label={dir < 0 ? "Previous card" : "Next card"}
+                      className={`absolute top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full flex items-center justify-center bg-[var(--t-bg0)] text-[color:var(--t-tx0)] text-2xl leading-none border border-solid border-[color:var(--t-bd1)] hover:border-[color:var(--t-ac)] hover:text-[color:var(--t-ac)] active:scale-90 transition-all duration-150 ${dir < 0 ? "left-1 sm:left-3" : "right-1 sm:right-3"}`}
+                      style={{ boxShadow: "0 4px 14px rgba(0,0,0,.35)" }}
+                    >
+                      {dir < 0 ? "\u2039" : "\u203A"}
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
 
-            {/* page counter + progress, like the page number of a book */}
-            <div className="flex items-center gap-3 px-1">
-              <span className="text-[color:var(--t-tx1)] text-[11px] font-bold tabular-nums whitespace-nowrap">
+            {/* indicator dots + counter */}
+            <div className="flex flex-col items-center gap-2">
+              {N > 1 && N <= 14 && (
+                <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                  {pages.map((pg, i) => (
+                    <button
+                      key={pg.kind === "card" ? pg.c.id : "add"}
+                      type="button"
+                      onClick={() => goTo(i)}
+                      aria-label={`Go to card ${i + 1}`}
+                      className={`h-2 rounded-full transition-all duration-300 ${i === active ? "w-6 bg-[var(--t-ac)]" : "w-2 bg-[var(--t-bd1)] hover:bg-[var(--t-tx2)]"}`}
+                    />
+                  ))}
+                </div>
+              )}
+              <span className="text-[color:var(--t-tx1)] text-[11px] font-bold tabular-nums">
                 {active >= deck.length ? "New card" : `Card ${active + 1} of ${deck.length}`}
               </span>
-              <div className="flex-1 h-1 bg-[var(--t-bg3)] overflow-hidden">
-                <div
-                  className="h-full bg-[var(--t-ac)] transition-all duration-300"
-                  style={{ width: `${((Math.min(active, deck.length - 1) + 1) / Math.max(deck.length, 1)) * 100}%` }}
-                />
-              </div>
             </div>
-            <p className="text-[color:var(--t-tx2)] text-[11px]">Swipe, scroll, use the arrows, or tap a blurred card to bring it into focus. Edit any card; quizzes and boss battles use your edited deck.</p>
+            <p className="text-[color:var(--t-tx2)] text-[11px]">Swipe, use the arrows or dots, or tap a side card to rotate it to the front. Use Edit flashcards to change any term or definition; quizzes and boss battles use your edited deck.</p>
           </>
         )}
       </Step>

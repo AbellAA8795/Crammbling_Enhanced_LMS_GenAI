@@ -18,6 +18,7 @@ import chatRoutes from "./routes/Chatbot_services/chat.route.js";
 import promptRoutes from "./routes/Chatbot_services/prompt.route.js";
 import feedbackRoutes from "./routes/Chatbot_services/feedback.route.js";
 import socialRoutes from "./routes/Social_services/social.route.js";
+import notificationRoutes from "./routes/Notification_services/notification.route.js";
 
 app.get("/", (req, res) => {
     res.send("Crammbling backend is running!");
@@ -32,6 +33,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/prompts", promptRoutes);
 app.use("/api/chat", feedbackRoutes);
 app.use("/api/social", socialRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 app.use((err, req, res, next) => {
     if (err.code === "LIMIT_FILE_SIZE") {

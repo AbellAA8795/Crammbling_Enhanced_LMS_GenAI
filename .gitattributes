@@ -1,0 +1,2 @@
+# Keep SQL exports identical across Windows, macOS and Linux.
+*.sql text eol=lf

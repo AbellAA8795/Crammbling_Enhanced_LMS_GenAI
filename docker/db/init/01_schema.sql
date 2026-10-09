@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict g7xA5BrfKmUgo6zrDomBaR16vnEvs89xU5t8VQeaEQjSxigwUCtLUVsv55AggQD
+\restrict dJm7DPypd0B0nVS3mdV2BVbwMo7YAuDAO60tWbnClk59Ew0VAbn8r9FPYRvC670
 
--- Dumped from database version 18.6
--- Dumped by pg_dump version 18.6
+-- Dumped from database version 18.6 (Debian 18.6-1.pgdg13+2)
+-- Dumped by pg_dump version 18.6 (Debian 18.6-1.pgdg13+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1625,7 +1625,7 @@ CREATE TABLE chatbot.chat_messages (
     completion_tokens integer,
     latency_ms integer,
     model_used character varying(50),
-    CONSTRAINT chat_messages_role_check CHECK (((role)::text = ANY ((ARRAY['user'::character varying, 'assistant'::character varying])::text[])))
+    CONSTRAINT chat_messages_role_check CHECK (((role)::text = ANY (ARRAY[('user'::character varying)::text, ('assistant'::character varying)::text])))
 );
 
 
@@ -2435,5 +2435,5 @@ ALTER TABLE ONLY social.friendships
 -- PostgreSQL database dump complete
 --
 
-\unrestrict g7xA5BrfKmUgo6zrDomBaR16vnEvs89xU5t8VQeaEQjSxigwUCtLUVsv55AggQD
+\unrestrict dJm7DPypd0B0nVS3mdV2BVbwMo7YAuDAO60tWbnClk59Ew0VAbn8r9FPYRvC670
 

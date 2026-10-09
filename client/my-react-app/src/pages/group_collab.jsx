@@ -1313,8 +1313,7 @@ function GroupCollabInner({ onNavigate, onSyncTaskToSprintBoard }) {
     const gcFileInputRef = useRef(null);
     const [viewerFile, setViewerFile] = useState(null);
     const [gcPictureTarget, setGcPictureTarget] = useState(null);
-    const messagesEndRef = useRef(null); // 👈 1. Add ref for auto-scroll
-
+    const messagesEndRef = useRef(null);
 
     function formatSize(bytes) {
         if (bytes < 1024) return `${bytes} B`;
@@ -1336,7 +1335,7 @@ function GroupCollabInner({ onNavigate, onSyncTaskToSprintBoard }) {
     const [editProfileOpen, setEditProfileOpen] = useState(false);
 
     const [friendships, setFriendships] = useState([{ id: "fr-seed", from: "m4", to: ME, status: "pending" }]);
-    const [blocked, setBlocked] = useState([]); 
+    const [blocked, setBlocked] = useState([]);
 
     const [myProfile, setMyProfile] = useState({
         name: "You", handle: "@you", bio: "", avatarUrl: null, bannerColor: null, bannerUrl: null,
@@ -1590,7 +1589,6 @@ function GroupCollabInner({ onNavigate, onSyncTaskToSprintBoard }) {
 
     const activeNavKey = showQuiz ? "quiz" : "group";
 
-    // 👈 3. New root layout using flexbox instead of fixed + margin
     return (
         <div style={rootThemeStyle} className="flex h-screen w-full bg-[var(--t-bg1)] overflow-hidden">
             <style>{SCROLLBAR_CSS}</style>
@@ -1605,13 +1603,12 @@ function GroupCollabInner({ onNavigate, onSyncTaskToSprintBoard }) {
                     </div>
                 </>
             )}
-    
+
             {mobileNavOpen && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setMobileNavOpen(false)} />}
 
-            {/* SIDEBAR - now flex child, not fixed */}
             <div style={{ backgroundImage: "var(--t-grad-side)" }}
-                className={`bg-[var(--t-bg0)] w-64 shrink-0 z-50 flex flex-col h-full transition-all duration-300 ease-out 
-                    ${mobileNavOpen ? "fixed inset-y-0 left-0 translate-x-0" : "fixed inset-y-0 left-0 -translate-x-full"} 
+                className={`bg-[var(--t-bg0)] w-64 shrink-0 z-50 flex flex-col h-full transition-all duration-300 ease-out
+                    ${mobileNavOpen ? "fixed inset-y-0 left-0 translate-x-0" : "fixed inset-y-0 left-0 -translate-x-full"}
                     lg:static lg:translate-x-0 ${navCollapsed ? "lg:w-0 lg:overflow-hidden" : "lg:w-64"}`}>
                 <div className="flex justify-end lg:hidden px-3 pt-3">
                     <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu"><CloseIcon className="w-4 h-4" /></button>
@@ -1644,10 +1641,10 @@ function GroupCollabInner({ onNavigate, onSyncTaskToSprintBoard }) {
                     </nav>
                 </div>
                 <div className="flex flex-col self-stretch bg-[color-mix(in_srgb,_var(--t-bg2)_45%,_transparent)] p-3 gap-1">
-                <button onClick={openMyProfile} className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]">
-                    <img src={PROFILE_ICON} className="w-[15px] h-[15px] mx-3 object-fill" />
-                    <span className="text-[color:var(--t-tx1)] text-[11px]">PROFILE</span>
-                </button>
+                    <button onClick={openMyProfile} className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]">
+                        <img src={PROFILE_ICON} className="w-[15px] h-[15px] mx-3 object-fill" />
+                        <span className="text-[color:var(--t-tx1)] text-[11px]">PROFILE</span>
+                    </button>
                     <button onClick={() => setSettingsOpen(true)} className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]">
                         <img src={IMG.settings} className="w-[15px] h-[15px] mx-3 object-fill" />
                         <span className="text-[color:var(--t-tx1)] text-[11px]">SETTINGS</span>
@@ -1659,7 +1656,6 @@ function GroupCollabInner({ onNavigate, onSyncTaskToSprintBoard }) {
                 </div>
             </div>
 
-            {/* DESKTOP TOGGLE BUTTON */}
             <button onClick={() => setNavCollapsed((v) => !v)}
                 aria-label={navCollapsed ? "Open navigation bar" : "Push navigation bar aside"}
                 className="hidden lg:flex fixed top-1/2 -translate-y-1/2 z-[55] w-5 h-16 items-center justify-center bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] border-l-0 text-[color:var(--t-ac)] hover:bg-[var(--t-ac)] hover:text-[color:var(--t-onac)] transition-all duration-300 active:scale-95"
@@ -1669,9 +1665,7 @@ function GroupCollabInner({ onNavigate, onSyncTaskToSprintBoard }) {
                 </svg>
             </button>
 
-            {/* MAIN CONTENT - takes remaining width, no margin */}
             <div style={{ backgroundImage: "var(--t-grad-main)" }} className="flex-1 flex flex-col min-w-0 h-full relative">
-                {/* TOP BAR */}
                 <div className="shrink-0 flex flex-wrap justify-between items-center gap-3 self-stretch bg-[color-mix(in_srgb,_var(--t-bg0)_40%,_transparent)] py-3 px-4 sm:px-6">
                     <div className="flex flex-1 min-w-0 items-center gap-3 sm:gap-4">
                         <button onClick={() => { setNavCollapsed(false); setMobileNavOpen(true); }} className={`shrink-0 ${navCollapsed ? "" : "lg:hidden"}`} aria-label="Open menu">
@@ -1711,11 +1705,9 @@ function GroupCollabInner({ onNavigate, onSyncTaskToSprintBoard }) {
 
                 {showQuiz && <QuizArena where="Group Collab" onBack={() => setShowQuiz(false)} />}
 
-                {/* CONTENT */}
                 <div className={`${showQuiz ? "hidden" : "flex"} flex-col flex-1 min-h-0 self-stretch px-4 sm:px-6 lg:px-10 py-4 gap-4`}>
                     <div className="flex flex-col sm:flex-row items-stretch flex-1 min-h-0 self-stretch gap-4">
-                        
-                        {/* LEFT PANEL */}
+
                         <div className="flex flex-col w-full sm:w-64 shrink-0 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-3 gap-2" style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}>
                             <div className="flex justify-between items-center pb-1">
                                 <span className="text-[color:var(--t-tx0)] text-xs font-bold">MY MESSAGES</span>
@@ -1760,7 +1752,6 @@ function GroupCollabInner({ onNavigate, onSyncTaskToSprintBoard }) {
                             </div>
                         </div>
 
-                        {/* RIGHT PANEL (CHAT) */}
                         <div className="flex-1 min-w-0 flex flex-col gap-3 h-full">
                             {!activeGroup ? (
                                 <div className="flex flex-col items-center justify-center flex-1 min-h-0 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-10 gap-2" style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}>
@@ -1802,7 +1793,6 @@ function GroupCollabInner({ onNavigate, onSyncTaskToSprintBoard }) {
                                         </button>
                                     </div>
 
-                                    {/* CHAT BOX */}
                                     <div className="flex flex-col flex-1 min-h-0 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-3 sm:p-4 gap-3" style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}>
                                         <div className="chat-scroll flex-1 flex flex-col gap-3 overflow-y-auto pr-1">
                                             {activeGroup.messages.length === 0 && <p className="text-[color:var(--t-tx2)] text-xs py-6 text-center">No messages yet — say hi!</p>}
@@ -1842,7 +1832,6 @@ function GroupCollabInner({ onNavigate, onSyncTaskToSprintBoard }) {
                                                     </div>
                                                 );
                                             })}
-                                            {/* 👈 4. This empty div serves as the scroll target */}
                                             <div ref={messagesEndRef} />
                                         </div>
 

@@ -8,8 +8,14 @@ import Personalized from './pages/personalized.jsx';
 import GroupCollab from './pages/group_collab.jsx';
 import QuizArena from './pages/QuizArena.jsx';
 import Classroom from './pages/classroom.jsx';
+import TeacherDashboard from './pages/TeacherDashboard.jsx';
+import TeacherClassroom from './pages/TeacherClassroom.jsx';
+import TeacherChatbot from './pages/TeacherChatbot.jsx';
+import TeacherMessenger from './pages/TeacherMessenger';
+import TeacherProfile from './pages/TeacherProfile';
+import TeacherPersonalized from './pages/TeacherPersonalized';
+import TeacherLogout from './pages/TeacherLogout';
 
-// 👇 1. Import useTheme
 import { useTheme } from './pages/Theme';
 import { ProfileProvider, ProfileHost } from './components/ProfileSystem';
 
@@ -54,13 +60,11 @@ function ClassroomPage() {
 }
 
 function App() {
-  // 👇 2. Get the theme variables
   const [, , rootThemeStyle] = useTheme();
 
   return (
     <BrowserRouter>
       <ProfileProvider>
-        {/* 👇 3. Wrap everything in the theme div */}
         <div style={rootThemeStyle} className="min-h-screen bg-[var(--t-bg0)] text-[color:var(--t-tx0)]">
           <Routes>
             <Route path="/" element={<Login />} />
@@ -72,9 +76,16 @@ function App() {
             <Route path="/group-collab" element={<GroupCollabPage />} />
             <Route path="/personalized" element={<PersonalizedPage />} />
             <Route path="/quiz-arena" element={<QuizArenaPage />} />
+
+            {/* Teacher routes */}
+            <Route path="/teacher"              element={<TeacherDashboard />} />
+            <Route path="/teacher/classroom"    element={<TeacherClassroom />} />
+            <Route path="/teacher/chatbot"      element={<TeacherChatbot />} />
+            <Route path="/teacher/messenger"    element={<TeacherMessenger />} />
+            <Route path="/teacher/profile"      element={<TeacherProfile />} />
+            <Route path="/teacher/personalized" element={<TeacherPersonalized />} />
           </Routes>
-          
-          {/* ProfileHost is now INSIDE the theme div */}
+
           <ProfileHost groups={[]} />
         </div>
       </ProfileProvider>

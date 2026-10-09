@@ -369,4 +369,73 @@ button {
     background: var(--t-bg3, #201917);
     border-color: var(--t-tx2, #9b9086);
   }
+
+  /* ---------- Number spinners ---------- */
+.tt-no-spin::-webkit-outer-spin-button,
+.tt-no-spin::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.tt-no-spin { -moz-appearance: textfield; appearance: textfield; }
+
+/* ---------- Date/time picker icons ---------- */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 0; position: absolute; right: 0; top: 0; width: 100%; height: 100%; cursor: pointer;
+}
+
+/* ---------- Rich text editor ---------- */
+.tt-rte ul { list-style: disc; padding-left: 22px; margin: 4px 0; }
+.tt-rte-post ul { list-style: disc; padding-left: 22px; margin: 6px 0; }
+.tt-rte-post ul li { margin: 2px 0; }
+.tt-rte-post b, .tt-rte-post strong { font-weight: 700; color: var(--tt-tx0); }
+.tt-rte-post i, .tt-rte-post em { font-style: italic; }
+.tt-rte-post u { text-decoration: underline; }
+.tt-rte-post a { color: var(--tt-ac); text-decoration: underline; }
+.tt-rte ul li { margin: 2px 0; }
+.tt-rte b, .tt-rte strong { font-weight: 700; }
+.tt-rte i, .tt-rte em { font-style: italic; }
+.tt-rte u { text-decoration: underline; }
+
+/* ---------- Global scrollbar ---------- */
+* { scrollbar-width: thin; scrollbar-color: var(--tt-bd1, #3F3F46) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-track-piece { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--tt-bd1, #3F3F46);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--tt-tx2, #71717A);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+*::-webkit-scrollbar-thumb:active {
+  background: var(--tt-tx1, #A1A1AA);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+*::-webkit-scrollbar-button,
+*::-webkit-scrollbar-button:start,
+*::-webkit-scrollbar-button:end,
+*::-webkit-scrollbar-button:vertical,
+*::-webkit-scrollbar-button:horizontal,
+*::-webkit-scrollbar-button:vertical:start,
+*::-webkit-scrollbar-button:vertical:end,
+*::-webkit-scrollbar-button:horizontal:start,
+*::-webkit-scrollbar-button:horizontal:end,
+*::-webkit-scrollbar-button:single-button,
+*::-webkit-scrollbar-button:double-button,
+*::-webkit-scrollbar-button:single-button:vertical:decrement,
+*::-webkit-scrollbar-button:single-button:vertical:increment,
+*::-webkit-scrollbar-button:single-button:horizontal:decrement,
+*::-webkit-scrollbar-button:single-button:horizontal:increment {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+*::-webkit-scrollbar-corner { background: transparent; }
 }

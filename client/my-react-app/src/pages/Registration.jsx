@@ -2,36 +2,27 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import personIcon from "../assets/person.svg";
 import googleIcon from "../assets/google-icon.svg";
-import { AuthCard, Field, EmailVerifyForm, primaryButton } from "../components/AuthShared";
+import {
+  AuthCard,
+  Field,
+  EmailVerifyForm,
+  primaryButton,
+  validateEmail,
+} from "../components/AuthShared";
 
-const NAME_PATTERN = /^\p{L}[\p{L}\s.'-]*$/u;
 const USERNAME_PATTERN = /^[A-Za-z0-9_]+$/;
-const STEPS = ["Your details", "Verify email"];
-
-const NAME_FIELDS = ["firstName", "middleName", "lastName"];
-
-const stripNameChars = (value) => value.replace(/[^\p{L}\s.'-]/gu, "");
+const STEPS = ["Your details", "Verify OTP"];
 
 const INITIAL = {
-  firstName: "",
-  middleName: "",
-  lastName: "",
+  email: "",
   username: "",
   password: "",
   confirmPassword: "",
 };
 
-const nameError = (value, label, required) => {
-  if (!value.trim()) return required ? `${label} is required.` : "";
-  if (!NAME_PATTERN.test(value.trim())) return `${label} should have letters only.`;
-  return "";
-};
-
 function validate(v) {
   return {
-    firstName: nameError(v.firstName, "First name", true),
-    middleName: nameError(v.middleName, "Middle name", false),
-    lastName: nameError(v.lastName, "Last name", true),
+    email: validateEmail(v.email),
     username: !v.username.trim()
       ? "Username is required."
       : v.username.length < 4
@@ -129,9 +120,7 @@ function Registration() {
   }, [showSuccess, navigate]);
 
   const handleChange = (field) => (e) => {
-    const raw = e.target.value;
-
-    const value = NAME_FIELDS.includes(field) ? stripNameChars(raw) : raw;
+    const value = e.target.value;
     setValues((prev) => ({ ...prev, [field]: value }));
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
@@ -146,19 +135,18 @@ function Registration() {
   const handleDetailsSubmit = (e) => {
     e.preventDefault();
     setTouched({
-      firstName: true,
-      middleName: true,
-      lastName: true,
+      email: true,
       username: true,
       password: true,
       confirmPassword: true,
     });
     if (Object.values(errors).some(Boolean)) return;
+    // TODO: call the API here to send the OTP to `values.email`
     setStep(2);
   };
 
   const handleVerified = () => {
-    // TODO: send `values` + verified email to the real registration API
+    // TODO: send `values` + verified OTP to the real registration API
     setShowSuccess(true);
   };
 
@@ -186,37 +174,28 @@ function Registration() {
           <>
             <form onSubmit={handleDetailsSubmit} noValidate>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5 items-start">
-                <Field
-                  {...field("firstName", {
-                    label: "First Name",
-                    placeholder: "First name",
-                    autoComplete: "given-name",
-                  })}
-                />
-                <Field
-                  {...field("lastName", {
-                    label: "Last Name",
-                    placeholder: "Last name",
-                    autoComplete: "family-name",
-                  })}
-                />
-                <Field
-                  {...field("middleName", {
-                    label: "Middle Name",
-                    optional: true,
-                    placeholder: "Middle name",
-                    autoComplete: "additional-name",
-                  })}
-                />
-                <Field
-                  {...field("username", {
-                    label: "Username",
-                    placeholder: "Username",
-                    tooltip: "4-20 characters. Letters, numbers, and underscores only.",
-                    icon: personIcon,
-                    autoComplete: "username",
-                  })}
-                />
+                <div className="sm:col-span-2">
+                  <Field
+                    {...field("username", {
+                      label: "Username",
+                      placeholder: "Username",
+                      tooltip: "4-20 characters. Letters, numbers, and underscores only.",
+                      icon: personIcon,
+                      autoComplete: "username",
+                    })}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <Field
+                    {...field("email", {
+                      label: "Email",
+                      type: "email",
+                      placeholder: "you@example.com",
+                      tooltip: "We'll send a one-time code (OTP) to this email.",
+                      autoComplete: "email",
+                    })}
+                  />
+                </div>
                 <Field
                   {...field("password", {
                     label: "Password",
@@ -269,6 +248,7 @@ function Registration() {
           </>
         ) : (
           <EmailVerifyForm
+            email={values.email.trim()}
             submitLabel="Verify & Create Account"
             onVerified={handleVerified}
             footer={

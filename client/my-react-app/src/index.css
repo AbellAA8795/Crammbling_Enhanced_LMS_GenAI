@@ -1,23 +1,33 @@
 @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap");
 @import "tailwindcss";
 
-:root {
+/* Design tokens. `@theme inline` makes every Tailwind colour class (bg-deep,
+   text-lime, border-edge ...) read the shared theme variables (--t-*) that
+   Theme.jsx sets on a page's root element, so the theme picker restyles the
+   Dashboard too. The second value is the fallback used on pages that do not
+   set a theme (Login, Registration, Forgot password). */
+/* Fonts are NOT inlined, so a page can swap them by setting --font-display /
+   --font-label on its root element (the Dashboard does this to use the same
+   sans-serif as the Chatbot pages). */
+@theme {
   --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-label: "Space Mono", ui-monospace, monospace;
+}
 
-  --color-deep: #0a0807;   /* page background */
-  --color-bar: #110d0b;    /* header, sidebar, panel title bars */
-  --color-panel: #171210;  /* panels */
-  --color-inset: #201917;  /* rows and boxes inside panels */
-  --color-edge: #2e2521;   /* borders */
-  --color-ink: #ece6dd;    /* main text */
-  --color-mute: #9b9086;   /* secondary text */
-  --color-faint: #6b6058; 
-  --color-cyan: #57e0e8;
-  --color-lime: #a5e060;
-  --color-gold: #f4c542;
+@theme inline {
+  --color-deep: var(--t-bg0, #0a0807);    /* page background */
+  --color-bar: var(--t-bg1, #110d0b);     /* header, sidebar, panel title bars */
+  --color-panel: var(--t-bg2, #171210);   /* panels */
+  --color-inset: var(--t-bg3, #201917);   /* rows and boxes inside panels */
+  --color-edge: var(--t-bd0, #2e2521);    /* borders */
+  --color-ink: var(--t-tx0, #ece6dd);     /* main text */
+  --color-mute: var(--t-tx2, #9b9086);    /* secondary text */
+  --color-faint: color-mix(in srgb, var(--t-tx2, #6b6058) 60%, var(--t-bg0, #0a0807));
+  --color-cyan: var(--t-ac, #57e0e8);
+  --color-lime: var(--t-ok, #a5e060);
+  --color-gold: var(--t-warn, #f4c542);
   --color-rose: #f08a9a;
-  --color-danger: #e05252;
+  --color-danger: var(--t-err, #e05252);
 }
 
 body {
@@ -30,8 +40,6 @@ body {
   width: 100%;
   max-width: 100%;
   margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
   min-height: 100svh;
   display: flex;
   flex-direction: column;
@@ -260,46 +268,114 @@ button {
   }
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
+/* ---------------------------------------------------------
+   Shared component classes. They read the theme variables
+   directly (with fallbacks) so they follow the active theme.
+--------------------------------------------------------- */
+@layer components {
+  .panel {
+    background: var(--t-bg2, #171210);
+    border: 1px solid var(--t-bd0, #2e2521);
+  }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+  .panel-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--t-tx0, #ece6dd);
+  }
+
+  .label {
+    font-family: var(--font-label);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--t-tx2, #9b9086);
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border: 1px solid var(--t-bd0, #2e2521);
+    font-family: var(--font-label);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    color: var(--t-tx2, #9b9086);
+  }
+  .tag-lime {
+    color: var(--t-ok, #a5e060);
+    background: color-mix(in srgb, var(--t-ok, #a5e060) 12%, transparent);
+    border-color: color-mix(in srgb, var(--t-ok, #a5e060) 40%, transparent);
+  }
+  .tag-gold {
+    color: var(--t-warn, #f4c542);
+    background: color-mix(in srgb, var(--t-warn, #f4c542) 12%, transparent);
+    border-color: color-mix(in srgb, var(--t-warn, #f4c542) 40%, transparent);
+  }
+  .tag-cyan {
+    color: var(--t-ac, #57e0e8);
+    background: color-mix(in srgb, var(--t-ac, #57e0e8) 12%, transparent);
+    border-color: color-mix(in srgb, var(--t-ac, #57e0e8) 40%, transparent);
+  }
+  .tag-rose {
+    color: #f08a9a;
+    background: color-mix(in srgb, #f08a9a 12%, transparent);
+    border-color: color-mix(in srgb, #f08a9a 40%, transparent);
+  }
+
+  /* .btn is a neutral base (transparent). Colour comes from btn-lime /
+     btn-cyan / btn-ghost or from utility classes on the element. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 9px 14px;
+    border: 1px solid transparent;
+    background: transparent;
+    font-family: var(--font-label);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: filter 100ms, background-color 100ms, border-color 100ms;
+  }
+  .btn-lime {
+    background: var(--t-ok, #a5e060);
+    color: var(--t-onok, #0a0807);
+  }
+  .btn-cyan {
+    background: var(--t-ac, #57e0e8);
+    color: var(--t-onac, #0a0807);
+  }
+  .btn-lime:hover,
+  .btn-cyan:hover {
+    filter: brightness(1.1);
+  }
+  .btn-ghost {
+    border-color: var(--t-bd0, #2e2521);
+    color: var(--t-tx0, #ece6dd);
+  }
+  .btn-ghost:hover {
+    background: var(--t-bg3, #201917);
+    border-color: var(--t-tx2, #9b9086);
   }
 }
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+/* Settings → Preferences → Reduce motion (class set by components/Settings.jsx) */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
 }

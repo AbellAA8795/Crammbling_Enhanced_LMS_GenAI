@@ -1,4 +1,5 @@
 import { createPromptVersion, activatePromptVersion, getActivePrompt } from "../../models/Chatbot_services/prompt.model.js";
+import { invalidatePromptCache } from "../../services/Chatbot_services/ollama.service.js";
 
 export async function getActivePromptController(req, res) {
     try {
@@ -12,13 +13,19 @@ export async function getActivePromptController(req, res) {
 
 export async function createPromptVersionController(req, res) {
     try {
-        const { version, content, activate } = req.body;
+        const { version, content, activate, fewShotExamples, responseGuidelines } = req.body;
 
         if (!version || !content) {
             return res.status(400).json({ success: false, message: "version and content are required." });
         }
 
-        await createPromptVersion(version, content, !!activate);
+        await createPromptVersion(version, content, !!activate, fewShotExamples || [], responseGuidelines || null);
+
+        // If this version was activated immediately, the in-memory cache
+        // in ollama.service.js would otherwise keep serving the old
+        // prompt for up to PROMPT_CACHE_TTL_MS. Invalidate it now so the
+        // very next chat message picks up the new version.
+        if (activate) invalidatePromptCache();
 
         return res.status(201).json({ success: true, message: "Prompt version created." });
     } catch (error) {
@@ -38,6 +45,8 @@ export async function activatePromptVersionController(req, res) {
         }
 
         await activatePromptVersion(version);
+        invalidatePromptCache();
+
         return res.status(200).json({ success: true, message: `Prompt version ${version} activated.` });
     } catch (error) {
         console.error("Error activating prompt version:", error);

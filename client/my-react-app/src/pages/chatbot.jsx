@@ -1,8 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Dashboard from "./Dashboard";
 import Personalized from "./personalized";
 import GroupCollab from "./group_collab";
 import { ThemePicker, useTheme, CloseIcon } from "./Theme";
+import { useNavigate } from "react-router-dom";
+import { listChats, getChatMessages, uploadChatFile } from "../api/chat";
+import { streamChatMessage } from "../api/chatStream";
 
 /* ------------------------------------------------------------------ */
 /*  Tiny inline icon set (keeps this file dependency-free)             */
@@ -80,14 +84,22 @@ const NAV_IMG = {
     personalized: NAV_ASSET("z60zmihq"),
     settings: NAV_ASSET("ojko43i5"),
     logout: NAV_ASSET("cxrmfyil"),
+    streak: NAV_ASSET("75egjh7r"),
+    xp: NAV_ASSET("5hwd9ufw"),
+    avatar: NAV_ASSET("24khomt6"),
 };
+
+// Graduation cap for the CLASSROOM sidebar entry, drawn inline so we don't
+// need a new hosted asset (same icon the Dashboard and Classroom use).
+const CLASSROOM_ICON =
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='15' viewBox='0 0 24 24' fill='none' stroke='%232CD4D9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M22 10 12 5 2 10l10 5 10-5z'/><path d='M6 12v5c3 3 9 3 12 0v-5'/></svg>";
 
 const NAV_ITEMS = [
     { key: "dashboard", label: "DASHBOARD", icon: NAV_IMG.dashboard, iconClass: "w-[18px] h-[15px]" },
+    { key: "classroom", label: "CLASSROOM", icon: CLASSROOM_ICON, iconClass: "w-[18px] h-[15px]" },
     { key: "chatbot", label: "CHATBOT", icon: NAV_IMG.chatbot, iconClass: "w-[18px] h-[15px]" },
     { key: "group", label: "GROUP COLLAB", icon: NAV_IMG.group, iconClass: "w-5 h-2.5" },
-    { key: "quiz", label: "QUIZ ARENA", icon: NAV_IMG.quiz, iconClass: "w-4 h-4" },
-    { key: "personalized", label: "PERSONALIZER", icon: NAV_IMG.personalized, iconClass: "w-[18px] h-[13px]" },
+    { key: "personalized", label: "PERSONALIZED", icon: NAV_IMG.personalized, iconClass: "w-[18px] h-[13px]" },
 ];
 
 const ASSET = (id) => `https://storage.googleapis.com/tagjs-prod.appspot.com/v1/tD9ysWtmXJ/${id}_expires_30_days.png`;
@@ -95,7 +107,7 @@ const ASSET = (id) => `https://storage.googleapis.com/tagjs-prod.appspot.com/v1/
 /* ------------------------------------------------------------------ */
 /*  Sidebar — scrollable, responsive, drives page navigation           */
 /* ------------------------------------------------------------------ */
-function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings }) {
+function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings, onLogout }) {
     return (
         <div style={{ backgroundImage: "var(--t-grad-side)" }} className="flex flex-col h-full bg-[var(--t-bg0)] w-64 shrink-0">
             {/* mobile close button — matches personalized's top-of-drawer close */}
@@ -115,10 +127,6 @@ function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings }) {
                             style={{ boxShadow: "0px 2px 4px color-mix(in srgb, var(--t-ac) 30%, transparent)" }}
                         >
                             <span className="text-[color:var(--t-ac)] text-[17px] font-bold">CRAMMBLING</span>
-                        </div>
-                        <div className="flex items-center self-stretch pt-1 gap-1">
-                            <div className="bg-[var(--t-ok)] w-1.5 h-1.5" />
-                            <span className="text-[color:var(--t-warn)] text-[10px] font-bold">VOXEL QUEST Lv.18</span>
                         </div>
                     </div>
                 </div>
@@ -162,7 +170,7 @@ function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings }) {
                     <img src={NAV_IMG.settings} className="w-[15px] h-[15px] mx-3 object-fill" />
                     <span className="text-[color:var(--t-tx1)] text-[11px]">SETTINGS</span>
                 </button>
-                <button className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]">
+                <button onClick={onLogout} className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]">
                     <img src={NAV_IMG.logout} className="w-3.5 h-3.5 mx-3 object-fill" />
                     <span className="text-[color:var(--t-tx1)] text-[11px]">LOGOUT</span>
                 </button>
@@ -286,48 +294,77 @@ function Message({ msg }) {
 /* ------------------------------------------------------------------ */
 /*  Main chatbot page                                                   */
 /* ------------------------------------------------------------------ */
-const SEED_MESSAGES = [
-    { role: "user", text: "How does DFS detect cycles in a directed graph?" },
-    {
-        role: "assistant",
-        text: "Encountering a node currently active in your recursion stack (BACK-EDGE) confirms a directed cycle.\n\nDFS uses recursive backtracking and 3-color visited marking — O(V + E). Kahn's BFS approach tracks in-degrees; if the processed count doesn't equal V, a cycle exists — also O(V + E).",
-    },
-];
+    function formatTimestamp(isoString) {
+    return new Date(isoString).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
 
-function makeConversation(title, seed = []) {
+function makeDraftConversation() {
     return {
-        id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        title,
-        timestamp: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
-        messages: seed,
+        id: `draft_${Date.now()}`,
+        backendId: null,
+        title: "New conversation",
+        timestamp: formatTimestamp(new Date().toISOString()),
+        messages: [],
+        messagesLoaded: true,
     };
 }
 
 export default function Chatbot({ onNavigate } = {}) {
-    const [theme, setTheme, rootThemeStyle] = useTheme(); // shared with personalized + group collab
+    const navigate = useNavigate();
+    const [theme, setTheme, rootThemeStyle] = useTheme();
     const [settingsOpen, setSettingsOpen] = useState(false);
-    const [page, setPage] = useState("chatbot"); // "chatbot" | "personalized"
-    const [fallbackPage, setFallbackPage] = useState(null); // "personalized" | "group" | null — used only when no onNavigate prop is passed
-    const [conversations, setConversations] = useState(() => [
-        makeConversation("DFS cycle detection in graphs", SEED_MESSAGES),
-    ]);
+    const [page, setPage] = useState("chatbot");
+    const [fallbackPage, setFallbackPage] = useState(null);
+    const [conversations, setConversations] = useState([makeDraftConversation()]);
     const [activeId, setActiveId] = useState(() => conversations[0].id);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
-    const [navCollapsed, setNavCollapsed] = useState(false); // desktop drawer: pushed to the side
+    const [navCollapsed, setNavCollapsed] = useState(false);
     const [input, setInput] = useState("");
     const [pendingFiles, setPendingFiles] = useState([]);
     const [isThinking, setIsThinking] = useState(false);
+    const [queuePosition, setQueuePosition] = useState(null);
+    const [sendError, setSendError] = useState("");
 
     const fileInputRef = useRef(null);
     const imageInputRef = useRef(null);
     const scrollRef = useRef(null);
 
     const active = conversations.find((c) => c.id === activeId) || conversations[0];
+    const activePage = showQuiz ? "quiz" : "chatbot";
 
     useEffect(() => {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }, [active?.messages, isThinking]);
+
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            navigate("/login");
+            return;
+        }
+        loadChatList();
+    }, []);
+
+    async function loadChatList() {
+        try {
+            const data = await listChats();
+            const loaded = data.data.map((c) => ({
+                id: String(c.chat_id),
+                backendId: c.chat_id,
+                title: c.title,
+                timestamp: formatTimestamp(c.updated_at),
+                messages: [],
+                messagesLoaded: false,
+            }));
+            setConversations((prev) => {
+                const draft = prev.find((c) => c.backendId === null);
+                return draft ? [draft, ...loaded] : loaded.length ? loaded : [makeDraftConversation()];
+            });
+        } catch (err) {
+            console.error("Failed to load chats:", err.message);
+        }
+    }
 
     function updateActiveMessages(updater) {
         setConversations((prev) =>
@@ -335,8 +372,26 @@ export default function Chatbot({ onNavigate } = {}) {
         );
     }
 
+    async function handleSelectConversation(id) {
+        setActiveId(id);
+        setDrawerOpen(false);
+
+        const convo = conversations.find((c) => c.id === id);
+        if (!convo || convo.messagesLoaded || convo.backendId === null) return;
+
+        try {
+            const data = await getChatMessages(convo.backendId);
+            const messages = data.data.map((m) => ({ role: m.role, text: m.content }));
+            setConversations((prev) =>
+                prev.map((c) => (c.id === id ? { ...c, messages, messagesLoaded: true } : c))
+            );
+        } catch (err) {
+            console.error("Failed to load chat history:", err.message);
+        }
+    }
+
     function handleNewChat() {
-        const fresh = makeConversation("New conversation", []);
+        const fresh = makeDraftConversation();
         setConversations((prev) => [fresh, ...prev]);
         setActiveId(fresh.id);
         setDrawerOpen(false);
@@ -348,7 +403,7 @@ export default function Chatbot({ onNavigate } = {}) {
             const next = prev.filter((c) => c.id !== id);
             if (id === activeId && next.length > 0) setActiveId(next[0].id);
             if (next.length === 0) {
-                const fresh = makeConversation("New conversation", []);
+                const fresh = makeDraftConversation();
                 setActiveId(fresh.id);
                 return [fresh];
             }
@@ -360,52 +415,111 @@ export default function Chatbot({ onNavigate } = {}) {
         updateActiveMessages(() => []);
     }
 
-    function handleFiles(fileList, kind) {
+    function handleFiles(fileList) {
         const files = Array.from(fileList || []);
         const mapped = files.map((f) => ({
+            file: f,
             name: f.name,
             type: f.type,
-            previewUrl: kind === "image" || f.type.startsWith("image/") ? URL.createObjectURL(f) : null,
+            previewUrl: f.type.startsWith("image/") ? URL.createObjectURL(f) : null,
         }));
         setPendingFiles((prev) => [...prev, ...mapped]);
     }
 
-    function simulateAssistantReply(userText) {
-        setIsThinking(true);
-        // NOTE: replace this with a real call to your AI backend / API.
-        setTimeout(() => {
-            updateActiveMessages((msgs) => [
-                ...msgs,
-                {
-                    role: "assistant",
-                    text: `Here's a starting point on "${userText.slice(0, 60)}${userText.length > 60 ? "…" : ""
-                        }" — reply coming soon with more details and references.`,
-                },
-            ]);
-            setIsThinking(false);
-        }, 700);
-    }
-
-    function handleSend() {
+    async function handleSend() {
         const trimmed = input.trim();
         if (!trimmed && pendingFiles.length === 0) return;
+        if (isThinking) return;
 
-        // first message in an empty/untitled conversation becomes its title
-        setConversations((prev) =>
-            prev.map((c) =>
-                c.id === activeId && c.messages.length === 0 && trimmed
-                    ? { ...c, title: trimmed.slice(0, 40), messages: [...c.messages] }
-                    : c
-            )
-        );
+        setSendError("");
+        setInput("");
+        const filesToSend = pendingFiles;
+        setPendingFiles([]);
 
         updateActiveMessages((msgs) => [
             ...msgs,
-            { role: "user", text: trimmed, attachments: pendingFiles },
+            {
+                role: "user",
+                text: trimmed,
+                attachments: filesToSend.map((f) => ({ name: f.name, previewUrl: f.previewUrl })),
+            },
         ]);
-        setInput("");
-        setPendingFiles([]);
-        simulateAssistantReply(trimmed || "shared attachment(s)");
+
+        let chatId = active.backendId;
+        setIsThinking(true);
+
+        try {
+            if (filesToSend.length > 0 && !chatId) {
+                chatId = await createChatFromFirstMessage(trimmed || "Shared attachment(s)");
+            }
+
+            if (filesToSend.length > 0) {
+                for (let i = 0; i < filesToSend.length; i++) {
+                    const caption = i === 0 ? trimmed || undefined : undefined;
+                    await uploadChatFile(chatId, filesToSend[i].file, caption);
+                }
+                const data = await getChatMessages(chatId);
+                updateActiveMessages(() => data.data.map((m) => ({ role: m.role, text: m.content })));
+            } else {
+                updateActiveMessages((msgs) => [...msgs, { role: "assistant", text: "" }]);
+
+                await streamChatMessage(chatId, trimmed, {
+                    onStart: (data) => {
+                        if (data.chatId && !chatId) {
+                            chatId = data.chatId;
+                            setConversations((prev) =>
+                                prev.map((c) =>
+                                    c.id === activeId
+                                        ? { ...c, id: String(data.chatId), backendId: data.chatId, title: data.title }
+                                        : c
+                                )
+                            );
+                            setActiveId(String(data.chatId));
+                        }
+                    },
+                    onQueued: (position) => setQueuePosition(position),
+                    onChunk: (chunk) => {
+                        setQueuePosition(null);
+                        setConversations((prev) =>
+                            prev.map((c) => {
+                                const targetId = chatId ? String(chatId) : c.id;
+                                if (c.id !== targetId && c.id !== activeId) return c;
+                                const msgs = [...c.messages];
+                                const lastIdx = msgs.length - 1;
+                                msgs[lastIdx] = { ...msgs[lastIdx], text: (msgs[lastIdx].text || "") + chunk };
+                                return { ...c, messages: msgs };
+                            })
+                        );
+                    },
+                    onDone: () => {
+                        setQueuePosition(null);
+                        loadChatList();
+                    },
+                    onError: (message) => setSendError(message),
+                });
+            }
+        } catch (err) {
+            setSendError(err.message || "Something went wrong sending your message.");
+        } finally {
+            setIsThinking(false);
+        }
+    }
+
+    async function createChatFromFirstMessage(message) {
+        let newChatId = null;
+        await streamChatMessage(null, message, {
+            onStart: (data) => { newChatId = data.chatId; },
+            onChunk: () => {},
+            onDone: () => {},
+            onError: (msg) => { throw new Error(msg); },
+        });
+        setConversations((prev) =>
+            prev.map((c) =>
+                c.id === activeId ? { ...c, id: String(newChatId), backendId: newChatId } : c
+            )
+        );
+        setActiveId(String(newChatId));
+        return newChatId;
     }
 
     function handleKeyDown(e) {
@@ -422,13 +536,23 @@ export default function Chatbot({ onNavigate } = {}) {
     }
 
     function handleNavigate(key) {
-        if (key === "chatbot") return;
+        setMobileNavOpen(false);
+        if (key === "chatbot") return setShowQuiz(false);
         if (onNavigate) {
             onNavigate(key);
+        } else if (key === "classroom") {
+            // Classroom is a real route, so jump straight to it (the other keys
+            // still swap pages in place when no onNavigate prop was passed).
+            navigate("/classroom");
         } else {
-            setFallbackPage(key); // "dashboard" | "personalized" | "group"
+            setFallbackPage(key);
         }
-        setMobileNavOpen(false);
+    }
+
+    function handleConfirmLogout() {
+        setShowLogoutConfirm(false);
+        // TODO: clear auth/session state here once real auth is wired up
+        navigate("/");
     }
 
     if (!onNavigate && fallbackPage === "dashboard") {
@@ -467,7 +591,13 @@ export default function Chatbot({ onNavigate } = {}) {
                 className="hidden md:flex h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
                 style={{ width: navCollapsed ? 0 : 256 }}
             >
-                <Sidebar activePage="chatbot" onNavigate={handleNavigate} onCloseMobile={() => { }} onOpenSettings={() => setSettingsOpen(true)} />
+                <Sidebar
+                    activePage={activePage}
+                    onNavigate={handleNavigate}
+                    onCloseMobile={() => { }}
+                    onOpenSettings={() => setSettingsOpen(true)}
+                    onLogout={() => setShowLogoutConfirm(true)}
+                />
             </div>
 
             {/* Desktop drawer handle — pushes the navigation bar to the side and back */}
@@ -486,35 +616,30 @@ export default function Chatbot({ onNavigate } = {}) {
             {/* mobile sidebar overlay */}
             {mobileNavOpen && (
                 <div className="fixed inset-0 z-50 flex md:hidden">
-                    <Sidebar activePage="chatbot" onNavigate={handleNavigate} onCloseMobile={() => setMobileNavOpen(false)} onOpenSettings={() => { setMobileNavOpen(false); setSettingsOpen(true); }} />
+                    <Sidebar
+                        activePage={activePage}
+                        onNavigate={handleNavigate}
+                        onCloseMobile={() => setMobileNavOpen(false)}
+                        onOpenSettings={() => { setMobileNavOpen(false); setSettingsOpen(true); }}
+                        onLogout={() => { setMobileNavOpen(false); setShowLogoutConfirm(true); }}
+                    />
                     <div className="flex-1 bg-black/50" onClick={() => setMobileNavOpen(false)} />
                 </div>
             )}
 
-            {/* Settings drawer — same design as personalized.jsx / group_collab.jsx */}
-            {settingsOpen && (
-                <div className="fixed inset-0 z-[60] flex justify-end">
-                    <div className="flex-1 bg-black/60" onClick={() => setSettingsOpen(false)} />
-                    <div className="w-full max-w-xs overflow-y-auto bg-[var(--t-bg2)] border-l border-solid border-[color:var(--t-bd0)] p-5 flex flex-col gap-4">
-                        <div className="flex justify-between items-center">
-                            <span className="text-[color:var(--t-tx0)] text-sm font-bold">SETTINGS</span>
-                            <button onClick={() => setSettingsOpen(false)} aria-label="Close settings">
-                                <CloseIcon className="w-4 h-4" />
-                            </button>
-                        </div>
-                        <ThemePicker theme={theme} onChange={setTheme} />
-                    </div>
-                </div>
+            {/* Settings drawer — shared by every page (and Quiz Arena) */}
+            <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} theme={theme} onThemeChange={setTheme} />
+
+            {/* Logout confirmation — same popup as the Dashboard */}
+            {showLogoutConfirm && (
+                <LogoutConfirmModal onConfirm={handleConfirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
             )}
 
             <HistoryDrawer
                 open={drawerOpen}
                 conversations={conversations}
                 activeId={activeId}
-                onSelect={(id) => {
-                    setActiveId(id);
-                    setDrawerOpen(false);
-                }}
+                onSelect={handleSelectConversation}
                 onDelete={handleDeleteConversation}
                 onNewChat={handleNewChat}
                 onClose={() => setDrawerOpen(false)}
@@ -534,100 +659,133 @@ export default function Chatbot({ onNavigate } = {}) {
                         >
                             <Icon.Menu className="w-5 h-5" />
                         </button>
-                        <button
-                            onClick={() => setDrawerOpen(true)}
-                            className="flex items-center gap-1.5 bg-[var(--t-bg0)] py-1.5 px-3"
-                            style={{ boxShadow: "0px 1px 2px #0000000D" }}
-                        >
-                            <Icon.History className="w-3.5 h-3.5 text-[color:var(--t-ac2)]" />
-                            <span className="text-[color:var(--t-ac2)] text-[10px] font-bold hidden sm:inline">HISTORY</span>
-                        </button>
-                        <button
-                            onClick={handleNewChat}
-                            className="flex items-center gap-1.5 bg-[var(--t-bg4)] py-1.5 px-3"
-                        >
-                            <Icon.Plus className="w-3.5 h-3.5 text-[color:var(--t-tx0)]" />
-                            <span className="text-[color:var(--t-tx0)] text-[10px] font-bold hidden sm:inline">NEW CHAT</span>
-                        </button>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center bg-[var(--t-bg0)] py-1 px-[15px] gap-1">
-                            <img src={ASSET("9a7i2gtu")} className="w-3 h-3.5 object-fill" />
-                            <span className="text-[color:var(--t-warn)] text-[10px] font-bold">14 STREAK</span>
-                        </div>
-                        <div className="flex items-center bg-[var(--t-bg0)] py-1 px-[15px] gap-1">
-                            <img src={ASSET("8kq93tyy")} className="w-[15px] h-[13px] object-fill" />
-                            <span className="text-[color:var(--t-ac2)] text-[10px] font-bold">3,420 XP</span>
-                        </div>
-                        <img src={ASSET("culn7maw")} className="w-[31px] h-8 rounded-full object-fill" />
-                    </div>
-                </div>
-
-                {/* chat header strip */}
-                <div className="flex flex-wrap justify-between items-center gap-2 px-4 sm:px-8 py-3 border-b border-[color:var(--t-bg2)]">
-                    <div className="flex items-center gap-2">
-                        <div className="flex items-center bg-[var(--t-bg0)] py-1 px-4 gap-2">
-                            <img src={ASSET("wtp1mt7q")} className="w-6 h-6 object-fill" />
-                            <span className="text-[color:var(--t-ac2)] text-base font-bold">ALLAY TUTOR</span>
-                            <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">/</span>
-                            <span className="text-[color:var(--t-warn)] text-[10px] font-bold">SOCRATIC MODE</span>
-                        </div>
-                    </div>
-                    <button
-                        onClick={handleClearChat}
-                        className="flex items-center bg-[var(--t-bg4)] py-1 px-[15px] gap-1"
-                        style={{ boxShadow: "0px 1px 2px #0000000D" }}
-                    >
-                        <Icon.Trash className="w-3 h-3 text-[color:var(--t-tx1)]" />
-                        <span className="text-[color:var(--t-tx1)] text-[10px] font-bold">CLEAR CHAT</span>
-                    </button>
-                </div>
-
-                {/* messages */}
-                <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-6">
-                    <div className="flex flex-col gap-6 max-w-[900px] mx-auto">
-                        {active.messages.length === 0 && (
-                            <div className="text-center text-[color:var(--t-tx2)] text-xs py-16">
-                                Ask Allay anything from your lecture slides to start this conversation.
-                            </div>
+                        {!showQuiz && (
+                            <>
+                                <button
+                                    onClick={() => setDrawerOpen(true)}
+                                    className="flex items-center gap-1.5 bg-[var(--t-bg0)] py-1.5 px-3"
+                                    style={{ boxShadow: "0px 1px 2px #0000000D" }}
+                                >
+                                    <Icon.History className="w-3.5 h-3.5 text-[color:var(--t-ac2)]" />
+                                    <span className="text-[color:var(--t-ac2)] text-[10px] font-bold hidden sm:inline">HISTORY</span>
+                                </button>
+                                <button
+                                    onClick={handleNewChat}
+                                    className="flex items-center gap-1.5 bg-[var(--t-bg4)] py-1.5 px-3"
+                                >
+                                    <Icon.Plus className="w-3.5 h-3.5 text-[color:var(--t-tx0)]" />
+                                    <span className="text-[color:var(--t-tx0)] text-[10px] font-bold hidden sm:inline">NEW CHAT</span>
+                                </button>
+                            </>
                         )}
-                        {active.messages.map((m, i) => (
-                            <Message key={i} msg={m} />
-                        ))}
+                    </div>
+                    {/* Same streak / XP / notifications / profile cluster as Group Collab and Personalized */}
+                    <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                        <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:var(--t-bd0)]">
+                            <img src={NAV_IMG.streak} className="w-3 h-3.5 object-fill" />
+                            <span className="text-[color:var(--t-warn)] text-[11px] font-bold hidden xs:inline">14 STREAK</span>
+                        </div>
+                        <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:var(--t-bd0)]">
+                            <img src={NAV_IMG.xp} className="w-[15px] h-[13px] object-fill" />
+                            <span className="text-[color:var(--t-ac)] text-[11px] font-bold hidden xs:inline">3,420 XP</span>
+                        </div>
 
-                        {active.messages.length > 0 && (
-                            <div className="flex items-start self-stretch pt-1 gap-[9px] flex-wrap">
-                                <button
-                                    onClick={() => handleQuickAction("Give me practice questions on this topic")}
-                                    className="flex items-center bg-[var(--t-ac2)] py-2 px-4 gap-1"
-                                >
-                                    <img src={ASSET("qj6m3auq")} className="w-[15px] h-[15px] object-fill" />
-                                    <span className="text-[color:var(--t-onac)] text-[10px] font-bold">PRACTICE IN QUIZ ARENA</span>
-                                </button>
-                                <button
-                                    onClick={() => handleQuickAction("Explain this with a diagram")}
-                                    className="flex items-center bg-[var(--t-bg4)] py-2 px-[15px] gap-1"
-                                >
-                                    <img src={ASSET("awaayiyv")} className="w-[15px] h-[13px] object-fill" />
-                                    <span className="text-[color:var(--t-tx0)] text-[10px] font-bold">EXPLAIN WITH DIAGRAM</span>
-                                </button>
-                                <button
-                                    onClick={() => handleQuickAction("Give me a summary cheat sheet")}
-                                    className="flex items-center bg-[var(--t-bg4)] py-2 px-[15px] gap-1"
-                                >
-                                    <img src={ASSET("msnkrwft")} className="w-[13px] h-[9px] object-fill" />
-                                    <span className="text-[color:var(--t-tx0)] text-[10px] font-bold">SUMMARY CHEAT SHEET</span>
-                                </button>
+                        <button className="relative shrink-0" onClick={() => setNotifOpen((v) => !v)} aria-label="Notifications">
+                            <img src={NAV_IMG.avatar} className="w-8 h-8 object-fill" />
+                            {notifOpen && (
+                                <div className="absolute right-0 top-10 z-50 w-56 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-3 text-left shadow-lg">
+                                    <span className="text-[color:var(--t-tx0)] text-xs font-bold block mb-2">Notifications</span>
+                                    <span className="text-[color:var(--t-tx2)] text-[11px] block">CS240 Midterm is coming up on Mar 20.</span>
+                                </div>
+                            )}
+                        </button>
+
+                        <button onClick={() => navigate("/profile")} className="flex flex-col shrink-0 items-start px-1 sm:px-2" aria-label="My profile">
+                            <div
+                                className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"
+                                style={{ boxShadow: "0px 1px 2px #0000000D" }}
+                            >
+                                <span className="text-[color:var(--t-onac)] text-sm font-bold">CP</span>
                             </div>
-                        )}
-
-                        {isThinking && <p className="text-[color:var(--t-ac2)] text-[10px] font-bold px-1">ALLAY IS THINKING…</p>}
+                        </button>
                     </div>
                 </div>
+
+                {showQuiz ? (
+                    <div className="flex-1 min-h-0 overflow-y-auto">
+                        <QuizArena where="Chatbot" onBack={() => setShowQuiz(false)} />
+                    </div>
+                ) : (
+                    <>
+                        {/* chat header strip */}
+                        <div className="flex flex-wrap justify-between items-center gap-2 px-4 sm:px-8 py-3 border-b border-[color:var(--t-bg2)]">
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center bg-[var(--t-bg0)] py-1 px-4 gap-2">
+                                    <img src={ASSET("wtp1mt7q")} className="w-6 h-6 object-fill" />
+                                    <span className="text-[color:var(--t-ac2)] text-base font-bold">ALLAY TUTOR</span>
+                                    <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">/</span>
+                                    <span className="text-[color:var(--t-warn)] text-[10px] font-bold">SOCRATIC MODE</span>
+                                </div>
+                            </div>
+                            <button
+                                onClick={handleClearChat}
+                                className="flex items-center bg-[var(--t-bg4)] py-1 px-[15px] gap-1"
+                                style={{ boxShadow: "0px 1px 2px #0000000D" }}
+                            >
+                                <Icon.Trash className="w-3 h-3 text-[color:var(--t-tx1)]" />
+                                <span className="text-[color:var(--t-tx1)] text-[10px] font-bold">CLEAR CHAT</span>
+                            </button>
+                        </div>
+
+                        {/* messages */}
+                        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-6">
+                            <div className="flex flex-col gap-6 max-w-[900px] mx-auto">
+                                {active.messages.length === 0 && (
+                                    <div className="text-center text-[color:var(--t-tx2)] text-xs py-16">
+                                        Ask Allay anything from your lecture slides to start this conversation.
+                                    </div>
+                                )}
+                                {active.messages.map((m, i) => (
+                                    <Message key={i} msg={m} />
+                                ))}
+
+                                {active.messages.length > 0 && (
+                                    <div className="flex items-start self-stretch pt-1 gap-[9px] flex-wrap">
+                                        <button
+                                            onClick={() => handleQuickAction("Give me practice questions on this topic")}
+                                            className="flex items-center bg-[var(--t-ac2)] py-2 px-4 gap-1"
+                                        >
+                                            <img src={ASSET("qj6m3auq")} className="w-[15px] h-[15px] object-fill" />
+                                            <span className="text-[color:var(--t-onac)] text-[10px] font-bold">PRACTICE IN QUIZ ARENA</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleQuickAction("Explain this with a diagram")}
+                                            className="flex items-center bg-[var(--t-bg4)] py-2 px-[15px] gap-1"
+                                        >
+                                            <img src={ASSET("awaayiyv")} className="w-[15px] h-[13px] object-fill" />
+                                            <span className="text-[color:var(--t-tx0)] text-[10px] font-bold">EXPLAIN WITH DIAGRAM</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleQuickAction("Give me a summary cheat sheet")}
+                                            className="flex items-center bg-[var(--t-bg4)] py-2 px-[15px] gap-1"
+                                        >
+                                            <img src={ASSET("msnkrwft")} className="w-[13px] h-[9px] object-fill" />
+                                            <span className="text-[color:var(--t-tx0)] text-[10px] font-bold">SUMMARY CHEAT SHEET</span>
+                                        </button>
+                                    </div>
+                                )}
+
+                                {isThinking && <p className="text-[color:var(--t-ac2)] text-[10px] font-bold px-1">ALLAY IS THINKING…</p>}
+                            </div>
+                        </div>
 
                 {/* composer */}
                 <div className="px-4 sm:px-8 pb-4 sm:pb-6 pt-2">
                     <div className="max-w-[900px] mx-auto">
+                        {sendError && <p className="text-[color:var(--t-err)] text-[11px] px-2 pb-1">{sendError}</p>}
+                            {queuePosition !== null && (
+                                <p className="text-[color:var(--t-tx2)] text-[11px] px-2 pb-1">Waiting in queue (position {queuePosition})...</p>
+                            )}
                         {pendingFiles.length > 0 && (
                             <div className="flex flex-wrap gap-2 mb-2">
                                 {pendingFiles.map((f, i) => (
@@ -649,21 +807,21 @@ export default function Chatbot({ onNavigate } = {}) {
                             </div>
                         )}
 
-                        <div className="flex items-end bg-[var(--t-bg0)] p-2" style={{ boxShadow: "0px 25px 50px #00000040" }}>
-                            <button
-                                onClick={() => fileInputRef.current?.click()}
-                                className="shrink-0 p-2 text-[color:var(--t-tx2)] hover:text-[color:var(--t-ac2)]"
-                                aria-label="Attach file"
-                            >
-                                <Icon.Paperclip className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => imageInputRef.current?.click()}
-                                className="shrink-0 p-2 text-[color:var(--t-tx2)] hover:text-[color:var(--t-ac2)]"
-                                aria-label="Attach image"
-                            >
-                                <Icon.Image className="w-4 h-4" />
-                            </button>
+                                <div className="flex items-end bg-[var(--t-bg0)] p-2" style={{ boxShadow: "0px 25px 50px #00000040" }}>
+                                    <button
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="shrink-0 p-2 text-[color:var(--t-tx2)] hover:text-[color:var(--t-ac2)]"
+                                        aria-label="Attach file"
+                                    >
+                                        <Icon.Paperclip className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => imageInputRef.current?.click()}
+                                        className="shrink-0 p-2 text-[color:var(--t-tx2)] hover:text-[color:var(--t-ac2)]"
+                                        aria-label="Attach image"
+                                    >
+                                        <Icon.Image className="w-4 h-4" />
+                                    </button>
 
                             <input
                                 ref={fileInputRef}
@@ -671,7 +829,7 @@ export default function Chatbot({ onNavigate } = {}) {
                                 multiple
                                 className="hidden"
                                 onChange={(e) => {
-                                    handleFiles(e.target.files, "file");
+                                    handleFiles(e.target.files);
                                     e.target.value = "";
                                 }}
                             />
@@ -682,44 +840,43 @@ export default function Chatbot({ onNavigate } = {}) {
                                 multiple
                                 className="hidden"
                                 onChange={(e) => {
-                                    handleFiles(e.target.files, "image");
+                                    handleFiles(e.target.files);
                                     e.target.value = "";
                                 }}
                             />
 
-                            <textarea
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={handleKeyDown}
-                                rows={1}
-                                placeholder="Ask Allay anything from your lecture slides..."
-                                className="flex-1 bg-transparent resize-none outline-none text-[color:var(--t-tx0)] text-xs font-bold placeholder-[color:var(--t-tx2)] py-2.5 px-2 max-h-32"
-                            />
+                                    <textarea
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        onKeyDown={handleKeyDown}
+                                        rows={1}
+                                        placeholder="Ask Allay anything from your lecture slides..."
+                                        className="flex-1 bg-transparent resize-none outline-none text-[color:var(--t-tx0)] text-xs font-bold placeholder-[color:var(--t-tx2)] py-2.5 px-2 max-h-32"
+                                    />
 
-                            <button
-                                onClick={handleSend}
-                                className="shrink-0 flex items-center bg-[var(--t-ac2)] py-3 px-[18px] gap-1.5"
-                                style={{ boxShadow: "0px 2px 4px #0000001A" }}
-                            >
-                                <span className="text-[color:var(--t-onac)] text-xs font-bold">SEND</span>
-                                <Icon.Send className="w-3.5 h-3 text-[color:var(--t-onac)]" />
-                            </button>
-                        </div>
-                        <div className="flex flex-wrap justify-between items-center gap-1 py-1.5 px-2">
-                            <div className="flex items-center gap-1">
-                                <div className="bg-[var(--t-ac2)] w-1.5 h-1.5" />
-                                <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">VOXEL PARSER ACTIVE</span>
-                            </div>
-                            <div className="flex items-center gap-[15px]">
-                                <span className="text-[color:var(--t-tx2)] text-[10px] font-bold hidden sm:inline">
-                                    PRESS [ENTER] TO DISPATCH
-                                </span>
-                                <span className="text-[color:var(--t-tx2)] text-[10px] font-bold hidden sm:inline">[ESC] TO RESET QUERY</span>
+                                    <button
+                                        onClick={handleSend}
+                                        className="shrink-0 flex items-center bg-[var(--t-ac2)] py-3 px-[18px] gap-1.5"
+                                        style={{ boxShadow: "0px 2px 4px #0000001A" }}
+                                    >
+                                        <span className="text-[color:var(--t-onac)] text-xs font-bold">SEND</span>
+                                        <Icon.Send className="w-3.5 h-3 text-[color:var(--t-onac)]" />
+                                    </button>
+                                </div>
+                                <div className="flex flex-wrap justify-between items-center gap-1 py-1.5 px-2">
+                                    <div className="flex items-center gap-[15px]">
+                                        <span className="text-[color:var(--t-tx2)] text-[10px] font-bold hidden sm:inline">
+                                            PRESS [ENTER] TO MESSAGE
+                                        </span>
+                                        <span className="text-[color:var(--t-tx2)] text-[10px] font-bold hidden sm:inline">[ESC] TO RESET QUERY</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </>
+                )}
             </div>
         </div>
     );
 }
+

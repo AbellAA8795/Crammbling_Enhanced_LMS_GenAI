@@ -1,37 +1,44 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Panel } from "../components/Panel";
 import QuizHistory from "../components/QuizHistory";
-import Chatbot from "./chatbot";
-import GroupCollab from "./group_collab";
-import Personalized from "./personalized";
-import { ThemePicker, useTheme, withAlpha, CloseIcon, MenuIcon } from "./Theme";
+import LogoutConfirmModal from "../components/LogoutConfirmModal";
+import Settings from "../components/Settings";
+import QuizArena from "./QuizArena";
+import { useTheme, CloseIcon } from "./Theme";
+import { ACHIEVEMENTS } from "./ProfileHub";
 
-/* ---------------------------------------------------------
-   Static assets — same icon art as personalized.jsx so the
-   navigation bar is pixel-identical on every page.
---------------------------------------------------------- */
-const IMG = {
-  logo: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/ec7p6crg_expires_30_days.png",
-  dashboard: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/5fuik1xz_expires_30_days.png",
-  chatbot: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/2ordxy0o_expires_30_days.png",
-  group: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/tda70phj_expires_30_days.png",
-  quiz: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/dni61l44_expires_30_days.png",
-  personalized: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/z60zmihq_expires_30_days.png",
-  settings: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/ojko43i5_expires_30_days.png",
-  logout: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/cxrmfyil_expires_30_days.png",
-  streak: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/75egjh7r_expires_30_days.png",
-  xp: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/5hwd9ufw_expires_30_days.png",
-  avatar: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/24khomt6_expires_30_days.png",
+// Same icon art, labels and layout as the Chatbot / Group Collab / Personalized sidebar.
+const NAV_ASSET = (id) => `https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/${id}_expires_30_days.png`;
+
+// Graduation cap for the CLASSROOM sidebar entry, drawn inline so we don't
+// need a new hosted asset. Same style as the other pages' nav icons.
+const CLASSROOM_ICON =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='15' viewBox='0 0 24 24' fill='none' stroke='%232CD4D9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M22 10 12 5 2 10l10 5 10-5z'/><path d='M6 12v5c3 3 9 3 12 0v-5'/></svg>";
+
+export const NAV_IMG = {
+  logo: NAV_ASSET("ec7p6crg"),
+  dashboard: NAV_ASSET("5fuik1xz"),
+  chatbot: NAV_ASSET("2ordxy0o"),
+  group: NAV_ASSET("tda70phj"),
+  quiz: NAV_ASSET("dni61l44"),
+  personalized: NAV_ASSET("z60zmihq"),
+  settings: NAV_ASSET("ojko43i5"),
+  logout: NAV_ASSET("cxrmfyil"),
+  avatar: NAV_ASSET("24khomt6"),
+  search: NAV_ASSET("l374rm3u"),
 };
 
-/* Same keys the other pages use: dashboard | chatbot | group | quiz | personalized */
 const NAV_ITEMS = [
-  { key: "dashboard", label: "DASHBOARD", icon: IMG.dashboard, iconClass: "w-[18px] h-[15px]" },
-  { key: "chatbot", label: "CHATBOT", icon: IMG.chatbot, iconClass: "w-[18px] h-[15px]" },
-  { key: "group", label: "GROUP COLLAB", icon: IMG.group, iconClass: "w-5 h-2.5" },
-  { key: "quiz", label: "QUIZ ARENA", icon: IMG.quiz, iconClass: "w-4 h-4" },
-  { key: "personalized", label: "PERSONALIZED", icon: IMG.personalized, iconClass: "w-[18px] h-[13px]" },
+  { key: "dashboard", label: "DASHBOARD", icon: NAV_IMG.dashboard, iconClass: "w-[18px] h-[15px]", path: "/dashboard" },
+  { key: "classroom", label: "CLASSROOM", icon: CLASSROOM_ICON, iconClass: "w-[18px] h-[15px]", path: "/classroom" },
+  { key: "chatbot", label: "CHATBOT", icon: NAV_IMG.chatbot, iconClass: "w-[18px] h-[15px]", path: "/chatbot" },
+  { key: "group", label: "GROUP COLLAB", icon: NAV_IMG.group, iconClass: "w-5 h-2.5", path: "/group-collab" },
+  { key: "personalized", label: "PERSONALIZED", icon: NAV_IMG.personalized, iconClass: "w-[18px] h-[13px]", path: "/personalized" },
 ];
+
+// The other pages use the plain sans-serif font, so the Dashboard does too.
+const SANS = 'ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif';
 
 const FILTERS = ["This Week", "This Month", "All Time"];
 
@@ -49,11 +56,11 @@ const PLAYER = {
 };
 
 const ANALYTICS_STATS = [
-  { label: "Total XP", value: "3,420", color: "var(--t-ac)" },
-  { label: "Current Level", value: "18", color: "var(--t-ok)" },
-  { label: "Study Streak", value: "14 days", color: "var(--t-warn)" },
-  { label: "Quizzes Completed", value: "47", color: "var(--t-ac)" },
-  { label: "Avg. Accuracy", value: "82%", color: "var(--t-ok)" },
+  { label: "Total XP", value: "3,420", color: "text-cyan" },
+  { label: "Current Level", value: "18", color: "text-lime" },
+  { label: "Study Streak", value: "14 days", color: "text-gold" },
+  { label: "Quizzes Completed", value: "47", color: "text-cyan" },
+  { label: "Avg. Accuracy", value: "82%", color: "text-lime" },
 ];
 
 const WEEKLY_ACTIVITY = [
@@ -79,50 +86,15 @@ const LEADERBOARD = [
   { rank: 10, name: "SofiaGarcia", level: 11, points: 3105 },
 ];
 
-/* Medal colours are fixed on purpose (gold / silver / bronze) in every theme. */
 const PODIUM = {
   1: { order: "order-2", trophy: "\u{1F3C6}", color: "#f4c542", pedestal: "h-24", avatar: "w-14 h-14 text-[20px]" },
   2: { order: "order-1", trophy: "\u{1F948}", color: "#cfc8bf", pedestal: "h-16", avatar: "w-11 h-11 text-[15px]" },
   3: { order: "order-3", trophy: "\u{1F949}", color: "#d08a52", pedestal: "h-12", avatar: "w-11 h-11 text-[15px]" },
 };
 
-/* ---------------------------------------------------------
-   Small themed building blocks
---------------------------------------------------------- */
-const LABEL = "text-[color:var(--t-tx2)] text-[10px] font-bold uppercase tracking-[0.12em]";
-
-function Tag({ color, children }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1 px-2 py-1 border border-solid text-[10px] font-bold uppercase tracking-wide"
-      style={{ color, borderColor: withAlpha(color, "66"), background: withAlpha(color, "1a") }}
-    >
-      {children}
-    </span>
-  );
-}
-
-function Panel({ icon, title, right, children }) {
-  return (
-    <section
-      className="bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)]"
-      style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
-    >
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-solid border-[color:var(--t-bd0)] bg-[var(--t-bg1)]">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-[color:var(--t-ac)] text-sm">{icon}</span>
-          <h3 className="text-[color:var(--t-tx0)] text-xs font-bold uppercase tracking-[0.12em] truncate">{title}</h3>
-        </div>
-        {right}
-      </div>
-      <div className="p-4">{children}</div>
-    </section>
-  );
-}
-
 function PixelAvatar() {
   return (
-    <div className="relative w-16 h-16 overflow-hidden border-2 border-solid border-[color:var(--t-bd1)] bg-[#d9a066] shrink-0">
+    <div className="relative w-16 h-16 overflow-hidden border-2 border-edge bg-[#d9a066] shrink-0">
       <div className="absolute top-0 left-0 w-full h-3 bg-[#4a3527]" />
       <div className="absolute top-7 left-3.5 w-2 h-2 bg-[#2a1c14]" />
       <div className="absolute top-7 right-3.5 w-2 h-2 bg-[#2a1c14]" />
@@ -138,15 +110,15 @@ function FilterDropdown({ value, onChange, ariaLabel }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label={ariaLabel}
-        className="appearance-none cursor-pointer pl-2.5 pr-6 py-1.5 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-ac)] text-[10px] font-bold uppercase tracking-wider focus:outline-none focus:border-[color:var(--t-ac)]"
+        className="appearance-none cursor-pointer pl-2.5 pr-6 py-1.5 bg-inset border border-edge text-cyan font-label text-[10px] font-bold uppercase tracking-wider focus:outline-none focus:border-cyan/60"
       >
         {FILTERS.map((option) => (
-          <option key={option} value={option} className="bg-[var(--t-bg2)] text-[color:var(--t-tx0)]">
+          <option key={option} value={option} className="bg-panel text-ink">
             {option}
           </option>
         ))}
       </select>
-      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[color:var(--t-ac)] text-[9px]">
+      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-cyan text-[9px]">
         {"\u25BE"}
       </span>
     </div>
@@ -160,125 +132,169 @@ function PodiumCard({ entry }) {
     <div className={`flex flex-1 max-w-[128px] flex-col items-center ${cfg.order}`}>
       <span className="text-[20px] leading-none mb-1">{cfg.trophy}</span>
       <div
-        className={`${cfg.avatar} border-2 border-solid flex items-center justify-center font-bold text-[color:var(--t-ok)] mb-2`}
-        style={{ borderColor: cfg.color, background: withAlpha("var(--t-ok)", "1a") }}
+        className={`${cfg.avatar} border-2 bg-lime/10 flex items-center justify-center font-display font-bold text-lime mb-2`}
+        style={{ borderColor: cfg.color }}
       >
         {entry.name.charAt(0)}
       </div>
-      <p
-        className="text-[12px] text-center truncate w-full"
-        style={{ color: isYou ? "var(--t-ac)" : "var(--t-tx0)" }}
-      >
+      <p className={`font-display text-[12px] text-center truncate w-full ${isYou ? "text-cyan" : "text-ink"}`}>
         {entry.name}
       </p>
-      <p className={`${LABEL} mb-2`}>Lvl {entry.level}</p>
+      <p className="label mb-2">Lvl {entry.level}</p>
       <div
-        className={`${cfg.pedestal} w-full border border-b-0 border-solid flex flex-col items-center pt-2 gap-0.5`}
+        className={`${cfg.pedestal} w-full border border-b-0 flex flex-col items-center pt-2 gap-0.5`}
         style={{ borderColor: `${cfg.color}66`, background: `${cfg.color}1a`, color: cfg.color }}
       >
-        <span className="text-[18px] font-bold leading-none">{entry.rank}</span>
-        <span className="text-[10px]">{entry.points.toLocaleString()} pts</span>
+        <span className="font-display text-[18px] font-bold leading-none">{entry.rank}</span>
+        <span className="font-label text-[10px]">{entry.points.toLocaleString()} pts</span>
       </div>
     </div>
   );
 }
 
-function ToggleRow({ label, defaultOn = false }) {
-  const [on, setOn] = useState(defaultOn);
+function AchievementsSection() {
+  const unlockedCount = ACHIEVEMENTS.filter((a) => a.unlocked).length;
+
   return (
-    <button
-      onClick={() => setOn((v) => !v)}
-      className="flex justify-between items-center py-2 border-b border-solid border-[color:var(--t-bd0)]"
-    >
-      <span className="text-[color:var(--t-tx1)] text-xs">{label}</span>
-      <div className={`w-9 h-5 flex items-center px-0.5 ${on ? "bg-[var(--t-ac)] justify-end" : "bg-[var(--t-bg3)] justify-start"}`}>
-        <div className="w-3.5 h-3.5 bg-[var(--t-tx0)]" />
+    <div className="mt-5 flex flex-col flex-1 min-h-0">
+      <div className="flex items-center justify-between mb-2">
+        <p className="label">Achievements</p>
+        <span className="font-label text-[11px] font-bold text-gold">
+          {unlockedCount} / {ACHIEVEMENTS.length}
+        </span>
       </div>
-    </button>
+
+      {/* The list fills whatever height is left, so Analytics always ends level with the Leaderboard */}
+      <div className="relative flex-1 min-h-[300px] xl:min-h-[160px] border border-edge bg-inset">
+        <ul className="absolute inset-0 p-2 flex flex-col gap-2 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:var(--t-bd0,#2e2521)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-edge">
+          {ACHIEVEMENTS.map((a) => (
+            <li
+              key={a.id}
+              className={`flex items-center gap-3 px-2.5 py-2 border ${a.unlocked ? "border-lime/30 bg-deep" : "border-edge bg-deep"
+                }`}
+            >
+              <img
+                src={a.badge}
+                alt=""
+                className={`w-10 h-10 shrink-0 object-contain ${a.unlocked ? "" : "grayscale opacity-40"}`}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className={`font-display text-[13px] font-bold truncate ${a.unlocked ? "text-ink" : "text-mute"}`}>
+                    {a.name}
+                  </h4>
+                  <span className={`tag shrink-0 ${a.unlocked ? "tag-lime" : "tag-gold"}`}>
+                    {a.unlocked ? "Unlocked" : "Locked"}
+                  </span>
+                </div>
+                <p className="font-label text-[10px] text-mute mt-0.5 leading-snug">
+                  <span className="text-cyan font-bold uppercase tracking-wider">Mission: </span>
+                  {a.mission}
+                </p>
+                <p className="font-display text-[11px] italic text-faint mt-0.5 leading-snug">
+                  {"\u201C"}{a.quote}{"\u201D"}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }
 
-function LogoutConfirmModal({ onConfirm, onCancel }) {
+export function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings, onLogout }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-black/70" onClick={onCancel} />
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="relative w-[340px] max-w-full bg-[var(--t-mbg)] border border-solid border-[color:var(--t-mbd)]"
-        style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.55)" }}
-      >
-        <div className="px-4 py-3 border-b border-solid border-[color:var(--t-mbd)] flex items-center gap-2">
-          <img src={IMG.logout} className="w-3.5 h-3.5 object-fill" alt="" />
-          <h3 className="text-[color:var(--t-tx0)] text-xs font-bold uppercase tracking-[0.12em]">Log out</h3>
-        </div>
-        <div className="p-4">
-          <p className="text-[color:var(--t-mtx)] text-sm mb-5">Are you sure you want to log out?</p>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="flex-1 py-2 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx1)] text-xs font-bold hover:border-[color:var(--t-ac)] transition-colors"
+    <div style={{ backgroundImage: "var(--t-grad-side)" }} className="flex flex-col h-full bg-[var(--t-bg0)] w-64 shrink-0">
+      <div className="flex justify-end md:hidden px-3 pt-3">
+        <button type="button" onClick={onCloseMobile} aria-label="Close menu">
+          <CloseIcon className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="flex items-center self-stretch bg-[color-mix(in_srgb,_var(--t-bg2)_45%,_transparent)] py-[13px]">
+          <img src={NAV_IMG.logo} alt="" className="w-9 h-9 ml-4 mr-3 object-fill" />
+          <div className="w-[127px]">
+            <div
+              className="flex flex-col items-start self-stretch"
+              style={{ boxShadow: "0px 2px 4px color-mix(in srgb, var(--t-ac) 30%, transparent)" }}
             >
-              CANCEL
-            </button>
-            <button
-              type="button"
-              onClick={onConfirm}
-              className="flex-1 py-2 bg-[var(--t-err)] text-[color:var(--t-onerr)] text-xs font-bold hover:brightness-110 transition-all active:scale-95"
-            >
-              LOG OUT
-            </button>
+              <span className="text-[color:var(--t-ac)] text-[17px] font-bold">CRAMMBLING</span>
+            </div>
           </div>
         </div>
+
+        <div className="flex flex-col items-start self-stretch pt-[21px] pl-5">
+          <span className="text-[color:var(--t-tx2)] text-[11px] font-bold mb-[9px]">NAVIGATION BAR</span>
+        </div>
+
+        <nav className="flex flex-col self-stretch px-3 gap-1">
+          {NAV_ITEMS.map((item) => {
+            const active = item.key === activePage;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => onNavigate(item)}
+                className={`flex items-center self-stretch py-[9px] text-left border border-solid transition-all duration-150 active:scale-[0.98]
+                  ${active ? "bg-[var(--t-bg3)] border-[#00000000]" : "border-[#00000000] hover:bg-[var(--t-bg2)]"}`}
+                style={active ? { boxShadow: "0px 0px 15px color-mix(in srgb, var(--t-ac) 15%, transparent)" } : undefined}
+              >
+                <img src={item.icon} alt="" className={`${item.iconClass} ml-[13px] mr-3 object-fill`} />
+                <span className={`text-xs font-bold ${active ? "text-[color:var(--t-ac)]" : "text-[color:var(--t-tx1)]"}`}>
+                  {item.label}
+                </span>
+                {active && (
+                  <div className="flex-1 flex justify-end pr-4">
+                    <div
+                      className="bg-[var(--t-ac)] w-1.5 h-1.5 rounded-full"
+                      style={{ boxShadow: "0px 0px 6px var(--t-ac)" }}
+                    />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      <div className="flex flex-col self-stretch bg-[color-mix(in_srgb,_var(--t-bg2)_45%,_transparent)] p-3 gap-1">
+        <button type="button" onClick={onOpenSettings} className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]">
+          <img src={NAV_IMG.settings} alt="" className="w-[15px] h-[15px] mx-3 object-fill" />
+          <span className="text-[color:var(--t-tx1)] text-[11px]">SETTINGS</span>
+        </button>
+        <button type="button" onClick={onLogout} className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]">
+          <img src={NAV_IMG.logout} alt="" className="w-3.5 h-3.5 mx-3 object-fill" />
+          <span className="text-[color:var(--t-tx1)] text-[11px]">LOGOUT</span>
+        </button>
       </div>
     </div>
   );
 }
 
-function ComingSoon({ nav, onBack }) {
-  return (
-    <div
-      className="flex flex-col items-start self-stretch bg-[var(--t-bg1)] p-6 sm:p-[25px] gap-3 border border-solid border-[color:var(--t-bd0)]"
-      style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
-    >
-      <span className="text-[color:var(--t-tx0)] text-xl font-bold">{nav}</span>
-      <p className="text-[color:var(--t-tx2)] text-sm max-w-md">This section isn't built out yet.</p>
-      <button
-        onClick={onBack}
-        className="bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-ac)] text-xs font-bold py-2 px-4 hover:border-[color:var(--t-ac)] transition-colors"
-      >
-        BACK TO DASHBOARD
-      </button>
-    </div>
-  );
-}
-
-/* ---------------------------------------------------------
-   Dashboard — also the hub that routes to the other pages.
-   Chatbot / Group Collab / Personalized each receive
-   onNavigate(key) and call it for any sidebar item that isn't
-   themselves, which brings the user back here (or across).
---------------------------------------------------------- */
 function Dashboard() {
   const navigate = useNavigate();
-  const [theme, setTheme, rootThemeStyle] = useTheme(); // shared with every other page
-  const [activeNav, setActiveNav] = useState("dashboard");
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [navCollapsed, setNavCollapsed] = useState(false); // desktop drawer: pushed to the side
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
+  const [theme, setTheme, themeVars] = useTheme(); // shared with chatbot, group collab, personalized
+  const [showSettings, setShowSettings] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showQuiz, setShowQuiz] = useState(false); // Quiz Arena placeholder shown inside the page
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [navCollapsed, setNavCollapsed] = useState(false); // desktop: push the sidebar aside
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const rootStyle = { ...themeVars, "--font-display": SANS, "--font-label": SANS };
   const [leaderboardFilter, setLeaderboardFilter] = useState(FILTERS[0]);
   const [analyticsFilter, setAnalyticsFilter] = useState(FILTERS[0]);
-
   const maxXp = Math.max(...WEEKLY_ACTIVITY.map((d) => d.xp));
   const topThree = LEADERBOARD.filter((e) => e.rank <= 3);
   const rest = LEADERBOARD.filter((e) => e.rank > 3);
 
-  const goTo = (key) => {
-    setActiveNav(key);
+  const activePage = showQuiz ? "quiz" : "dashboard";
+
+  const handleNavigate = (item) => {
     setMobileNavOpen(false);
+    if (item.key === "dashboard") return setShowQuiz(false);
+    navigate(item.path);
   };
 
   const handleConfirmLogout = () => {
@@ -287,376 +303,270 @@ function Dashboard() {
     navigate("/");
   };
 
-  // The other pages bring their own sidebar/topbar, so they replace this page entirely.
-  if (activeNav === "chatbot") return <Chatbot onNavigate={goTo} />;
-  if (activeNav === "group") return <GroupCollab onNavigate={goTo} />;
-  if (activeNav === "personalized") return <Personalized onNavigateToDashboard={() => goTo("dashboard")} onNavigateToChatbot={() => goTo("chatbot")} onNavigateToGroup={() => goTo("group")} />;
-
   return (
-    <div style={rootThemeStyle} className="flex flex-col bg-[var(--t-bg0)] min-h-screen">
-      <div className="self-stretch bg-[var(--t-bg0)] min-h-screen relative">
-        <div className="flex items-start self-stretch relative">
-          {/* Mobile sidebar backdrop */}
-          {mobileNavOpen && (
-            <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setMobileNavOpen(false)} />
-          )}
+    <div style={rootStyle} className="flex h-screen w-full bg-[var(--t-bg1)] text-ink overflow-hidden">
+      {/* desktop sidebar: collapsible drawer */}
+      <div
+        className="hidden md:flex h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
+        style={{ width: navCollapsed ? 0 : 256 }}
+      >
+        <Sidebar
+          activePage={activePage}
+          onNavigate={handleNavigate}
+          onCloseMobile={() => { }}
+          onOpenSettings={() => setShowSettings(true)}
+          onLogout={() => setShowLogoutConfirm(true)}
+        />
+      </div>
 
-          {/* ---------------- SIDEBAR (personalized design) ---------------- */}
-          <div
-            style={{ backgroundImage: "var(--t-grad-side)" }}
-            className={`bg-[var(--t-bg0)] w-64 shrink-0 z-50 flex flex-col h-screen
-              fixed inset-y-0 left-0 transition-transform duration-300 ease-out
-              ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}
-              ${navCollapsed ? "lg:-translate-x-full" : "lg:translate-x-0"}`}
-          >
-            <div className="flex justify-end lg:hidden px-3 pt-3">
-              <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu">
-                <CloseIcon className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="self-stretch flex-1 overflow-y-auto">
-              <div className="flex items-center self-stretch bg-[color-mix(in_srgb,_var(--t-bg2)_45%,_transparent)] py-[13px]">
-                <img src={IMG.logo} className="w-9 h-9 ml-4 mr-3 object-fill" alt="" />
-                <div className="w-[127px]">
-                  <div
-                    className="flex flex-col items-start self-stretch"
-                    style={{ boxShadow: "0px 2px 4px color-mix(in srgb, var(--t-ac) 30%, transparent)" }}
-                  >
-                    <span className="text-[color:var(--t-ac)] text-[17px] font-bold">CRAMMBLING</span>
-                  </div>
-                  <div className="flex items-center self-stretch pt-1 gap-1">
-                    <div className="bg-[var(--t-ok)] w-1.5 h-1.5" />
-                    <span className="text-[color:var(--t-warn)] text-[10px] font-bold">VOXEL QUEST Lv.{PLAYER.level}</span>
-                  </div>
-                </div>
-              </div>
+      <button
+        type="button"
+        onClick={() => setNavCollapsed((v) => !v)}
+        aria-label={navCollapsed ? "Open navigation bar" : "Push navigation bar aside"}
+        title={navCollapsed ? "Open navigation" : "Push navigation aside"}
+        className="hidden md:flex fixed top-1/2 -translate-y-1/2 z-30 w-5 h-16 items-center justify-center bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] border-l-0 text-[color:var(--t-ac)] hover:bg-[var(--t-ac)] hover:text-[color:var(--t-onac)] hover:shadow-[0_0_14px_color-mix(in_srgb,var(--t-ac)_40%,transparent)] transition-all duration-300 active:scale-95"
+        style={{ left: navCollapsed ? 0 : 256 }}
+      >
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: navCollapsed ? "rotate(0deg)" : "rotate(180deg)", transition: "transform .3s" }}>
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
 
-              <div className="flex flex-col items-start self-stretch pt-[21px] pl-5">
-                <span className="text-[color:var(--t-tx2)] text-[11px] font-bold mb-[9px]">NAVIGATION BAR</span>
-              </div>
+      {/* mobile sidebar overlay */}
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <Sidebar
+            activePage={activePage}
+            onNavigate={handleNavigate}
+            onCloseMobile={() => setMobileNavOpen(false)}
+            onOpenSettings={() => { setMobileNavOpen(false); setShowSettings(true); }}
+            onLogout={() => { setMobileNavOpen(false); setShowLogoutConfirm(true); }}
+          />
+          <div className="flex-1 bg-black/50" onClick={() => setMobileNavOpen(false)} />
+        </div>
+      )}
 
-              <nav className="flex flex-col self-stretch px-3 gap-1">
-                {NAV_ITEMS.map((item) => {
-                  const active = activeNav === item.key;
-                  return (
-                    <button
-                      key={item.key}
-                      onClick={() => goTo(item.key)}
-                      className={`flex items-center self-stretch py-[9px] text-left border border-solid transition-all duration-150 active:scale-[0.98]
-                        ${active ? "bg-[var(--t-bg3)] border-[#00000000]" : "border-[#00000000] hover:bg-[var(--t-bg2)]"}`}
-                      style={active ? { boxShadow: "0px 0px 15px color-mix(in srgb, var(--t-ac) 15%, transparent)" } : undefined}
-                    >
-                      <img src={item.icon} className={`${item.iconClass} ml-[13px] mr-3 object-fill`} alt="" />
-                      <span className={`text-xs font-bold ${active ? "text-[color:var(--t-ac)]" : "text-[color:var(--t-tx1)]"}`}>
-                        {item.label}
-                      </span>
-                      {active && (
-                        <div className="flex-1 flex justify-end pr-4">
-                          <div
-                            className="bg-[var(--t-ac)] w-1.5 h-1.5 rounded-full"
-                            style={{ boxShadow: "0px 0px 6px var(--t-ac)" }}
-                          />
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
-
-            <div className="flex flex-col self-stretch bg-[color-mix(in_srgb,_var(--t-bg2)_45%,_transparent)] p-3 gap-1">
-              <button
-                onClick={() => {
-                  setMobileNavOpen(false);
-                  setSettingsOpen(true);
-                }}
-                className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]"
-              >
-                <img src={IMG.settings} className="w-[15px] h-[15px] mx-3 object-fill" alt="" />
-                <span className="text-[color:var(--t-tx1)] text-[11px]">SETTINGS</span>
-              </button>
-              <button
-                onClick={() => {
-                  setMobileNavOpen(false);
-                  setShowLogoutConfirm(true);
-                }}
-                className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]"
-              >
-                <img src={IMG.logout} className="w-3.5 h-3.5 mx-3 object-fill" alt="" />
-                <span className="text-[color:var(--t-tx1)] text-[11px]">LOGOUT</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Desktop drawer handle — pushes the navigation bar to the side and back */}
-          <button
-            onClick={() => setNavCollapsed((v) => !v)}
-            aria-label={navCollapsed ? "Open navigation bar" : "Push navigation bar aside"}
-            title={navCollapsed ? "Open navigation" : "Push navigation aside"}
-            className="hidden lg:flex fixed top-1/2 -translate-y-1/2 z-[55] w-5 h-16 items-center justify-center bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] border-l-0 text-[color:var(--t-ac)] hover:bg-[var(--t-ac)] hover:text-[color:var(--t-onac)] transition-[left,background-color,color] duration-300 ease-out"
-            style={{ left: navCollapsed ? 0 : 256 }}
-          >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ transform: navCollapsed ? "rotate(0deg)" : "rotate(180deg)", transition: "transform .3s" }}
+      <div style={{ backgroundImage: "var(--t-grad-main)" }} className="flex-1 flex flex-col min-w-0 bg-[var(--t-bg1)]">
+        {/* top bar */}
+        <div className="flex flex-wrap justify-between items-center gap-3 bg-[color-mix(in_srgb,_var(--t-bg0)_40%,_transparent)] py-3 px-4 sm:px-8">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className={`text-[color:var(--t-tx0)] ${navCollapsed ? "" : "md:hidden"}`}
+              onClick={() => {
+                setNavCollapsed(false);
+                setMobileNavOpen(true);
+              }}
+              aria-label="Open menu"
             >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-
-          {/* ---------------- MAIN ---------------- */}
-          <div
-            style={{ backgroundImage: "var(--t-grad-main)" }}
-            className={`flex-1 bg-[var(--t-bg1)] pb-16 min-w-0 min-h-screen transition-[margin] duration-300 ease-out ${navCollapsed ? "lg:ml-0" : "lg:ml-64"}`}
-          >
-            {/* Top bar */}
-            <div className="sticky top-0 z-30 backdrop-blur flex flex-wrap justify-between items-center gap-3 self-stretch bg-[color-mix(in_srgb,_var(--t-bg0)_40%,_transparent)] py-3 px-4 sm:px-6 mb-6">
-              <div className="flex flex-1 min-w-0 items-center gap-3 sm:gap-4">
-                <button
-                  onClick={() => {
-                    setNavCollapsed(false);
-                    setMobileNavOpen(true);
-                  }}
-                  className={`shrink-0 ${navCollapsed ? "" : "lg:hidden"}`}
-                  aria-label="Open menu"
-                >
-                  <MenuIcon className="w-6 h-6" />
-                </button>
-                <div className="hidden sm:flex flex-col shrink-0 items-start bg-[var(--t-bg3)] py-[3px] px-[9px] border border-solid border-[color:var(--t-bd0)]">
-                  <span className="text-[color:var(--t-ac)] text-[10px]">VOXEL ENGINE V2.4</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+                <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+          {/* Dashboard shows only notifications + profile (streak and XP are already on the player card) */}
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <button type="button" className="relative shrink-0" onClick={() => setNotifOpen((v) => !v)} aria-label="Notifications">
+              <img src={NAV_IMG.avatar} alt="" className="w-8 h-8 object-fill" />
+              {notifOpen && (
+                <div className="absolute right-0 top-10 z-50 w-56 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-3 text-left shadow-lg">
+                  <span className="text-[color:var(--t-tx0)] text-xs font-bold block mb-2">Notifications</span>
+                  <span className="text-[color:var(--t-tx2)] text-[11px] block">CS240 Midterm is coming up on Mar 20.</span>
                 </div>
-              </div>
-
-              <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:var(--t-bd0)]">
-                  <img src={IMG.streak} className="w-3 h-3.5 object-fill" alt="" />
-                  <span className="text-[color:var(--t-warn)] text-[11px] font-bold hidden sm:inline">{PLAYER.streakDays} STREAK</span>
-                </div>
-                <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:var(--t-bd0)]">
-                  <img src={IMG.xp} className="w-[15px] h-[13px] object-fill" alt="" />
-                  <span className="text-[color:var(--t-ac)] text-[11px] font-bold hidden sm:inline">3,420 XP</span>
-                </div>
-
-                <button className="relative shrink-0" onClick={() => setNotifOpen((v) => !v)} aria-label="Notifications">
-                  <img src={IMG.avatar} className="w-8 h-8 object-fill" alt="" />
-                  {notifOpen && (
-                    <div className="absolute right-0 top-10 z-50 w-56 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-3 text-left shadow-lg">
-                      <span className="text-[color:var(--t-tx0)] text-xs font-bold block mb-2">Notifications</span>
-                      <span className="text-[color:var(--t-tx2)] text-[11px] block">CS240 Midterm is coming up on Mar 20.</span>
-                    </div>
-                  )}
-                </button>
-
-                <button
-                  onClick={() => setSettingsOpen(true)}
-                  className="flex flex-col shrink-0 items-start px-1 sm:px-2"
-                  aria-label="Profile / Settings"
-                >
-                  <div
-                    className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"
-                    style={{ boxShadow: "0px 1px 2px #0000000D" }}
-                  >
-                    <span className="text-[color:var(--t-onac)] text-sm font-bold">{PLAYER.name.charAt(0)}</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="flex flex-col self-stretch px-4 sm:px-6 lg:px-10 gap-6 text-[color:var(--t-tx0)]">
-              {activeNav !== "dashboard" ? (
-                <ComingSoon nav={NAV_ITEMS.find((n) => n.key === activeNav)?.label} onBack={() => goTo("dashboard")} />
-              ) : (
-                <>
-                  {/* Player card */}
-                  <section
-                    className="bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-5"
-                    style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <PixelAvatar />
-                        <div>
-                          <p className={LABEL}>Welcome back</p>
-                          <div className="flex items-center gap-2.5 mt-1">
-                            <h1 className="text-[26px] leading-none font-bold uppercase tracking-wide">{PLAYER.name}</h1>
-                            <Tag color="var(--t-ok)">[LVL {PLAYER.level}]</Tag>
-                          </div>
-                          <div className="flex items-center gap-3 mt-2.5 text-[13px]">
-                            <span className="tracking-wide" style={{ color: "var(--t-err)" }}>
-                              {"\u2764".repeat(PLAYER.hp)}
-                              <span style={{ color: "var(--t-bd1)" }}>{"\u2764".repeat(PLAYER.hpMax - PLAYER.hp)}</span>
-                            </span>
-                            <span style={{ color: "var(--t-bd1)" }}>|</span>
-                            <span className="flex gap-0.5">
-                              {Array.from({ length: PLAYER.focusMax }).map((_, i) => (
-                                <span
-                                  key={i}
-                                  className="w-2.5 h-2.5"
-                                  style={{ background: i < PLAYER.focus ? "var(--t-warn)" : "var(--t-bd1)" }}
-                                />
-                              ))}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Tag color="var(--t-warn)">{"\u25B2"} {PLAYER.streakDays} day streak</Tag>
-                        <Tag color="var(--t-ac)">{"\u23F1"} {PLAYER.studyHours} hrs studied</Tag>
-                        <Tag color="var(--t-ok)">{"\u2691"} Rank #{PLAYER.rank}</Tag>
-                      </div>
-                    </div>
-
-                    <div className="mt-5">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className={LABEL}>Experience progress</span>
-                        <span className="text-[11px] font-bold text-[color:var(--t-ac)]">
-                          LVL {PLAYER.level} - {PLAYER.xpPercent}%
-                        </span>
-                      </div>
-                      <div className="w-full h-3.5 bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)]">
-                        <div
-                          className="h-full bg-[var(--t-ok)]"
-                          style={{
-                            width: `${PLAYER.xpPercent}%`,
-                            backgroundImage: "repeating-linear-gradient(90deg, transparent 0 9px, rgba(0,0,0,0.3) 9px 10px)",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </section>
-
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-                    {/* Leaderboard */}
-                    <Panel
-                      icon={"\u26C6"}
-                      title="Class Leaderboard"
-                      right={<FilterDropdown value={leaderboardFilter} onChange={setLeaderboardFilter} ariaLabel="Filter leaderboard" />}
-                    >
-                      <div className="flex items-end justify-center gap-3 mb-5">
-                        {topThree.map((entry) => (
-                          <PodiumCard key={entry.rank} entry={entry} />
-                        ))}
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        {rest.map((entry) => {
-                          const isYou = entry.name === "You";
-                          return (
-                            <div
-                              key={entry.rank}
-                              className="flex items-center justify-between px-3 py-2 border border-solid"
-                              style={{
-                                borderColor: isYou ? withAlpha("var(--t-ac)", "66") : "var(--t-bd0)",
-                                background: isYou ? withAlpha("var(--t-ac)", "1a") : "var(--t-bg3)",
-                              }}
-                            >
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <span className="w-7 h-7 shrink-0 border border-solid border-[color:var(--t-bd0)] bg-[var(--t-bg0)] flex items-center justify-center text-[11px] font-bold text-[color:var(--t-tx2)]">
-                                  {entry.rank}
-                                </span>
-                                <span
-                                  className="w-7 h-7 shrink-0 border border-solid flex items-center justify-center text-[12px] font-bold text-[color:var(--t-ok)]"
-                                  style={{ borderColor: withAlpha("var(--t-ok)", "66"), background: withAlpha("var(--t-ok)", "1a") }}
-                                >
-                                  {entry.name.charAt(0)}
-                                </span>
-                                <span className="text-[13px] truncate" style={{ color: isYou ? "var(--t-ac)" : "var(--t-tx0)" }}>
-                                  {entry.name}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-4 text-[11px] shrink-0">
-                                <span className="text-[color:var(--t-warn)]">Lvl {entry.level}</span>
-                                <span className="text-[color:var(--t-tx2)] w-20 text-right">{entry.points.toLocaleString()} pts</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </Panel>
-
-                    {/* Analytics */}
-                    <Panel
-                      icon={"\u25A4"}
-                      title="Analytics"
-                      right={<FilterDropdown value={analyticsFilter} onChange={setAnalyticsFilter} ariaLabel="Filter analytics" />}
-                    >
-                      <div className="grid grid-cols-2 gap-2 mb-5">
-                        {ANALYTICS_STATS.map((stat, i) => (
-                          <div
-                            key={stat.label}
-                            className={`border border-solid border-[color:var(--t-bd0)] bg-[var(--t-bg3)] px-4 py-3 ${i === ANALYTICS_STATS.length - 1 && ANALYTICS_STATS.length % 2 ? "col-span-2" : ""
-                              }`}
-                          >
-                            <p className="text-[22px] font-bold leading-none" style={{ color: stat.color }}>
-                              {stat.value}
-                            </p>
-                            <p className={`${LABEL} mt-1.5`}>{stat.label}</p>
-                          </div>
-                        ))}
-                      </div>
-
-                      <p className={`${LABEL} mb-2`}>Weekly activity</p>
-                      <div className="border border-solid border-[color:var(--t-bd0)] bg-[var(--t-bg3)] p-3">
-                        <div className="flex items-end justify-between gap-2 h-28 px-1">
-                          {WEEKLY_ACTIVITY.map((d) => (
-                            <div key={d.day} className="flex-1 flex flex-col items-center gap-2">
-                              <div className="w-full flex items-end justify-center h-20">
-                                <div
-                                  className="w-full max-w-[24px]"
-                                  style={{
-                                    height: `${(d.xp / maxXp) * 100}%`,
-                                    background: d.xp === maxXp ? "var(--t-warn)" : "var(--t-ok)",
-                                  }}
-                                  title={`${d.xp} XP`}
-                                />
-                              </div>
-                              <span className={LABEL}>{d.day}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </Panel>
-                  </div>
-
-                  <QuizHistory />
-                </>
               )}
-            </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate("/profile")}
+              className="flex flex-col shrink-0 items-start px-1 sm:px-2"
+              aria-label="My profile"
+            >
+              <div
+                className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"
+                style={{ boxShadow: "0px 1px 2px #0000000D" }}
+              >
+                <span className="text-[color:var(--t-onac)] text-sm font-bold">CP</span>
+              </div>
+            </button>
           </div>
         </div>
 
-        {/* Settings drawer — same design as chatbot / group collab / personalized */}
-        {settingsOpen && (
-          <div className="fixed inset-0 z-50 flex justify-end">
-            <div className="flex-1 bg-black/60" onClick={() => setSettingsOpen(false)} />
-            <div className="w-full max-w-xs bg-[var(--t-bg2)] border-l border-solid border-[color:var(--t-bd0)] p-5 flex flex-col gap-4">
-              <div className="flex justify-between items-center">
-                <span className="text-[color:var(--t-tx0)] text-sm font-bold">SETTINGS</span>
-                <button onClick={() => setSettingsOpen(false)} aria-label="Close settings">
-                  <CloseIcon className="w-4 h-4" />
-                </button>
-              </div>
-              <ThemePicker theme={theme} onChange={setTheme} />
-              <ToggleRow label="Email reminders" />
-              <ToggleRow label="Group session pings" defaultOn />
-              <ToggleRow label="Voxel quest sound effects" />
-            </div>
-          </div>
+        {/* Quiz Arena placeholder (shown inside the page, sidebar and top bar stay) */}
+        {showQuiz && (
+          <main className="flex-1 min-h-0 overflow-y-auto">
+            <QuizArena where="Dashboard" onBack={() => setShowQuiz(false)} />
+          </main>
         )}
 
-        {showLogoutConfirm && (
-          <LogoutConfirmModal onConfirm={handleConfirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
-        )}
+        {/* Main (hidden, not unmounted, while Quiz Arena is open so quiz history state is kept) */}
+        <main className={`${showQuiz ? "hidden" : ""} flex-1 min-h-0 p-6 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:var(--t-bd0,#2e2521)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-edge`}>
+          <div className="flex flex-col gap-6">
+            {/* Player card */}
+            <section className="panel p-5">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <PixelAvatar />
+                  <div>
+                    <p className="label">Welcome back</p>
+                    <div className="flex items-center gap-2.5 mt-1">
+                      <h1 className="text-[26px] leading-none font-bold uppercase tracking-wide">
+                        {PLAYER.name}
+                      </h1>
+                      <span className="tag tag-lime">[LVL {PLAYER.level}]</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-2.5 text-[13px]">
+                      <span className="text-danger tracking-wide">
+                        {"\u2764".repeat(PLAYER.hp)}
+                        <span className="text-edge">{"\u2764".repeat(PLAYER.hpMax - PLAYER.hp)}</span>
+                      </span>
+                      <span className="text-edge">|</span>
+                      <span className="flex gap-0.5">
+                        {Array.from({ length: PLAYER.focusMax }).map((_, i) => (
+                          <span key={i} className={`w-2.5 h-2.5 ${i < PLAYER.focus ? "bg-gold" : "bg-edge"}`} />
+                        ))}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="tag tag-gold">{"\u25B2"} {PLAYER.streakDays} day streak</span>
+                  <span className="tag tag-cyan">{"\u23F1"} {PLAYER.studyHours} hrs studied</span>
+                  <span className="tag tag-lime">{"\u2691"} Rank #{PLAYER.rank}</span>
+                </div>
+              </div>
+
+              <div className="mt-5">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="label">Experience progress</span>
+                  <span className="font-label text-[11px] font-bold text-cyan">
+                    LVL {PLAYER.level} - {PLAYER.xpPercent}%
+                  </span>
+                </div>
+                <div className="w-full h-3.5 bg-deep border border-edge">
+                  <div
+                    className="h-full bg-lime"
+                    style={{
+                      width: `${PLAYER.xpPercent}%`,
+                      backgroundImage:
+                        "repeating-linear-gradient(90deg, transparent 0 9px, rgba(0,0,0,0.3) 9px 10px)",
+                    }}
+                  />
+                </div>
+              </div>
+            </section>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch">
+              {/* Leaderboard */}
+              <Panel
+                icon={"\u26C6"}
+                title="Class Leaderboard"
+                right={
+                  <FilterDropdown
+                    value={leaderboardFilter}
+                    onChange={setLeaderboardFilter}
+                    ariaLabel="Filter leaderboard"
+                  />
+                }
+              >
+                <div className="flex items-end justify-center gap-3 mb-5">
+                  {topThree.map((entry) => (
+                    <PodiumCard key={entry.rank} entry={entry} />
+                  ))}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  {rest.map((entry) => {
+                    const isYou = entry.name === "You";
+                    return (
+                      <div
+                        key={entry.rank}
+                        className={`flex items-center justify-between px-3 py-2 border ${isYou ? "border-cyan/40 bg-cyan/10" : "border-edge bg-inset"
+                          }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-7 h-7 border border-edge bg-deep flex items-center justify-center font-label text-[11px] font-bold text-mute">
+                            {entry.rank}
+                          </span>
+                          <span className="w-7 h-7 border border-lime/40 bg-lime/10 flex items-center justify-center font-display text-[12px] font-bold text-lime">
+                            {entry.name.charAt(0)}
+                          </span>
+                          <span className={`font-display text-[13px] ${isYou ? "text-cyan" : "text-ink"}`}>
+                            {entry.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 font-label text-[11px]">
+                          <span className="text-gold">Lvl {entry.level}</span>
+                          <span className="text-mute w-20 text-right">{entry.points.toLocaleString()} pts</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Panel>
+
+              {/* Analytics */}
+              <Panel
+                icon={"\u25A4"}
+                title="Analytics"
+                bodyClassName="p-4 flex-1 min-h-0 flex flex-col"
+                right={
+                  <FilterDropdown
+                    value={analyticsFilter}
+                    onChange={setAnalyticsFilter}
+                    ariaLabel="Filter analytics"
+                  />
+                }
+              >
+                <div className="grid grid-cols-2 gap-2 mb-5">
+                  {ANALYTICS_STATS.map((stat, i) => (
+                    <div
+                      key={stat.label}
+                      className={`border border-edge bg-inset px-4 py-3 ${i === ANALYTICS_STATS.length - 1 && ANALYTICS_STATS.length % 2 ? "col-span-2" : ""
+                        }`}
+                    >
+                      <p className={`font-display text-[22px] font-bold leading-none ${stat.color}`}>
+                        {stat.value}
+                      </p>
+                      <p className="label mt-1.5">{stat.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="label mb-2">Weekly activity</p>
+                <div className="border border-edge bg-inset p-3">
+                  <div className="flex items-end justify-between gap-2 h-28 px-1">
+                    {WEEKLY_ACTIVITY.map((d) => (
+                      <div key={d.day} className="flex-1 flex flex-col items-center gap-2">
+                        <div className="w-full flex items-end justify-center h-20">
+                          <div
+                            className={`w-full max-w-[24px] ${d.xp === maxXp ? "bg-gold" : "bg-lime"}`}
+                            style={{ height: `${(d.xp / maxXp) * 100}%` }}
+                            title={`${d.xp} XP`}
+                          />
+                        </div>
+                        <span className="label text-faint">{d.day}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <AchievementsSection />
+              </Panel>
+            </div>
+
+            <QuizHistory />
+          </div>
+        </main>
       </div>
+
+      {/* Settings drawer — shared by every page (and Quiz Arena) */}
+      <Settings open={showSettings} onClose={() => setShowSettings(false)} theme={theme} onThemeChange={setTheme} />
+
+      {showLogoutConfirm && (
+        <LogoutConfirmModal onConfirm={handleConfirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
+      )}
     </div>
   );
 }

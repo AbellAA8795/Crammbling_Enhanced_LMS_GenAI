@@ -1,29 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useHubClasses, syncClassGroups, requestOpenClassroom, TASK_TYPE_LABEL } from "./Classhub";
 import Dashboard from "./Dashboard";
 import Chatbot from "./chatbot";
 import Personalized from "./personalized";
-import { ThemePicker, useTheme, withAlpha, CloseIcon, MenuIcon } from "./Theme";
+import { useTheme, withAlpha, CloseIcon, MenuIcon } from "./Theme";
+import LogoutConfirmModal from "../components/LogoutConfirmModal";
+import Settings from "../components/Settings";
+import QuizArena from "./QuizArena";
+import { PEOPLE, searchPeople, findPersonByName } from "./ProfileHub";
 
-/* ---------------------------------------------------------
-   GROUP COLLAB
-   Two kinds of group chat:
-   - "normal"    (a squad): creator becomes ADMIN, any admin can
-                  promote other members to admin, everyone can
-                  send files, add members, and create tasks
-                  (tasks optionally sync to the Study Sprint Board).
-   - "classroom" (a class): creator becomes TEACHER automatically,
-                  only the teacher adds members, grades submitted
-                  tasks, and posts lesson materials.
-   Members can be added via Account ID, Username, or Gmail.
-   Files / Tasks / Materials / Grades / Members now live in a single
-   tabbed pop-up card instead of being stacked inline on the page.
-   Right-clicking a group chat opens a quick-access context menu.
---------------------------------------------------------- */
 
-/* ---------------------------------------------------------
-   Same asset set as chatbot.jsx / personalized.jsx, so the
-   shell (sidebar, topbar, nav icons) matches pixel-for-pixel.
---------------------------------------------------------- */
 const IMG = {
     logo: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/ec7p6crg_expires_30_days.png",
     dashboard: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/5fuik1xz_expires_30_days.png",
@@ -43,28 +30,18 @@ const IMG = {
         "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23BBC9C9' stroke-width='2' stroke-linecap='round'><line x1='4' y1='4' x2='20' y2='20'/><line x1='20' y1='4' x2='4' y2='20'/></svg>",
 };
 
+// Graduation cap for the CLASSROOM sidebar entry, drawn inline so we don't
+// need a new hosted asset (same icon the Dashboard and Classroom use).
+const CLASSROOM_ICON =
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='15' viewBox='0 0 24 24' fill='none' stroke='%232CD4D9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M22 10 12 5 2 10l10 5 10-5z'/><path d='M6 12v5c3 3 9 3 12 0v-5'/></svg>";
+
 const NAV_ITEMS = [
     { key: "dashboard", label: "DASHBOARD", icon: IMG.dashboard, iconClass: "w-[18px] h-[15px]" },
+    { key: "classroom", label: "CLASSROOM", icon: CLASSROOM_ICON, iconClass: "w-[18px] h-[15px]" },
     { key: "chatbot", label: "CHATBOT", icon: IMG.chatbot, iconClass: "w-[18px] h-[15px]" },
     { key: "group", label: "GROUP COLLAB", icon: IMG.group, iconClass: "w-5 h-2.5" },
-    { key: "quiz", label: "QUIZ ARENA", icon: IMG.quiz, iconClass: "w-4 h-4" },
     { key: "personalized", label: "PERSONALIZED", icon: IMG.personalized, iconClass: "w-[18px] h-[13px]" },
 ];
-
-function ToggleRow({ label, defaultOn = false }) {
-    const [on, setOn] = useState(defaultOn);
-    return (
-        <button
-            onClick={() => setOn((v) => !v)}
-            className="flex justify-between items-center py-2 border-b border-solid border-[color:var(--t-bd0)]"
-        >
-            <span className="text-[color:var(--t-tx1)] text-xs">{label}</span>
-            <div className={`w-9 h-5 flex items-center px-0.5 ${on ? "bg-[var(--t-ac)] justify-end" : "bg-[var(--t-bg3)] justify-start"}`}>
-                <div className="w-3.5 h-3.5 bg-[var(--t-tx0)]" />
-            </div>
-        </button>
-    );
-}
 
 const CURRENT_USER = { id: "you", name: "You" };
 
@@ -84,16 +61,18 @@ function initialsFor(name) {
         .toUpperCase();
 }
 
-/* Quick-access options for the right-click context menu — depends on GC type. */
+/* Quick-access options for the right-click context menu — depends on chat type. */
 function tabDefsFor(g) {
     if (!g) return [];
     if (g.type === "classroom") {
         return [
             { key: "tasks", label: "Assignments" },
             { key: "materials", label: "Materials" },
-            { key: "grades", label: "Grades" },
             { key: "members", label: "Members" },
         ];
+    }
+    if (g.type === "dm") {
+        return [{ key: "members", label: "Members" }];
     }
     return [
         { key: "tasks", label: "Tasks" },
@@ -106,7 +85,7 @@ const INITIAL_GROUPS = [
     {
         id: "g1",
         name: "Algorithm Study Squad",
-        type: "normal",
+        type: "squad",
         color: "var(--t-ac)",
         members: [
             { id: "you", name: "You", role: "admin" },
@@ -124,20 +103,20 @@ const INITIAL_GROUPS = [
     },
     {
         id: "g2",
-        name: "CS240 — Prof. Santos",
+        classId: "cls_cs240",
+        name: "CS240 — Study Group",
         type: "classroom",
         color: "var(--t-ok)",
-        teacherId: "you",
         members: [
-            { id: "you", name: "You", role: "teacher" },
-            { id: "s2", name: "Maya K.", role: "student" },
-            { id: "s3", name: "Alex Chen", role: "student" },
+            { id: "you", name: "You", role: "member" },
+            { id: "s2", name: "Maya K.", role: "member" },
+            { id: "s3", name: "Alex Chen", role: "member" },
         ],
         messages: [
             { id: "msg1", senderId: "you", senderName: "You", text: "Reminder: Midterm covers chapters 1-6.", time: "08:00" },
         ],
         materials: [
-            { id: "mat1", title: "Chapter 5 Slides — Graph Traversals", kind: "Slides", addedBy: "You" },
+            { id: "mat1", title: "Chapter 5 Slides — Graph Traversals", kind: "Slides", addedBy: "Course Materials" },
         ],
         tasks: [
             {
@@ -146,17 +125,15 @@ const INITIAL_GROUPS = [
                 desc: "Implement shortest path with a min-heap.",
                 due: "Mon, Mar 23",
                 points: 100,
-                submissions: [{ studentId: "s2", studentName: "Maya K.", submittedAt: "Mar 19", grade: null, feedback: "" }],
+                submissions: [{ studentId: "s2", studentName: "Maya K.", submittedAt: "Mar 19" }],
                 createdBy: "You",
             },
         ],
     },
     {
-        // Demo: what the UI looks like when "You" are a regular MEMBER
-        // (not the admin) of a normal squad — no "Make Admin" button shows.
         id: "g3",
         name: "Discrete Math Circle",
-        type: "normal",
+        type: "squad",
         color: "var(--t-warn)",
         members: [
             { id: "m4", name: "Priya N.", role: "admin" },
@@ -172,21 +149,32 @@ const INITIAL_GROUPS = [
         ],
     },
     {
-        // Demo: what the UI looks like when "You" are a STUDENT (not the
-        // teacher) in a classroom — no grading inputs, no "Add Member",
-        // and the Grades tab only shows your own graded work.
         id: "g4",
-        name: "MATH210 — Prof. Alvarez",
-        type: "classroom",
+        name: "Riley P.",
+        type: "dm",
         color: "var(--t-ac2)",
-        teacherId: "t1",
         members: [
-            { id: "t1", name: "Dr. Alvarez", role: "teacher" },
-            { id: "you", name: "You", role: "student" },
-            { id: "s4", name: "Riley P.", role: "student" },
+            { id: "you", name: "You", role: "member" },
+            { id: "s4", name: "Riley P.", role: "member" },
         ],
-        messages: [{ id: "msg4", senderId: "t1", senderName: "Dr. Alvarez", text: "Assignment 2 grades are posted.", time: "07:45" }],
-        materials: [{ id: "mat2", title: "Set Theory Review Deck", kind: "Slides", addedBy: "Dr. Alvarez" }],
+        messages: [
+            { id: "msg4", senderId: "s4", senderName: "Riley P.", text: "Hey, are you free to review the proofs later?", time: "11:20" },
+            { id: "msg5", senderId: "you", senderName: "You", text: "Yeah, after 6pm works.", time: "11:22" },
+        ],
+    },
+    {
+        id: "g5",
+        classId: "cls_math210",
+        name: "MATH210 — Study Group",
+        type: "classroom",
+        color: "var(--t-ok2)",
+        members: [
+            { id: "you", name: "You", role: "member" },
+            { id: "s6", name: "Devon M.", role: "member" },
+            { id: "s7", name: "Riley P.", role: "member" },
+        ],
+        messages: [{ id: "msg6", senderId: "s6", senderName: "Devon M.", text: "Assignment 2 grades are posted.", time: "07:45" }],
+        materials: [{ id: "mat2", title: "Set Theory Review Deck", kind: "Slides", addedBy: "Course Materials" }],
         tasks: [
             {
                 id: "at2",
@@ -194,38 +182,127 @@ const INITIAL_GROUPS = [
                 desc: "Prove the given identities using set builder notation.",
                 due: "Fri, Mar 14",
                 points: 50,
-                submissions: [
-                    { studentId: "you", studentName: "You", submittedAt: "Mar 13", grade: 46, feedback: "Great work, minor notation slip on #4." },
-                    { studentId: "s4", studentName: "Riley P.", submittedAt: "Mar 14", grade: null, feedback: "" },
-                ],
-                createdBy: "Dr. Alvarez",
+                submissions: [{ studentId: "you", studentName: "You", submittedAt: "Mar 13" }],
+                createdBy: "Devon M.",
             },
         ],
     },
 ];
 
-function Panel({ title, count, children, action }) {
+/* Name that opens the person's profile when they're in the people directory
+   (see ProfileHub); plain text otherwise (e.g. "You", unknown members). */
+function PersonName({ name, onOpenProfile, className, style }) {
+    const person = findPersonByName(name);
+    if (!person || !onOpenProfile) return <span className={className} style={style}>{name}</span>;
     return (
-        <div className="flex flex-col self-stretch gap-3">
-            <div className="flex justify-between items-center">
-                <span className="text-[color:var(--t-tx0)] text-xs font-bold tracking-wide">
-                    {title} {typeof count === "number" && <span className="text-[color:var(--t-tx2)] font-normal">({count})</span>}
-                </span>
-                {action}
-            </div>
-            {children}
+        <button type="button" onClick={() => onOpenProfile(person.id)} title={`View ${name}'s profile`} className={`${className} hover:underline`} style={style}>
+            {name}
+        </button>
+    );
+}
+
+const FILTERS = [
+    { key: "all", label: "All" },
+    { key: "classroom", label: "Classrooms" },
+    { key: "dm", label: "1v1" },
+    { key: "squad", label: "Squads" },
+];
+
+/* ---------------------------------------------------------
+   Dashboard-style design kit (theme-aware, flat + pixel-sharp):
+   hard pixel shadows, micro-caps labels, tinted tags, panels with
+   a glyph header bar, pixel avatars and segmented "pip" meters.
+--------------------------------------------------------- */
+const PIXEL_SHADOW = "3px 3px 0px var(--t-shadow)";
+const LABEL = "text-[10px] font-bold uppercase tracking-wider text-[color:var(--t-tx2)]";
+const PRIMARY_BTN =
+    "bg-[var(--t-ac)] text-[color:var(--t-onac)] font-bold uppercase tracking-wider border-2 border-solid border-[color:var(--t-ac2)] border-b-4 border-b-[color:color-mix(in_srgb,_var(--t-ac)_55%,_#000)] hover:brightness-110 active:translate-y-[2px] active:border-b-2 transition-all duration-150";
+const ACTION_BTN =
+    "text-[10px] font-bold uppercase tracking-wider py-1 px-2 border border-solid border-[color:var(--t-ac)] text-[color:var(--t-ac)] hover:bg-[var(--t-ac)] hover:text-[color:var(--t-onac)] transition-colors duration-150";
+const SEGMENTS = "repeating-linear-gradient(90deg, transparent 0 9px, rgba(0,0,0,0.3) 9px 10px)";
+
+/* Header bar shared by every panel: glyph + title + optional right slot. */
+function PanelHeader({ icon = "◆", title, right, tone = "page" }) {
+    return (
+        <div
+            className="flex items-center justify-between gap-2 px-3 py-2 border-b border-solid bg-[color-mix(in_srgb,_var(--t-ac)_7%,_transparent)]"
+            style={{ borderColor: tone === "modal" ? "var(--t-mbd)" : "var(--t-bd0)" }}
+        >
+            <span className="flex items-center gap-2 min-w-0">
+                <span className="text-[color:var(--t-ac)] text-[13px] leading-none">{icon}</span>
+                <span className="text-[color:var(--t-tx0)] text-xs font-bold uppercase tracking-wider truncate">{title}</span>
+            </span>
+            {right}
         </div>
     );
 }
 
-function Badge({ color, children }) {
+/* Panel used inside the pop-up card (tasks / files / materials / members). */
+function Panel({ title, count, children, action, icon = "◆" }) {
+    return (
+        <div className="flex flex-col self-stretch border border-solid border-[color:var(--t-mbd)]">
+            <PanelHeader
+                tone="modal"
+                icon={icon}
+                title={title}
+                right={
+                    <span className="flex items-center gap-2 shrink-0">
+                        {typeof count === "number" && <Badge color="var(--t-warn)">{count}</Badge>}
+                        {action}
+                    </span>
+                }
+            />
+            <div className="p-2.5">{children}</div>
+        </div>
+    );
+}
+
+/* Tinted tag chip (same idea as the Dashboard's tag-lime / tag-gold / tag-cyan). */
+function Badge({ color, children, className = "" }) {
     return (
         <span
-            className="text-[10px] font-bold py-0.5 px-2 border border-solid shrink-0"
-            style={{ backgroundColor: withAlpha(color, "33"), borderColor: withAlpha(color, "4D"), color }}
+            className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider py-0.5 px-2 border border-solid shrink-0 ${className}`}
+            style={{ backgroundColor: withAlpha(color, "26"), borderColor: withAlpha(color, "66"), color }}
         >
             {children}
         </span>
+    );
+}
+
+/* Square avatar with a pixel "hair" strip, like the Dashboard player avatar. */
+function GroupAvatar({ color, name, className = "w-8 h-8 text-[10px]" }) {
+    return (
+        <div
+            className={`relative shrink-0 flex items-center justify-center font-bold border-2 border-solid ${className}`}
+            style={{ backgroundColor: withAlpha(color, "26"), borderColor: color, color }}
+        >
+            <span className="absolute top-0 left-0 w-full h-[3px]" style={{ backgroundColor: color }} />
+            {initialsFor(name)}
+        </div>
+    );
+}
+
+/* Segmented meter — same idea as the HP / focus meter on the Dashboard player card. */
+function Pips({ value, max = 10, color = "var(--t-ok)" }) {
+    return (
+        <span className="flex gap-0.5" aria-hidden="true">
+            {Array.from({ length: max }).map((_, i) => (
+                <span key={i} className="w-2 h-2" style={{ backgroundColor: i < value ? color : "var(--t-bd0)" }} />
+            ))}
+        </span>
+    );
+}
+
+/* Pixel-art chat bubble avatar for the page banner (built from plain divs). */
+function HubAvatar() {
+    return (
+        <div className="relative w-16 h-16 shrink-0 overflow-hidden border-2 border-solid border-[color:var(--t-bd1)] bg-[color-mix(in_srgb,_var(--t-ac)_22%,_var(--t-bg2))]">
+            <div className="absolute top-0 left-0 w-full h-3 bg-[var(--t-ac)]" />
+            <div className="absolute top-7 left-3 w-2 h-2 bg-[var(--t-tx0)]" />
+            <div className="absolute top-7 left-7 w-2 h-2 bg-[var(--t-tx0)]" />
+            <div className="absolute top-7 left-[44px] w-2 h-2 bg-[var(--t-tx0)]" />
+            <div className="absolute bottom-0 left-0 w-full h-3 bg-[var(--t-ok)]" />
+        </div>
     );
 }
 
@@ -291,6 +368,82 @@ function TabIcon({ type, className }) {
     }
 }
 
+/* Custom themed dropdown for the messages filter. */
+function FilterDropdown({ value, onChange }) {
+    const [open, setOpen] = useState(false);
+    const current = FILTERS.find((f) => f.key === value) || FILTERS[0];
+
+    return (
+        <div className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                aria-haspopup="listbox"
+                aria-expanded={open}
+                className="flex items-center justify-between w-full bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] py-1.5 pl-2.5 pr-2 text-[10px] font-bold uppercase tracking-wider text-[color:var(--t-ac)] hover:border-[color:var(--t-ac)] transition-colors duration-150"
+            >
+                <span className="flex items-center gap-1.5 min-w-0">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-70">
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                    </svg>
+                    <span className="truncate">{current.label}</span>
+                </span>
+                <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="shrink-0 ml-1 transition-transform duration-200"
+                    style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+                >
+                    <polyline points="6 9 12 15 18 9" />
+                </svg>
+            </button>
+
+            {open && (
+                <>
+                    <div className="fixed inset-0 z-[5]" onClick={() => setOpen(false)} />
+                    <div
+                        role="listbox"
+                        className="absolute top-full left-0 right-0 z-10 mt-1 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] overflow-hidden"
+                        style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.5), 0 0 20px color-mix(in srgb, var(--t-glow) 20%, transparent)" }}
+                    >
+                        {FILTERS.map((f) => {
+                            const active = f.key === value;
+                            return (
+                                <button
+                                    key={f.key}
+                                    role="option"
+                                    aria-selected={active}
+                                    onClick={() => {
+                                        onChange(f.key);
+                                        setOpen(false);
+                                    }}
+                                    className={`flex items-center justify-between w-full text-left px-2.5 py-1.5 text-[11px] font-bold transition-colors duration-100 ${active
+                                        ? "bg-[var(--t-bg3)] text-[color:var(--t-ac)]"
+                                        : "text-[color:var(--t-tx1)] hover:bg-[var(--t-bg3)] hover:text-[color:var(--t-tx0)]"
+                                        }`}
+                                >
+                                    <span>{f.label}</span>
+                                    {active && (
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="20 6 9 17 4 12" />
+                                        </svg>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
 function AddMemberModal({ onClose, onAdd }) {
     const [method, setMethod] = useState("id");
     const [value, setValue] = useState("");
@@ -312,11 +465,11 @@ function AddMemberModal({ onClose, onAdd }) {
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
             <form
                 onSubmit={submit}
-                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_90%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-5 w-full max-w-sm flex flex-col gap-3"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
+                className="relative bg-[var(--t-mbg)] border border-solid border-[color:var(--t-mbd2)] border-t-[3px] border-t-[color:var(--t-ac)] p-5 w-full max-w-sm flex flex-col gap-3"
+                style={{ boxShadow: "6px 6px 0px var(--t-shadow), 0 0 40px color-mix(in srgb, var(--t-glow) 18%, transparent)" }}
             >
                 <div className="flex justify-between items-center mb-1">
-                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">ADD MEMBER</span>
+                    <span className="flex items-center gap-2 text-[color:var(--t-tx0)] text-sm font-bold uppercase tracking-wider"><span className="text-[color:var(--t-ac)]">⛆</span>ADD MEMBER</span>
                     <button type="button" onClick={onClose} className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors">
                         ×
                     </button>
@@ -352,7 +505,7 @@ function AddMemberModal({ onClose, onAdd }) {
 
                 <button
                     type="submit"
-                    className="mt-1 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2 hover:opacity-90 hover:shadow-[0_0_16px_color-mix(in_srgb,_var(--t-ac)_40%,_transparent)] transition-all duration-150 active:scale-[0.98]"
+                    className={`mt-1 text-xs py-2 ${PRIMARY_BTN}`}
                 >
                     ADD TO GROUP
                 </button>
@@ -361,80 +514,175 @@ function AddMemberModal({ onClose, onAdd }) {
     );
 }
 
-function CreateGroupModal({ onClose, onCreate }) {
+/* Tinted chip showing whether a person is a teacher or a student. */
+function RoleBadge({ role }) {
+    return (
+        <Badge color={role === "teacher" ? "var(--t-warn)" : "var(--t-ac2)"} className="!text-[8px] !py-0 !px-1">
+            {role === "teacher" ? "TEACHER" : "STUDENT"}
+        </Badge>
+    );
+}
+
+/* Search bar for finding students/teachers — picking one opens a 1v1 chat. */
+function PeopleSearch({ onSelect }) {
+    const [query, setQuery] = useState("");
+    const [open, setOpen] = useState(false);
+    const results = searchPeople(query);
+
+    function pick(person) {
+        onSelect(person);
+        setQuery("");
+        setOpen(false);
+    }
+
+    return (
+        <div className="relative">
+            <div className="flex items-center bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] py-1.5 px-2.5 gap-2 focus-within:border-[color:var(--t-ac)] transition-colors duration-150">
+                <img src={IMG.search} className="w-[11px] h-[11px] object-fill shrink-0" />
+                <input
+                    value={query}
+                    onChange={(e) => {
+                        setQuery(e.target.value);
+                        setOpen(true);
+                    }}
+                    onFocus={() => setOpen(true)}
+                    onBlur={() => setOpen(false)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter" && results[0]) {
+                            e.preventDefault();
+                            pick(results[0]);
+                        }
+                        if (e.key === "Escape") e.currentTarget.blur();
+                    }}
+                    placeholder="Search students / teachers..."
+                    className="bg-transparent outline-none text-[color:var(--t-tx0)] placeholder-[color:var(--t-tx2)] text-[11px] w-full min-w-0"
+                />
+            </div>
+
+            {open && (
+                <div
+                    role="listbox"
+                    className="absolute top-full left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)]"
+                    style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.5), 0 0 20px color-mix(in srgb, var(--t-glow) 20%, transparent)" }}
+                >
+                    {results.length === 0 && <p className="text-[color:var(--t-tx2)] text-[11px] px-2.5 py-3 text-center">No one matches “{query.trim()}”.</p>}
+                    {results.map((p) => (
+                        <button
+                            key={p.id}
+                            type="button"
+                            role="option"
+                            // mousedown fires before the input's blur closes the list
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                pick(p);
+                            }}
+                            className="flex items-center gap-2 w-full text-left px-2.5 py-1.5 hover:bg-[var(--t-bg3)] transition-colors duration-100"
+                        >
+                            <GroupAvatar color={colorForString(p.name)} name={p.name} className="w-6 h-6 text-[8px]" />
+                            <div className="flex-1 min-w-0">
+                                <span className="text-[color:var(--t-tx0)] text-[11px] font-bold truncate block">{p.name}</span>
+                                <span className="text-[color:var(--t-tx2)] text-[10px] truncate block">@{p.username}</span>
+                            </div>
+                            <RoleBadge role={p.role} />
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* Create a squad group chat: a name plus the people to invite. */
+function CreateSquadModal({ onClose, onCreate }) {
     const [name, setName] = useState("");
-    const [type, setType] = useState("normal");
+    const [query, setQuery] = useState("");
+    const [picked, setPicked] = useState([]); // person ids
+
+    function toggle(id) {
+        setPicked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    }
 
     function submit(e) {
         e.preventDefault();
         if (!name.trim()) return;
-        onCreate(name.trim(), type);
+        onCreate(name.trim(), PEOPLE.filter((p) => picked.includes(p.id)));
     }
+
+    const results = searchPeople(query);
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
             <form
                 onSubmit={submit}
-                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_90%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-5 w-full max-w-sm flex flex-col gap-3"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
+                className="relative bg-[var(--t-mbg)] border border-solid border-[color:var(--t-mbd2)] border-t-[3px] border-t-[color:var(--t-ac)] p-5 w-full max-w-sm flex flex-col gap-3"
+                style={{ boxShadow: "6px 6px 0px var(--t-shadow), 0 0 40px color-mix(in srgb, var(--t-glow) 18%, transparent)" }}
             >
                 <div className="flex justify-between items-center mb-1">
-                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">NEW GROUP CHAT</span>
+                    <span className="flex items-center gap-2 text-[color:var(--t-tx0)] text-sm font-bold uppercase tracking-wider"><span className="text-[color:var(--t-ac)]">▲</span>NEW SQUAD</span>
                     <button type="button" onClick={onClose} className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors">
                         ×
                     </button>
                 </div>
 
                 <label className="flex flex-col gap-1">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Group name</span>
+                    <span className="text-[color:var(--t-mtx)] text-[11px]">Squad name</span>
                     <input
                         autoFocus
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="e.g. Discrete Math Warband"
+                        placeholder="e.g. Discrete Math Study Squad"
                         className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac)] transition-colors"
                     />
                 </label>
 
                 <div className="flex flex-col gap-1.5">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Type</span>
-                    <button
-                        type="button"
-                        onClick={() => setType("normal")}
-                        className={`flex flex-col items-start p-3 border border-solid text-left transition-all duration-150 ${type === "normal" ? "border-[color:var(--t-ac)] bg-[var(--t-in1)] shadow-[0_0_14px_color-mix(in_srgb,_var(--t-ac)_20%,_transparent)]" : "border-[color:var(--t-mbd)] bg-[var(--t-in0)] hover:border-[color:var(--t-ac2)]"
-                            }`}
-                    >
-                        <span className="text-[color:var(--t-ac)] text-xs font-bold">NORMAL SQUAD</span>
-                        <span className="text-[color:var(--t-mtx)] text-[11px] mt-0.5">
-                            You become admin. Anyone can add members, share files, and create tasks.
-                        </span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setType("classroom")}
-                        className={`flex flex-col items-start p-3 border border-solid text-left transition-all duration-150 ${type === "classroom" ? "border-[color:var(--t-ok)] bg-[var(--t-in1)] shadow-[0_0_14px_color-mix(in_srgb,_var(--t-ok)_20%,_transparent)]" : "border-[color:var(--t-mbd)] bg-[var(--t-in0)] hover:border-[color:var(--t-ac2)]"
-                            }`}
-                    >
-                        <span className="text-[color:var(--t-ok)] text-xs font-bold">CLASSROOM</span>
-                        <span className="text-[color:var(--t-mtx)] text-[11px] mt-0.5">
-                            You become the teacher. You add members, post materials, and grade tasks.
-                        </span>
-                    </button>
+                    <span className="flex items-center justify-between text-[color:var(--t-mtx)] text-[11px]">
+                        Add members
+                        {picked.length > 0 && <Badge color="var(--t-ac)">{picked.length} PICKED</Badge>}
+                    </span>
+                    <input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search students / teachers..."
+                        className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac)] transition-colors"
+                    />
+                    <div className="flex flex-col max-h-48 overflow-y-auto border border-solid border-[color:var(--t-mbd)]">
+                        {results.length === 0 && <p className="text-[color:var(--t-mtx)] text-[11px] px-2.5 py-3 text-center">No one matches.</p>}
+                        {results.map((p) => {
+                            const on = picked.includes(p.id);
+                            return (
+                                <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => toggle(p.id)}
+                                    className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 transition-colors duration-100 ${on ? "bg-[var(--t-in1)]" : "hover:bg-[var(--t-in1)]"}`}
+                                >
+                                    <span
+                                        className="flex items-center justify-center w-3.5 h-3.5 border border-solid shrink-0"
+                                        style={{ borderColor: on ? "var(--t-ac)" : "var(--t-mbd2)", backgroundColor: on ? "var(--t-ac)" : "transparent", color: "var(--t-onac)" }}
+                                    >
+                                        {on && (
+                                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="20 6 9 17 4 12" />
+                                            </svg>
+                                        )}
+                                    </span>
+                                    <span className="flex-1 min-w-0 text-[color:var(--t-tx0)] text-[11px] truncate">{p.name}</span>
+                                    <RoleBadge role={p.role} />
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
 
-                <button
-                    type="submit"
-                    className="mt-1 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2 hover:opacity-90 hover:shadow-[0_0_16px_color-mix(in_srgb,_var(--t-ac)_40%,_transparent)] transition-all duration-150 active:scale-[0.98]"
-                >
-                    CREATE GROUP CHAT
+                <button type="submit" disabled={!name.trim()} className={`mt-1 text-xs py-2 disabled:opacity-40 disabled:cursor-not-allowed ${PRIMARY_BTN}`}>
+                    CREATE SQUAD
                 </button>
             </form>
         </div>
     );
 }
-
-const POINT_PRESETS = [10, 50, 100, 200];
 
 function toISODate(d) {
     const p = (n) => String(n).padStart(2, "0");
@@ -452,7 +700,7 @@ function daysUntil(iso) {
     return Math.round((new Date(`${iso}T00:00:00`) - today) / 86400000);
 }
 
-function NewTaskModal({ isClassroom, onClose, onCreate }) {
+function NewTaskModal({ isClassroom, onCreate }) {
     const [title, setTitle] = useState("");
     const [desc, setDesc] = useState("");
     const [due, setDue] = useState(""); // ISO yyyy-mm-dd from the date field
@@ -565,7 +813,7 @@ function NewTaskModal({ isClassroom, onClose, onCreate }) {
 
                 {/* progress bar */}
                 <div className="px-5 pb-4">
-                    <div className="relative h-1.5 bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] overflow-hidden">
+                    <div className="relative h-3 bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] overflow-hidden">
                         <div
                             className="absolute inset-y-0 left-0 transition-all duration-500 ease-out overflow-hidden"
                             style={{ width: `${pct}%`, backgroundColor: barColor, boxShadow: `0 0 10px ${withAlpha(barColor, "99")}` }}
@@ -577,9 +825,10 @@ function NewTaskModal({ isClassroom, onClose, onCreate }) {
                                 />
                             )}
                         </div>
+                        <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: SEGMENTS }} />
                     </div>
                     <div className="flex justify-between mt-1.5 text-[10px] text-[color:var(--t-ph)]">
-                        <span>Progress</span>
+                        <span className="uppercase tracking-wider font-bold">Progress</span>
                         <span className="font-bold transition-colors duration-500" style={{ color: barColor }}>
                             {Math.round(pct)}%
                         </span>
@@ -708,81 +957,17 @@ function NewTaskModal({ isClassroom, onClose, onCreate }) {
     );
 }
 
-function NewMaterialModal({ onClose, onCreate }) {
-    const [title, setTitle] = useState("");
-    const [kind, setKind] = useState("PDF");
-    const [link, setLink] = useState("");
-
-    function submit(e) {
-        e.preventDefault();
-        if (!title.trim()) return;
-        onCreate({ title: title.trim(), kind, link: link.trim() });
-    }
-
-    return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
-            <div className="absolute inset-0 bg-black/70" onClick={onClose} />
-            <form
-                onSubmit={submit}
-                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_90%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-5 w-full max-w-sm flex flex-col gap-3"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
-            >
-                <div className="flex justify-between items-center mb-1">
-                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">ADD LESSON MATERIAL</span>
-                    <button type="button" onClick={onClose} className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors">
-                        ×
-                    </button>
-                </div>
-                <label className="flex flex-col gap-1">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Title</span>
-                    <input
-                        autoFocus
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ok)] transition-colors"
-                    />
-                </label>
-                <label className="flex flex-col gap-1">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Type</span>
-                    <select
-                        value={kind}
-                        onChange={(e) => setKind(e.target.value)}
-                        className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ok)] transition-colors"
-                    >
-                        <option>PDF</option>
-                        <option>Slides</option>
-                        <option>Video</option>
-                        <option>Link</option>
-                    </select>
-                </label>
-                <label className="flex flex-col gap-1">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Link / filename</span>
-                    <input
-                        value={link}
-                        onChange={(e) => setLink(e.target.value)}
-                        placeholder="e.g. Chapter6_Slides.pdf"
-                        className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ok)] transition-colors"
-                    />
-                </label>
-                <button
-                    type="submit"
-                    className="mt-1 bg-[var(--t-ok)] text-[color:var(--t-onok)] text-xs font-bold py-2 hover:opacity-90 hover:shadow-[0_0_16px_color-mix(in_srgb,_var(--t-ok)_40%,_transparent)] transition-all duration-150 active:scale-[0.98]"
-                >
-                    ADD MATERIAL
-                </button>
-            </form>
-        </div>
-    );
-}
-
 /* ---------------------------------------------------------
-   Tabbed pop-up card: Tasks / Files / Materials / Grades / Members
+   Tabbed pop-up card: Tasks / Files / Materials / Members
    all live here now instead of being stacked on the page.
+   Grading + teacher controls removed — classrooms are
+   student-only and everyone has equal access. Materials
+   are read-only (no "Add Material" for students).
 --------------------------------------------------------- */
 function GroupDetailModal({
     group,
     isClassroom,
-    isTeacher,
+    isDm,
     canAddMembers,
     canCreateTask,
     tab,
@@ -790,41 +975,41 @@ function GroupDetailModal({
     tabDefs,
     onClose,
     onNewTask,
-    onNewMaterial,
     onAddMember,
     onSubmitTask,
     onPromote,
+    onOpenProfile,
     isAdmin,
-    gradeDrafts,
-    setGradeDrafts,
-    onSaveGrade,
 }) {
     if (!group) return null;
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
             <div
-                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_90%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] w-full max-w-lg max-h-[85vh] flex flex-col"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 50px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
+                className="relative bg-[var(--t-mbg)] border border-solid border-[color:var(--t-mbd2)] border-t-[3px] border-t-[color:var(--t-ac)] w-full max-w-lg max-h-[85vh] flex flex-col"
+                style={{ boxShadow: "6px 6px 0px var(--t-shadow), 0 0 40px color-mix(in srgb, var(--t-glow) 18%, transparent)" }}
             >
                 <div className="flex justify-between items-center p-4 border-b border-solid border-[color:var(--t-mbd)] shrink-0">
-                    <div className="min-w-0">
-                        <span className="text-[color:var(--t-tx0)] text-sm font-bold block truncate">{group.name}</span>
-                        <span className="text-[color:var(--t-mtx)] text-[11px]">{isClassroom ? "Classroom details" : "Squad details"}</span>
+                    <div className="flex items-center gap-3 min-w-0">
+                        <GroupAvatar color={group.color} name={group.name} className="w-10 h-10 text-xs" />
+                        <div className="min-w-0">
+                            <span className="text-[color:var(--t-tx0)] text-sm font-bold uppercase tracking-wide block truncate">{group.name}</span>
+                            <span className="text-[color:var(--t-mtx)] text-[11px]">{isDm ? "Direct message" : isClassroom ? "Classroom details" : "Squad details"}</span>
+                        </div>
                     </div>
                     <button onClick={onClose} className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors" aria-label="Close">
                         ×
                     </button>
                 </div>
 
-                <div className="flex flex items-center gap-2 px-4 pt-3 border-b border-solid border-[color:var(--t-mbd)] shrink-0 ">
+                <div className=" flex items-center gap-2 px-4 pt-3 border-b border-solid border-[color:var(--t-mbd)] shrink-0 ">
                     {tabDefs.map((t) => {
                         const active = tab === t.key;
                         return (
                             <button
                                 key={t.key}
                                 onClick={() => onTabChange(t.key)}
-                                className={`flex items-center gap-1.2 pb-2.5 -mb-px border-b-2 text-[5px] font-bold whitespace-nowrap flex-1 min-w-0 justify-center transition-all duration-150 active:scale-95 ${active
+                                className={`flex items-center gap-1.5 pb-2.5 -mb-px border-b-2 text-[10px] uppercase tracking-wider font-bold whitespace-nowrap flex-1 min-w-0 justify-center transition-all duration-150 active:scale-95 ${active
                                     ? "border-[color:var(--t-ac)] text-[color:var(--t-ac)]"
                                     : "border-transparent text-[color:var(--t-mtx)] hover:text-[color:var(--t-tx1)] hover:border-[color:var(--t-mbd2)]"
                                     }`}
@@ -840,11 +1025,12 @@ function GroupDetailModal({
                 <div className="flex-1 overflow-y-auto p-4">
                     {tab === "tasks" && (
                         <Panel
+                            icon="⚑"
                             title={isClassroom ? "ASSIGNMENTS" : "TASKS"}
                             count={group.tasks?.length || 0}
                             action={
                                 canCreateTask && (
-                                    <button onClick={onNewTask} className="text-[color:var(--t-ac)] text-[10px] font-bold hover:text-[color:var(--t-ac2)] hover:underline underline-offset-2 transition-colors">
+                                    <button onClick={onNewTask} className={ACTION_BTN}>
                                         + {isClassroom ? "New Assignment" : "New Task"}
                                     </button>
                                 )
@@ -853,6 +1039,7 @@ function GroupDetailModal({
                             {(group.tasks || []).length === 0 && <p className="text-[color:var(--t-mtx)] text-xs py-2">Nothing here yet.</p>}
                             {(group.tasks || []).map((t) => {
                                 const mySubmission = isClassroom && t.submissions?.find((s) => s.studentId === "you");
+                                const submittedCount = (t.submissions || []).length;
                                 return (
                                     <div
                                         key={t.id}
@@ -861,7 +1048,7 @@ function GroupDetailModal({
                                         <div className="flex justify-between items-start gap-2">
                                             <span className="text-[color:var(--t-tx0)] text-sm font-bold">{t.title}</span>
                                             {isClassroom ? (
-                                                <Badge color="var(--t-warn)">{t.points} PTS</Badge>
+                                                t.points != null ? <Badge color="var(--t-warn)">{t.points} PTS</Badge> : null
                                             ) : (
                                                 <Badge color={colorForString(t.badge)}>{t.badge}</Badge>
                                             )}
@@ -869,53 +1056,48 @@ function GroupDetailModal({
                                         {t.desc && <span className="text-[color:var(--t-tx1)] text-xs">{t.desc}</span>}
                                         <span className="text-[color:var(--t-mtx)] text-[11px]">Due {t.due || "—"}</span>
 
-                                        {isClassroom && !isTeacher && (
-                                            <button
-                                                onClick={() => onSubmitTask(t.id)}
-                                                disabled={!!mySubmission}
-                                                className={`self-start text-[10px] font-bold py-1.5 px-3 mt-1 transition-all duration-150 active:scale-95 ${mySubmission ? "bg-[var(--t-in2)] text-[color:var(--t-mtx)] cursor-not-allowed" : "bg-[var(--t-ac2)] text-[color:var(--t-onac)] hover:opacity-90 hover:shadow-[0_0_14px_color-mix(in_srgb,_var(--t-ac2)_40%,_transparent)]"
-                                                    }`}
-                                            >
-                                                {mySubmission ? "✓ Submitted" : "Submit Task"}
-                                            </button>
-                                        )}
-
-                                        {isClassroom && isTeacher && (
-                                            <div className="flex flex-col gap-1.5 mt-1">
+                                        {isClassroom && (
+                                            <div className="flex flex-wrap items-center gap-2 mt-1">
                                                 <span className="text-[color:var(--t-mtx)] text-[10px] font-bold">
-                                                    {t.submissions.length} submission{t.submissions.length === 1 ? "" : "s"}
+                                                    {submittedCount} submitted
                                                 </span>
-                                                {t.submissions.map((s) => {
-                                                    const key = `${t.id}:${s.studentId}`;
-                                                    const draft = gradeDrafts[key] || { grade: s.grade ?? "", feedback: s.feedback || "" };
-                                                    return (
-                                                        <div key={s.studentId} className="flex flex-wrap items-center gap-2 bg-[var(--t-mbg)] p-2 border border-solid border-[color:var(--t-mbd)]">
-                                                            <span className="text-[color:var(--t-tx1)] text-xs flex-1 min-w-[80px]">{s.studentName}</span>
-                                                            {s.grade != null ? (
-                                                                <Badge color="var(--t-ok2)">
-                                                                    {s.grade}/{t.points}
-                                                                </Badge>
-                                                            ) : (
-                                                                <>
-                                                                    <input
-                                                                        type="number"
-                                                                        value={draft.grade}
-                                                                        onChange={(e) => setGradeDrafts((prev) => ({ ...prev, [key]: { ...draft, grade: e.target.value } }))}
-                                                                        placeholder="Grade"
-                                                                        className="w-16 bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-1 px-2 outline-none focus:border-[color:var(--t-ok2)] transition-colors"
-                                                                    />
-                                                                    <button
-                                                                        onClick={() => onSaveGrade(t.id, s.studentId)}
-                                                                        className="text-[color:var(--t-ok2)] text-[10px] font-bold py-1 px-2 hover:text-[color:var(--t-ok3)] hover:underline underline-offset-2 transition-colors"
-                                                                    >
-                                                                        Save
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                                {t.submissions.length === 0 && <span className="text-[color:var(--t-mtx)] text-[11px]">No submissions yet.</span>}
+
+                                                <button
+                                                    onClick={() => onSubmitTask(t.id)}
+                                                    disabled={!!mySubmission}
+                                                    className={`group/md relative overflow-hidden flex items-center gap-1 text-[9px] font-bold tracking-wide py-1 pl-1.5 pr-2 border border-solid transition-all duration-200 active:scale-95 ${mySubmission
+                                                        ? "bg-[color-mix(in_srgb,_var(--t-ok)_14%,_transparent)] border-[color:color-mix(in_srgb,_var(--t-ok)_40%,_transparent)] text-[color:var(--t-ok2)] cursor-default"
+                                                        : "bg-[color-mix(in_srgb,_var(--t-ac2)_16%,_transparent)] border-[color:color-mix(in_srgb,_var(--t-ac2)_45%,_transparent)] text-[color:var(--t-ac2)] hover:bg-[var(--t-ac2)] hover:text-[color:var(--t-onac)] hover:border-[color:var(--t-ac2)] hover:shadow-[0_0_12px_color-mix(in_srgb,_var(--t-ac2)_50%,_transparent)]"
+                                                        }`}
+                                                >
+                                                    <span
+                                                        className={`flex items-center justify-center w-3 h-3 border border-solid transition-all duration-200 ${mySubmission
+                                                            ? "bg-[var(--t-ok2)] border-[color:var(--t-ok2)] text-[color:var(--t-onac)]"
+                                                            : "bg-transparent border-[color:var(--t-ac2)] text-[color:var(--t-ac2)] group-hover/md:bg-[var(--t-onac)] group-hover/md:border-[color:var(--t-onac)] group-hover/md:text-[color:var(--t-ac2)]"
+                                                            }`}
+                                                    >
+                                                        <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                                                            <polyline points="20 6 9 17 4 12" />
+                                                        </svg>
+                                                    </span>
+
+                                                    <span>{mySubmission ? "Done" : "Mark Done"}</span>
+
+                                                    {!mySubmission && (
+                                                        <span
+                                                            className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 opacity-0 group-hover/md:opacity-100 group-hover/md:animate-[mdSweep_0.9s_ease-out]"
+                                                            style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)" }}
+                                                        />
+                                                    )}
+                                                </button>
+
+                                                {/* keyframes for the sweep — safe to leave inline, browsers dedupe */}
+                                                <style>{`
+            @keyframes mdSweep {
+                from { transform: translateX(0); }
+                to   { transform: translateX(400%); }
+            }
+        `}</style>
                                             </div>
                                         )}
                                     </div>
@@ -924,8 +1106,8 @@ function GroupDetailModal({
                         </Panel>
                     )}
 
-                    {tab === "files" && !isClassroom && (
-                        <Panel title="SHARED FILES" count={group.files?.length || 0}>
+                    {tab === "files" && !isClassroom && !isDm && (
+                        <Panel icon="▤" title="SHARED FILES" count={group.files?.length || 0}>
                             {(group.files || []).length === 0 && (
                                 <p className="text-[color:var(--t-mtx)] text-xs py-2">No files shared yet — attach one from the composer below.</p>
                             )}
@@ -944,17 +1126,7 @@ function GroupDetailModal({
                     )}
 
                     {tab === "materials" && isClassroom && (
-                        <Panel
-                            title="LESSON MATERIALS"
-                            count={group.materials?.length || 0}
-                            action={
-                                isTeacher && (
-                                    <button onClick={onNewMaterial} className="text-[color:var(--t-ok)] text-[10px] font-bold hover:text-[color:var(--t-ok3)] hover:underline underline-offset-2 transition-colors">
-                                        + Add Material
-                                    </button>
-                                )
-                            }
-                        >
+                        <Panel icon="◆" title="LESSON MATERIALS" count={group.materials?.length || 0}>
                             {(group.materials || []).length === 0 && <p className="text-[color:var(--t-mtx)] text-xs py-2">No materials posted yet.</p>}
                             {(group.materials || []).map((m) => (
                                 <div
@@ -971,43 +1143,14 @@ function GroupDetailModal({
                         </Panel>
                     )}
 
-                    {tab === "grades" && isClassroom && (
-                        <Panel title="GRADES">
-                            {(group.tasks || []).length === 0 && <p className="text-[color:var(--t-mtx)] text-xs py-2">No graded work yet.</p>}
-                            <div className="flex flex-col gap-1.5">
-                                {(group.tasks || []).flatMap((t) =>
-                                    t.submissions
-                                        .filter((s) => isTeacher || s.studentId === "you")
-                                        .map((s) => (
-                                            <div
-                                                key={`${t.id}-${s.studentId}`}
-                                                className="flex justify-between items-center bg-[var(--t-in0)] p-2.5 border border-solid border-[color:var(--t-mbd)] transition-colors hover:border-[color:var(--t-mbd2)]"
-                                            >
-                                                <div className="min-w-0">
-                                                    <span className="text-[color:var(--t-tx1)] text-xs block truncate">{t.title}</span>
-                                                    {isTeacher && <span className="text-[color:var(--t-mtx)] text-[10px]">{s.studentName}</span>}
-                                                </div>
-                                                {s.grade != null ? (
-                                                    <Badge color="var(--t-ok2)">
-                                                        {s.grade}/{t.points}
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge color="var(--t-warn)">PENDING</Badge>
-                                                )}
-                                            </div>
-                                        ))
-                                )}
-                            </div>
-                        </Panel>
-                    )}
-
                     {tab === "members" && (
                         <Panel
+                            icon="⛆"
                             title="MEMBERS"
                             count={group.members.length}
                             action={
                                 canAddMembers && (
-                                    <button onClick={onAddMember} className="text-[color:var(--t-ac)] text-[10px] font-bold hover:text-[color:var(--t-ac2)] hover:underline underline-offset-2 transition-colors">
+                                    <button onClick={onAddMember} className={ACTION_BTN}>
                                         + Add Member
                                     </button>
                                 )
@@ -1018,10 +1161,12 @@ function GroupDetailModal({
                                     key={m.id}
                                     className="flex justify-between items-center bg-[var(--t-in0)] p-2.5 border border-solid border-[color:var(--t-mbd)] mb-1.5 transition-colors hover:border-[color:var(--t-mbd2)]"
                                 >
-                                    <span className="text-[color:var(--t-tx0)] text-xs">{m.name}</span>
+                                    <PersonName name={m.name} onOpenProfile={onOpenProfile} className="text-[color:var(--t-tx0)] text-xs text-left" />
                                     <div className="flex items-center gap-2">
-                                        <Badge color={m.role === "admin" || m.role === "teacher" ? "var(--t-ac)" : "var(--t-mtx)"}>{m.role.toUpperCase()}</Badge>
-                                        {!isClassroom && isAdmin && m.role !== "admin" && (
+                                        {!isClassroom && !isDm && (
+                                            <Badge color={m.role === "admin" ? "var(--t-ac)" : "var(--t-mtx)"}>{m.role.toUpperCase()}</Badge>
+                                        )}
+                                        {!isClassroom && !isDm && isAdmin && m.role !== "admin" && (
                                             <button
                                                 onClick={() => onPromote(m.id)}
                                                 className="group/adm flex items-center gap-1 text-[10px] font-bold py-0.5 px-2 border border-solid shrink-0 bg-[color-mix(in_srgb,_var(--t-warn)_20%,_transparent)] border-[color:color-mix(in_srgb,_var(--t-warn)_30%,_transparent)] text-[color:var(--t-warn)] hover:bg-[var(--t-warn)] hover:text-[color:var(--t-onwarn)] hover:border-[color:var(--t-warn)] hover:shadow-[0_0_12px_color-mix(in_srgb,_var(--t-warn)_40%,_transparent)] active:scale-95 transition-all duration-150"
@@ -1041,7 +1186,7 @@ function GroupDetailModal({
     );
 }
 
-/* Right-click quick-access menu on a group chat list item. */
+/* Right-click quick-access menu on a conversation list item. */
 function GroupContextMenu({ x, y, group, onClose, onOpenMessages, onOpenTab }) {
     const opts = tabDefsFor(group);
     const clampedX = Math.min(x, (typeof window !== "undefined" ? window.innerWidth : 1000) - 190);
@@ -1050,8 +1195,8 @@ function GroupContextMenu({ x, y, group, onClose, onOpenMessages, onOpenTab }) {
         <>
             <div className="fixed inset-0 z-[70]" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
             <div
-                className="fixed z-[80] bg-[color-mix(in_srgb,_var(--t-mbg)_90%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] py-1 min-w-[172px]"
-                style={{ top: Math.max(8, clampedY), left: Math.max(8, clampedX), boxShadow: "0 12px 32px rgba(0,0,0,0.6), 0 0 24px color-mix(in srgb, var(--t-glow) 25%, transparent)" }}
+                className="fixed z-[80] bg-[var(--t-mbg)] border border-solid border-[color:var(--t-mbd2)] border-t-[3px] border-t-[color:var(--t-ac)] py-1 min-w-[172px]"
+                style={{ top: Math.max(8, clampedY), left: Math.max(8, clampedX), boxShadow: "4px 4px 0px var(--t-shadow), 0 0 24px color-mix(in srgb, var(--t-glow) 18%, transparent)" }}
             >
                 <div className="px-3 py-1.5 border-b border-solid border-[color:var(--t-mbd)]">
                     <span className="text-[color:var(--t-mtx)] text-[10px] font-bold truncate block">{group.name}</span>
@@ -1089,6 +1234,7 @@ function GroupContextMenu({ x, y, group, onClose, onOpenMessages, onOpenTab }) {
  *    parent Study Sprint Board integration.
  */
 export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
+    const navigate = useNavigate();
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const [navCollapsed, setNavCollapsed] = useState(false); // desktop drawer: pushed to the side
     const [fallbackPage, setFallbackPage] = useState(null); // used only when no onNavigate prop is passed
@@ -1096,29 +1242,41 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
     const [searchFocused, setSearchFocused] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [theme, setTheme, rootThemeStyle] = useTheme(); // shared with chatbot + personalized
-    const [loggedOut, setLoggedOut] = useState(false);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+    const [showQuiz, setShowQuiz] = useState(false); // Quiz Arena placeholder shown inside the page
     const [notifOpen, setNotifOpen] = useState(false);
     const searchRef = useRef(null);
 
-    const [groups, setGroups] = useState(INITIAL_GROUPS);
-    const [activeGroupId, setActiveGroupId] = useState(INITIAL_GROUPS[0]?.id || null);
+    // Every class in Classroom has a chat here: its members become chat members and every
+    // task posted in the class shows up as a clickable message (see classHub.js).
+    const [hubClasses] = useHubClasses();
+    const firstGroups = useRef(null);
+    if (firstGroups.current === null) firstGroups.current = syncClassGroups(INITIAL_GROUPS, hubClasses);
+    const [groups, setGroups] = useState(firstGroups.current);
+    const [activeGroupId, setActiveGroupId] = useState(firstGroups.current[0]?.id || null);
     const [openPanel, setOpenPanel] = useState(null); // which tab is open in the pop-up modal, or null
     const [messageText, setMessageText] = useState("");
-    const [showCreateGroup, setShowCreateGroup] = useState(false);
+    const [showCreateSquad, setShowCreateSquad] = useState(false);
     const [showAddMember, setShowAddMember] = useState(false);
     const [showNewTask, setShowNewTask] = useState(false);
-    const [showNewMaterial, setShowNewMaterial] = useState(false);
-    const [gradeDrafts, setGradeDrafts] = useState({}); // `${taskId}:${studentId}` -> { grade, feedback }
-    const [openSections, setOpenSections] = useState({ classroom: true, normal: true }); // dropdown state for the group list
+    const [filter, setFilter] = useState("all"); // all | classroom | dm | squad
     const [contextMenu, setContextMenu] = useState(null); // { x, y, groupId } | null
 
     const activeGroup = groups.find((g) => g.id === activeGroupId) || null;
     const isClassroom = activeGroup?.type === "classroom";
+    const isDm = activeGroup?.type === "dm";
+    const isSquad = activeGroup?.type === "squad";
     const me = activeGroup?.members.find((m) => m.id === "you");
-    const isAdmin = me?.role === "admin";
-    const isTeacher = me?.role === "teacher";
-    const canAddMembers = activeGroup ? (isClassroom ? isTeacher : true) : false;
-    const canCreateTask = activeGroup ? (isClassroom ? isTeacher : true) : false;
+    const isAdmin = !!isSquad && me?.role === "admin";
+    // Classrooms have no teacher/student split — everyone can add members and post.
+    const canAddMembers = activeGroup ? !isDm : false;
+    const canCreateTask = !!isSquad; // only squads can create tasks now
+
+    useEffect(() => {
+        setGroups((prev) => syncClassGroups(prev, hubClasses));
+    }, [hubClasses]);
+
+    const visibleGroups = useMemo(() => groups.filter((g) => filter === "all" || g.type === filter), [groups, filter]);
 
     /* Keyboard shortcut: "/" focuses search, Esc clears/closes things — same as personalized.jsx */
     useEffect(() => {
@@ -1144,20 +1302,47 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
         setGroups((prev) => prev.map((g) => (g.id === activeGroupId ? fn(g) : g)));
     }
 
-    function createGroup(name, type) {
+    function createSquad(name, people) {
         const id = `g${Date.now()}`;
-        const base = {
+        const fresh = {
             id,
             name,
-            type,
+            type: "squad",
             color: colorForString(name),
-            members: [{ id: "you", name: "You", role: type === "classroom" ? "teacher" : "admin" }],
+            members: [{ id: "you", name: "You", role: "admin" }, ...people.map((p) => ({ id: p.id, name: p.name, role: "member" }))],
             messages: [],
+            files: [],
+            tasks: [],
         };
-        const fresh = type === "classroom" ? { ...base, teacherId: "you", materials: [], tasks: [] } : { ...base, files: [], tasks: [] };
         setGroups((prev) => [fresh, ...prev]);
         setActiveGroupId(id);
-        setShowCreateGroup(false);
+        setFilter("all");
+        setShowCreateSquad(false);
+        setOpenPanel(null);
+    }
+
+    /* Messenger-style: reuse the 1v1 chat with this person, or start a new one. */
+    function openDmWith(person) {
+        const existing = groups.find((g) => g.type === "dm" && g.members.some((m) => m.id === person.id || m.name === person.name));
+        let id = existing?.id;
+        if (!existing) {
+            id = `g${Date.now()}`;
+            const fresh = {
+                id,
+                name: person.name,
+                type: "dm",
+                color: colorForString(person.name),
+                members: [
+                    { id: "you", name: "You", role: "member" },
+                    { id: person.id, name: person.name, role: "member" },
+                ],
+                messages: [],
+            };
+            setGroups((prev) => [fresh, ...prev]);
+        }
+        setShowQuiz(false);
+        setActiveGroupId(id);
+        setFilter("all");
         setOpenPanel(null);
     }
 
@@ -1174,7 +1359,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
     function addMember(rawValue) {
         updateActiveGroup((g) => ({
             ...g,
-            members: [...g.members, { id: `m${Date.now()}`, name: rawValue, role: g.type === "classroom" ? "student" : "member" }],
+            members: [...g.members, { id: `m${Date.now()}`, name: rawValue, role: "member" }],
         }));
         setShowAddMember(false);
     }
@@ -1187,33 +1372,15 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
     }
 
     function createTask(fields) {
-        if (isClassroom) {
-            updateActiveGroup((g) => ({
-                ...g,
-                tasks: [
-                    ...(g.tasks || []),
-                    { id: `at${Date.now()}`, title: fields.title, desc: fields.desc, due: fields.due, points: fields.points, submissions: [], createdBy: "You" },
-                ],
-            }));
-        } else {
-            updateActiveGroup((g) => ({
-                ...g,
-                tasks: [
-                    ...(g.tasks || []),
-                    { id: `t${Date.now()}`, title: fields.title, desc: fields.desc, due: fields.due, badge: fields.badge || "SQUAD", createdBy: "You" },
-                ],
-            }));
-            onSyncTaskToSprintBoard?.(fields.title, { subject: (fields.badge || "SQUAD").toUpperCase(), meta: fields.due || activeGroup.name });
-        }
-        setShowNewTask(false);
-    }
-
-    function addMaterial(fields) {
         updateActiveGroup((g) => ({
             ...g,
-            materials: [...(g.materials || []), { id: `mat${Date.now()}`, title: fields.title, kind: fields.kind, link: fields.link, addedBy: "You" }],
+            tasks: [
+                ...(g.tasks || []),
+                { id: `t${Date.now()}`, title: fields.title, desc: fields.desc, due: fields.due, badge: fields.badge || "SQUAD", createdBy: "You" },
+            ],
         }));
-        setShowNewMaterial(false);
+        onSyncTaskToSprintBoard?.(fields.title, { subject: (fields.badge || "SQUAD").toUpperCase(), meta: fields.due || activeGroup.name });
+        setShowNewTask(false);
     }
 
     function submitTask(taskId) {
@@ -1224,23 +1391,10 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                     ? {
                         ...t,
                         submissions: [
-                            ...t.submissions.filter((s) => s.studentId !== "you"),
-                            { studentId: "you", studentName: "You", submittedAt: "Now", grade: null, feedback: "" },
+                            ...(t.submissions || []).filter((s) => s.studentId !== "you"),
+                            { studentId: "you", studentName: "You", submittedAt: "Now" },
                         ],
                     }
-                    : t
-            ),
-        }));
-    }
-
-    function saveGrade(taskId, studentId) {
-        const draft = gradeDrafts[`${taskId}:${studentId}`];
-        if (!draft) return;
-        updateActiveGroup((g) => ({
-            ...g,
-            tasks: g.tasks.map((t) =>
-                t.id === taskId
-                    ? { ...t, submissions: t.submissions.map((s) => (s.studentId === studentId ? { ...s, grade: draft.grade, feedback: draft.feedback || "" } : s)) }
                     : t
             ),
         }));
@@ -1252,55 +1406,67 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
             return [
                 { key: "tasks", label: "ASSIGNMENTS", count: activeGroup.tasks?.length || 0 },
                 { key: "materials", label: "MATERIALS", count: activeGroup.materials?.length || 0 },
-                { key: "grades", label: "GRADES" },
                 { key: "members", label: "MEMBERS", count: activeGroup.members.length },
             ];
+        }
+        if (isDm) {
+            return [{ key: "members", label: "MEMBERS", count: activeGroup.members.length }];
         }
         return [
             { key: "tasks", label: "TASKS", count: activeGroup.tasks?.length || 0 },
             { key: "files", label: "FILES", count: activeGroup.files?.length || 0 },
             { key: "members", label: "MEMBERS", count: activeGroup.members.length },
         ];
-    }, [activeGroup, isClassroom]);
+    }, [activeGroup, isClassroom, isDm]);
 
     function handleNavClick(key) {
-        if (key === "group") return;
+        setMobileNavOpen(false);
+        if (key === "group") return setShowQuiz(false);
         if (onNavigate) {
             onNavigate(key);
+        } else if (key === "classroom") {
+            // Classroom is a real route, so jump straight to it (the other keys
+            // still swap pages in place when no onNavigate prop was passed).
+            navigate("/classroom");
         } else if (key === "chatbot") {
             setFallbackPage("chatbot");
         } else if (key === "personalized") {
             setFallbackPage("personalized");
+        } else if (key === "dashboard") {
+            setFallbackPage("dashboard");
         }
-        setMobileNavOpen(false);
+    }
+
+    function openProfile(personId) {
+
+        navigate(`/profile/${personId}`);
+
+    }
+
+
+    function openTaskInClassroom(link) {
+        requestOpenClassroom({ classId: link.classId, classworkId: link.classworkId, tab: "classwork" });
+        handleNavClick("classroom");
+    }
+
+    function handleConfirmLogout() {
+        setShowLogoutConfirm(false);
+        // TODO: clear auth/session state here once real auth is wired up
+        navigate("/");
     }
 
     function openGroupTab(groupId, tabKey) {
+        setShowQuiz(false);
         setActiveGroupId(groupId);
         setOpenPanel(tabKey);
         setContextMenu(null);
     }
 
     function openGroupMessages(groupId) {
+        setShowQuiz(false);
         setActiveGroupId(groupId);
         setOpenPanel(null);
         setContextMenu(null);
-    }
-
-    if (loggedOut) {
-        return (
-            <div style={rootThemeStyle} className="flex flex-col items-center justify-center min-h-screen bg-[var(--t-bg0)] px-6 text-center">
-                <img src={IMG.logo} className="w-12 h-12 mb-4 object-fill" />
-                <span className="text-[color:var(--t-ac)] text-lg font-bold mb-2">CRAMMBLING</span>
-                <p className="text-[color:var(--t-tx2)] text-sm mb-6">You've been logged out.</p>
-                <button
-                    onClick={() => setLoggedOut(false)}
-                    className="bg-[var(--t-ac)] text-[color:var(--t-onac)] text-sm font-bold py-2 px-6 border border-solid border-[color:var(--t-bd0)] hover:opacity-90 transition-all duration-150 active:scale-95"
-                >
-                    LOG BACK IN
-                </button>
-            </div>
-        );
     }
 
     if (fallbackPage === "dashboard") {
@@ -1318,6 +1484,15 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
             />
         );
     }
+
+    const activeNavKey = showQuiz ? "quiz" : "group";
+
+    // Display-only numbers for the banner (derived from the existing chats, nothing new is stored)
+    const chatMix = [
+        { key: "classroom", label: "Classrooms", glyph: "⚑", color: "var(--t-ok)", n: groups.filter((g) => g.type === "classroom").length },
+        { key: "squad", label: "Squads", glyph: "▲", color: "var(--t-ac)", n: groups.filter((g) => g.type === "squad").length },
+        { key: "dm", label: "1v1", glyph: "◆", color: "var(--t-ac2)", n: groups.filter((g) => g.type === "dm").length },
+    ];
 
     return (
         <div style={rootThemeStyle} className="flex flex-col bg-[var(--t-bg0)] min-h-screen">
@@ -1345,10 +1520,6 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                     <div className="flex flex-col items-start self-stretch" style={{ boxShadow: "0px 2px 4px color-mix(in srgb, var(--t-ac) 30%, transparent)" }}>
                                         <span className="text-[color:var(--t-ac)] text-[17px] font-bold">CRAMMBLING</span>
                                     </div>
-                                    <div className="flex items-center self-stretch pt-1 gap-1">
-                                        <div className="bg-[var(--t-ok)] w-1.5 h-1.5" />
-                                        <span className="text-[color:var(--t-warn)] text-[10px] font-bold">VOXEL QUEST Lv.18</span>
-                                    </div>
                                 </div>
                             </div>
 
@@ -1358,7 +1529,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
 
                             <nav className="flex flex-col self-stretch px-3 gap-1">
                                 {NAV_ITEMS.map((item) => {
-                                    const active = item.key === "group";
+                                    const active = item.key === activeNavKey;
                                     return (
                                         <button
                                             key={item.key}
@@ -1389,7 +1560,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                 <span className="text-[color:var(--t-tx1)] text-[11px]">SETTINGS</span>
                             </button>
                             <button
-                                onClick={() => setLoggedOut(true)}
+                                onClick={() => setShowLogoutConfirm(true)}
                                 className="flex items-center self-stretch py-2 text-left hover:bg-[var(--t-bg3)] transition-all duration-150 active:scale-[0.98]"
                             >
                                 <img src={IMG.logout} className="w-3.5 h-3.5 mx-3 object-fill" />
@@ -1436,25 +1607,21 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                             onChange={(e) => setSearchQuery(e.target.value)}
                                             onFocus={() => setSearchFocused(true)}
                                             onBlur={() => setSearchFocused(false)}
-                                            placeholder={searchFocused ? "Search group chats..." : "[ / ] Search group chats..."}
+                                            placeholder={searchFocused ? "Search messages..." : "[ / ] Search messages..."}
                                             className="bg-transparent outline-none text-[color:var(--t-tx0)] placeholder-[color:var(--t-tx2)] text-xs w-full min-w-0"
                                         />
                                     </div>
                                 </div>
-
-                                <div className="hidden sm:flex flex-col shrink-0 items-start bg-[var(--t-bg3)] py-[3px] px-[9px] border border-solid border-[color:var(--t-bd0)]">
-                                    <span className="text-[color:var(--t-ac)] text-[10px]">VOXEL ENGINE V2.4</span>
-                                </div>
                             </div>
 
                             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                                <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:var(--t-bd0)]">
+                                <div className="flex shrink-0 items-center bg-[color-mix(in_srgb,_var(--t-warn)_14%,_transparent)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:color-mix(in_srgb,_var(--t-warn)_45%,_transparent)]">
                                     <img src={IMG.streak} className="w-3 h-3.5 object-fill" />
-                                    <span className="text-[color:var(--t-warn)] text-[11px] font-bold hidden xs:inline">14 STREAK</span>
+                                    <span className="text-[color:var(--t-warn)] text-[11px] font-bold tracking-wider hidden xs:inline">▲ 14 STREAK</span>
                                 </div>
-                                <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:var(--t-bd0)]">
+                                <div className="flex shrink-0 items-center bg-[color-mix(in_srgb,_var(--t-ac)_14%,_transparent)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:color-mix(in_srgb,_var(--t-ac)_45%,_transparent)]">
                                     <img src={IMG.xp} className="w-[15px] h-[13px] object-fill" />
-                                    <span className="text-[color:var(--t-ac)] text-[11px] font-bold hidden xs:inline">3,420 XP</span>
+                                    <span className="text-[color:var(--t-ac)] text-[11px] font-bold tracking-wider hidden xs:inline">3,420 XP</span>
                                 </div>
 
                                 <button className="relative shrink-0" onClick={() => setNotifOpen((v) => !v)} aria-label="Notifications">
@@ -1467,7 +1634,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                     )}
                                 </button>
 
-                                <button onClick={() => setSettingsOpen(true)} className="flex flex-col shrink-0 items-start px-1 sm:px-2" aria-label="Profile / Settings">
+                                <button onClick={() => navigate("/profile")} className="flex flex-col shrink-0 items-start px-1 sm:px-2" aria-label="My profile">
                                     <div
                                         className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"
                                         style={{ boxShadow: "0px 1px 2px #0000000D" }}
@@ -1478,143 +1645,136 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                             </div>
                         </div>
 
-                        {/* Content */}
-                        <div className="flex flex-col self-stretch px-4 sm:px-6 lg:px-10 py-4 gap-4">
-                            <div className="flex flex-col sm:flex-row items-start self-stretch gap-4">
-                                {/* Group list */}
-                                <div
-                                    className="flex flex-col w-full sm:w-64 shrink-0 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-3 gap-2"
-                                    style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
-                                >
-                                    <div className="flex justify-between items-center pb-1">
-                                        <span className="text-[color:var(--t-tx0)] text-xs font-bold">MY GROUP CHATS</span>
-                                        <span className="text-[color:var(--t-tx2)] text-[10px]">{groups.length}</span>
+                        {/* Quiz Arena placeholder (shown inside the page, sidebar and top bar stay) */}
+                        {showQuiz && <QuizArena where="Group Collab" onBack={() => setShowQuiz(false)} />}
+
+                        {/* Content (hidden, not unmounted, while Quiz Arena is open so chats are kept) */}
+                        <div className={`${showQuiz ? "hidden" : "flex"} flex-col self-stretch px-4 sm:px-6 py-6 gap-6`}>
+                            {/* Banner — same "player card" idea as the Dashboard, built from the chats you already have */}
+                            <section className="border border-solid border-[color:var(--t-bd0)] bg-[var(--t-bg1)] p-4 sm:p-5" style={{ boxShadow: PIXEL_SHADOW }}>
+                                <div className="flex flex-wrap items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4 min-w-0">
+                                        <HubAvatar />
+                                        <div className="min-w-0">
+                                            <p className={LABEL}>Squad HQ</p>
+                                            <div className="flex flex-wrap items-center gap-2.5 mt-1">
+                                                <h1 className="text-[22px] sm:text-[26px] leading-none font-bold uppercase tracking-wide text-[color:var(--t-tx0)]">Group Collab</h1>
+                                                <Badge color="var(--t-ok)">[{groups.length} {groups.length === 1 ? "CHAT" : "CHATS"}]</Badge>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <button
-                                        onClick={() => setShowCreateGroup(true)}
-                                        className="flex justify-center items-center bg-[var(--t-bg3)] py-2 gap-1.5 border border-solid border-[color:var(--t-bd0)] hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-[0.98]"
-                                    >
-                                        <span className="text-[color:var(--t-ac)] text-xs font-bold">+ NEW GROUP CHAT</span>
-                                    </button>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {chatMix.map((m) => (
+                                            <Badge key={m.key} color={m.color}>
+                                                {m.glyph} {m.n} {m.label}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </div>
+ 
+                            </section>
 
-                                    <p className="text-[color:var(--t-bd1)] text-[10px] italic px-0.5">Right-click a chat for quick access.</p>
+                            <div className="flex flex-col sm:flex-row items-start self-stretch gap-6">
+                                {/* Messages list with dropdown filter */}
+                                <div
+                                    className="flex flex-col w-full sm:w-72 shrink-0 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)]"
+                                    style={{ boxShadow: PIXEL_SHADOW }}
+                                >
+                                    <PanelHeader icon="✉" title="MY MESSAGES" right={<Badge color="var(--t-warn)">{visibleGroups.length}</Badge>} />
+                                    <div className="flex flex-col gap-2 p-3">
+                                        {/* Find a student / teacher and chat with them 1v1 */}
+                                        <PeopleSearch onSelect={openDmWith} />
 
-                                    <div className="flex flex-col gap-2 max-h-[420px] overflow-y-auto pr-0.5">
-                                        {[
-                                            { key: "classroom", label: "CLASSROOMS", color: "var(--t-ok)" },
-                                            { key: "normal", label: "SQUADS", color: "var(--t-ac)" },
-                                        ].map((section) => {
-                                            const items = groups.filter((g) => (section.key === "classroom" ? g.type === "classroom" : g.type !== "classroom"));
-                                            const open = openSections[section.key];
-                                            return (
-                                                <div key={section.key} className="flex flex-col gap-1">
+                                        {/* Dropdown filter + create squad */}
+                                        <div className="flex items-stretch gap-1.5">
+                                            <div className="flex-1 min-w-0">
+                                                <FilterDropdown value={filter} onChange={setFilter} />
+                                            </div>
+                                            <button
+                                                onClick={() => setShowCreateSquad(true)}
+                                                aria-label="Create a squad group chat"
+                                                title="Create a squad group chat"
+                                                className={`flex items-center justify-center w-8 shrink-0 text-base leading-none ${PRIMARY_BTN}`}
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+
+                                        <p className="text-[color:var(--t-tx2)] text-[10px] italic px-0.5 opacity-80">Right-click a message for quick access.</p>
+
+                                        <div className="flex flex-col gap-1.5 max-h-[460px] overflow-y-auto pr-0.5">
+                                            {visibleGroups.length === 0 && (
+                                                <p className="text-[color:var(--t-tx2)] text-xs py-6 text-center">Nothing here yet.</p>
+                                            )}
+                                            {visibleGroups.map((g) => {
+                                                const active = g.id === activeGroupId;
+                                                const lastMsg = g.messages[g.messages.length - 1];
+                                                const myRole = g.members.find((m) => m.id === "you")?.role;
+                                                const showRole = g.type === "squad" && myRole;
+                                                return (
                                                     <button
-                                                        onClick={() => setOpenSections((s) => ({ ...s, [section.key]: !s[section.key] }))}
-                                                        aria-expanded={open}
-                                                        className="flex items-center gap-2 py-1.5 px-2 border border-solid bg-[var(--t-bg2)] border-[color:var(--t-bd0)] hover:border-[color:var(--t-bd1)] transition-all duration-150 active:scale-[0.99]"
-                                                        style={{ borderLeft: `3px solid ${section.color}` }}
+                                                        key={g.id}
+                                                        onClick={() => {
+                                                            setActiveGroupId(g.id);
+                                                            setOpenPanel(null);
+                                                        }}
+                                                        onContextMenu={(e) => {
+                                                            e.preventDefault();
+                                                            setContextMenu({ x: e.clientX, y: e.clientY, groupId: g.id });
+                                                        }}
+                                                        className={`flex items-center gap-2.5 p-2 text-left border border-solid border-l-[3px] transition-all duration-150 ${active ? "bg-[var(--t-bg3)]" : "bg-[var(--t-bg0)] hover:bg-[var(--t-bg2)]"}`}
+                                                        style={{
+                                                            borderColor: active ? withAlpha(g.color, "99") : "var(--t-bd0)",
+                                                            borderLeftColor: g.color,
+                                                            boxShadow: active ? `0px 0px 12px ${withAlpha(g.color, "33")}` : undefined,
+                                                        }}
                                                     >
-                                                        <svg
-                                                            width="10"
-                                                            height="10"
-                                                            viewBox="0 0 24 24"
-                                                            fill="none"
-                                                            stroke={section.color}
-                                                            strokeWidth="3"
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            className="shrink-0 transition-transform duration-200"
-                                                            style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
-                                                        >
-                                                            <polyline points="9 18 15 12 9 6" />
-                                                        </svg>
-                                                        <span className="text-xs font-bold flex-1 text-left" style={{ color: section.color }}>
-                                                            {section.label}
-                                                        </span>
-                                                        <span className="text-[10px] font-bold px-1.5 py-px" style={{ backgroundColor: withAlpha(section.color, "22"), color: section.color }}>
-                                                            {items.length}
-                                                        </span>
-                                                    </button>
-
-                                                    {open && (
-                                                        <div className="flex flex-col gap-1.5 pl-1.5">
-                                                            {items.length === 0 && <p className="text-[color:var(--t-bd1)] text-[10px] italic py-1.5 px-2">Nothing here yet.</p>}
-                                                            {items.map((g) => {
-                                                                const active = g.id === activeGroupId;
-                                                                const lastMsg = g.messages[g.messages.length - 1];
-                                                                const myRole = g.members.find((m) => m.id === "you")?.role;
-                                                                const myRoleColor = myRole === "admin" || myRole === "teacher" ? "var(--t-ac)" : "var(--t-tx2)";
-                                                                return (
-                                                                    <button
-                                                                        key={g.id}
-                                                                        onClick={() => {
-                                                                            setActiveGroupId(g.id);
-                                                                            setOpenPanel(null);
-                                                                        }}
-                                                                        onContextMenu={(e) => {
-                                                                            e.preventDefault();
-                                                                            setContextMenu({ x: e.clientX, y: e.clientY, groupId: g.id });
-                                                                        }}
-                                                                        className={`flex items-center gap-2.5 p-2 text-left border border-solid transition-all duration-150 ${active ? "bg-[var(--t-bg3)] border-[#00000000]" : "border-[#00000000] hover:bg-[var(--t-bg2)]"}`}
-                                                                        style={active ? { boxShadow: `0px 0px 12px ${withAlpha(g.color, "33")}` } : undefined}
-                                                                    >
-                                                                        <div
-                                                                            className="w-8 h-8 shrink-0 flex items-center justify-center text-[10px] font-bold"
-                                                                            style={{ backgroundColor: withAlpha(g.color, "33"), color: g.color, border: `1px solid ${withAlpha(g.color, "4D")}` }}
-                                                                        >
-                                                                            {initialsFor(g.name)}
-                                                                        </div>
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <div className="flex items-center gap-1.5">
-                                                                                <span className="text-[color:var(--t-tx0)] text-xs font-bold truncate">{g.name}</span>
-                                                                                {myRole && (
-                                                                                    <span className="text-[9px] font-bold shrink-0" style={{ color: myRoleColor }}>
-                                                                                        · {myRole.toUpperCase()}
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                            <span className="text-[color:var(--t-tx2)] text-[10px] truncate block">{lastMsg ? lastMsg.text : "No messages yet"}</span>
-                                                                        </div>
-                                                                    </button>
-                                                                );
-                                                            })}
+                                                        <GroupAvatar color={g.color} name={g.name} />
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-[color:var(--t-tx0)] text-xs font-bold truncate">{g.name}</span>
+                                                                {showRole && (
+                                                                    <Badge color={myRole === "admin" ? "var(--t-ac)" : "var(--t-tx2)"} className="!text-[8px] !py-0 !px-1">
+                                                                        {myRole.toUpperCase()}
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                            <span className="text-[color:var(--t-tx2)] text-[10px] truncate block">{lastMsg ? lastMsg.text : "No messages yet"}</span>
                                                         </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                        {groups.length === 0 && <p className="text-[color:var(--t-tx2)] text-xs py-4 text-center">No group chats yet — create one above.</p>}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Active group */}
+                                {/* Active conversation */}
                                 <div className="flex-1 min-w-0 flex flex-col gap-3">
                                     {!activeGroup ? (
                                         <div
                                             className="flex flex-col items-center justify-center self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-10 gap-2"
-                                            style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
+                                            style={{ boxShadow: PIXEL_SHADOW }}
                                         >
-                                            <span className="text-[color:var(--t-tx0)] text-sm font-bold">No group chat selected</span>
-                                            <p className="text-[color:var(--t-tx2)] text-xs">Create or pick a group chat from the list on the left.</p>
+                                            <span className="text-[color:var(--t-ac)] text-2xl leading-none">✉</span>
+                                            <span className="text-[color:var(--t-tx0)] text-sm font-bold uppercase tracking-wider">No message selected</span>
+                                            <p className="text-[color:var(--t-tx2)] text-xs">Create or pick a conversation from the list on the left.</p>
                                         </div>
                                     ) : (
                                         <>
                                             {/* Header */}
                                             <div
-                                                className="flex flex-wrap justify-between items-center gap-3 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-3 sm:p-4"
-                                                style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
+                                                className="flex flex-wrap justify-between items-center gap-3 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] border-t-[3px] p-3 sm:p-4"
+                                                style={{ boxShadow: PIXEL_SHADOW, borderTopColor: activeGroup.color }}
                                             >
                                                 <div className="flex items-center gap-3 min-w-0">
-                                                    <div
-                                                        className="w-10 h-10 shrink-0 flex items-center justify-center text-xs font-bold"
-                                                        style={{ backgroundColor: withAlpha(activeGroup.color, "33"), color: activeGroup.color, border: `1px solid ${withAlpha(activeGroup.color, "4D")}` }}
-                                                    >
-                                                        {initialsFor(activeGroup.name)}
-                                                    </div>
+                                                    <GroupAvatar color={activeGroup.color} name={activeGroup.name} className="w-12 h-12 text-sm" />
                                                     <div className="min-w-0">
-                                                        <span className="text-[color:var(--t-tx0)] text-base font-bold truncate block">{activeGroup.name}</span>
-                                                        <div className="flex items-center gap-1.5">
-                                                            <Badge color={isClassroom ? "var(--t-ok)" : "var(--t-ac)"}>{isClassroom ? "CLASSROOM" : "SQUAD"}</Badge>
+                                                        <span className="text-[color:var(--t-tx0)] text-base font-bold uppercase tracking-wide truncate block">{activeGroup.name}</span>
+                                                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                            <Badge color={isClassroom ? "var(--t-ok)" : isDm ? "var(--t-ac2)" : "var(--t-ac)"}>
+                                                                {isClassroom ? "CLASSROOM" : isDm ? "1v1" : "SQUAD"}
+                                                            </Badge>
+                                                            <Pips value={activeGroup.members.length} color={activeGroup.color} />
                                                             <span className="text-[color:var(--t-tx2)] text-[11px]">
                                                                 {activeGroup.members.length} member{activeGroup.members.length === 1 ? "" : "s"}
                                                             </span>
@@ -1625,7 +1785,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                                 {/* Single entry point into the tabbed pop-up card */}
                                                 <button
                                                     onClick={() => setOpenPanel(tabDefs[0]?.key || "members")}
-                                                    className="flex items-center gap-1.5 py-1.5 px-3 border border-solid border-[color:var(--t-bd0)] bg-[var(--t-bg0)] text-[color:var(--t-tx1)] text-[10px] font-bold hover:border-[color:var(--t-ac)] hover:text-[color:var(--t-ac)] transition-all duration-150 active:scale-95"
+                                                    className="flex items-center justify-center w-10 h-10 border-2 border-solid border-[color:var(--t-bd0)] bg-[var(--t-bg0)] text-[color:var(--t-tx1)] text-base font-bold hover:bg-[var(--t-ac)] hover:border-[color:var(--t-ac)] hover:text-[color:var(--t-onac)] transition-all duration-150 active:scale-95"
                                                 >
                                                     <span>☰</span>
                                                 </button>
@@ -1633,56 +1793,103 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
 
                                             {/* Chat stream */}
                                             <div
-                                                className="flex flex-col self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-3 sm:p-4 gap-3 h-[600px]"
-                                                style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
+                                                className="flex flex-col self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] h-[600px]"
+                                                style={{ boxShadow: PIXEL_SHADOW }}
                                             >
-                                                <div className="flex-1 flex flex-col gap-3 max-h-[380px] overflow-y-auto pr-1">
-                                                    {activeGroup.messages.length === 0 && <p className="text-[color:var(--t-tx2)] text-xs py-6 text-center">No messages yet — say hi!</p>}
-                                                    {activeGroup.messages.map((m) => {
-                                                        const mine = m.senderId === "you";
-                                                        return (
-                                                            <div key={m.id} className={`flex flex-col gap-0.5 ${mine ? "items-end" : "items-start"}`}>
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">{m.senderName}</span>
-                                                                    <span className="text-[color:var(--t-bd1)] text-[10px]">{m.time}</span>
-                                                                </div>
-                                                                <div
-                                                                    className={`max-w-[80%] py-2 px-3 text-xs ${mine ? "bg-[var(--t-ac)] text-[color:var(--t-onac)]" : "bg-[var(--t-bg3)] text-[color:var(--t-tx0)] border border-solid border-[color:var(--t-bd0)]"
-                                                                        }`}
-                                                                >
-                                                                    {m.text}
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-
-                                                <form onSubmit={sendMessage} className="flex items-center gap-2 pt-2 border-t border-solid border-[color:var(--t-bd0)]">
-                                                    <input
-                                                        value={messageText}
-                                                        onChange={(e) => setMessageText(e.target.value)}
-                                                        placeholder={`Message ${activeGroup.name}...`}
-                                                        className="flex-1 min-w-0 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac)]"
-                                                    />
-                                                    {!isClassroom && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                updateActiveGroup((g) => ({
-                                                                    ...g,
-                                                                    files: [...(g.files || []), { id: `f${Date.now()}`, name: "Shared_File.pdf", uploadedBy: "You", size: "0.9 MB" }],
-                                                                }))
+                                                <PanelHeader icon="▤" title="CHAT LOG" right={<Badge color="var(--t-ac)">{activeGroup.messages.length} MSG</Badge>} />
+                                                <div className="flex flex-col flex-1 min-h-0 p-3 sm:p-4 gap-3">
+                                                    <div className="flex-1 flex flex-col gap-3 max-h-[380px] overflow-y-auto pr-1">
+                                                        {activeGroup.messages.length === 0 && <p className="text-[color:var(--t-tx2)] text-xs py-6 text-center">No messages yet — say hi!</p>}
+                                                        {activeGroup.messages.map((m) => {
+                                                            if (m.kind === "system") {
+                                                                return (
+                                                                    <div key={m.id} className="self-center flex items-center gap-2 py-1 px-3 border border-dashed border-[color:var(--t-bd1)] text-[color:var(--t-tx2)] text-[10px] font-bold uppercase tracking-wider">
+                                                                        <span className="text-[color:var(--t-ok)]">✦</span>
+                                                                        {m.text}
+                                                                        {m.time && <span className="opacity-70">· {m.time}</span>}
+                                                                    </div>
+                                                                );
                                                             }
-                                                            className="shrink-0 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx1)] text-xs py-2 px-3 hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-95"
-                                                            aria-label="Attach a file"
-                                                        >
-                                                            📎
+                                                            if (m.kind === "task" && m.link) {
+                                                                const isMaterial = m.link.type === "material";
+                                                                return (
+                                                                    <div key={m.id} className="flex flex-col gap-0.5 items-start">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <PersonName name={m.senderName} onOpenProfile={openProfile} className="text-[10px] font-bold uppercase tracking-wider" style={{ color: colorForString(m.senderName) }} />
+                                                                            <span className="text-[color:var(--t-tx2)] text-[10px] opacity-70">{m.time}</span>
+                                                                        </div>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => openTaskInClassroom(m.link)}
+                                                                            title="Open this task in Classroom"
+                                                                            className="group w-full max-w-[85%] flex flex-col gap-2 text-left p-3 bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] border-l-[3px] border-l-[color:var(--t-ok)] hover:border-[color:var(--t-ok)] transition-all duration-150 active:scale-[0.99]"
+                                                                            style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
+                                                                        >
+                                                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                                                <Badge color="var(--t-ok)">⚑ {TASK_TYPE_LABEL[m.link.type] || "Task"}</Badge>
+                                                                                <span className="text-[color:var(--t-tx2)] text-[10px] font-bold uppercase tracking-wider truncate">{m.link.className}</span>
+                                                                            </div>
+                                                                            <span className="text-[color:var(--t-tx0)] text-sm font-bold">{m.link.title}</span>
+                                                                            {(m.link.due || m.link.points != null) && (
+                                                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                                                    {m.link.due && !isMaterial && <Badge color="var(--t-warn)">▲ Due {m.link.due}</Badge>}
+                                                                                    {m.link.points != null && <Badge color="var(--t-ac)">{m.link.points} PTS</Badge>}
+                                                                                </div>
+                                                                            )}
+                                                                            <span className="text-[color:var(--t-ac)] text-[10px] font-bold uppercase tracking-wider group-hover:translate-x-0.5 transition-transform">
+                                                                                Open in Classroom →
+                                                                            </span>
+                                                                        </button>
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            const mine = m.senderId === "you";
+                                                            return (
+                                                                <div key={m.id} className={`flex flex-col gap-0.5 ${mine ? "items-end" : "items-start"}`}>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <PersonName name={m.senderName} onOpenProfile={openProfile} className="text-[10px] font-bold uppercase tracking-wider" style={{ color: mine ? "var(--t-ac)" : colorForString(m.senderName) }} />
+                                                                        <span className="text-[color:var(--t-tx2)] text-[10px] opacity-70">{m.time}</span>
+                                                                    </div>
+                                                                    <div
+                                                                        className={`max-w-[80%] py-2 px-3 text-xs ${mine ? "bg-[var(--t-ac)] text-[color:var(--t-onac)] border border-solid border-[color:var(--t-ac2)]" : "bg-[var(--t-bg0)] text-[color:var(--t-tx0)] border border-solid border-[color:var(--t-bd0)] border-l-[3px]"
+                                                                            }`}
+                                                                        style={mine ? { boxShadow: "2px 2px 0px var(--t-shadow)" } : { borderLeftColor: colorForString(m.senderName) }}
+                                                                    >
+                                                                        {m.text}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    <form onSubmit={sendMessage} className="flex items-center gap-2 pt-2 border-t border-solid border-[color:var(--t-bd0)]">
+                                                        <input
+                                                            value={messageText}
+                                                            onChange={(e) => setMessageText(e.target.value)}
+                                                            placeholder={`Message ${activeGroup.name}...`}
+                                                            className="flex-1 min-w-0 bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] placeholder-[color:var(--t-tx2)] text-xs py-2.5 px-3 outline-none focus:border-[color:var(--t-ac)]"
+                                                        />
+                                                        {isSquad && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    updateActiveGroup((g) => ({
+                                                                        ...g,
+                                                                        files: [...(g.files || []), { id: `f${Date.now()}`, name: "Shared_File.pdf", uploadedBy: "You", size: "0.9 MB" }],
+                                                                    }))
+                                                                }
+                                                                className="shrink-0 bg-[var(--t-bg0)] border-2 border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx1)] text-xs py-2 px-3 hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-95"
+                                                                aria-label="Attach a file"
+                                                            >
+                                                                📎
+                                                            </button>
+                                                        )}
+                                                        <button type="submit" className={`shrink-0 text-xs py-2 px-4 ${PRIMARY_BTN}`}>
+                                                            SEND 
+                                                            
                                                         </button>
-                                                    )}
-                                                    <button type="submit" className="shrink-0 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2 px-4 hover:opacity-90 transition-all duration-150 active:scale-95">
-                                                        SEND
-                                                    </button>
-                                                </form>
+                                                    </form>
+                                                </div>
                                             </div>
                                         </>
                                     )}
@@ -1692,31 +1899,15 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                     </div>
                 </div>
 
-                {/* Settings drawer — same design as chatbot.jsx / personalized.jsx */}
-                {settingsOpen && (
-                    <div className="fixed inset-0 z-50 flex justify-end">
-                        <div className="flex-1 bg-black/60" onClick={() => setSettingsOpen(false)} />
-                        <div className="w-full max-w-xs overflow-y-auto bg-[var(--t-bg2)] border-l border-solid border-[color:var(--t-bd0)] p-5 flex flex-col gap-4">
-                            <div className="flex justify-between items-center">
-                                <span className="text-[color:var(--t-tx0)] text-sm font-bold">SETTINGS</span>
-                                <button onClick={() => setSettingsOpen(false)}>
-                                    <CloseIcon className="w-4 h-4" />
-                                </button>
-                            </div>
-                            <ThemePicker theme={theme} onChange={setTheme} />
-                            <ToggleRow label="Group message notifications" defaultOn />
-                            <ToggleRow label="Grade posted alerts" defaultOn />
-                            <ToggleRow label="Sync tasks to Sprint Board" defaultOn />
-                        </div>
-                    </div>
-                )}
+                {/* Settings drawer — shared by every page (and Quiz Arena) */}
+                <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} theme={theme} onThemeChange={setTheme} />
             </div>
 
             {openPanel && activeGroup && (
                 <GroupDetailModal
                     group={activeGroup}
                     isClassroom={isClassroom}
-                    isTeacher={isTeacher}
+                    isDm={isDm}
                     isAdmin={isAdmin}
                     canAddMembers={canAddMembers}
                     canCreateTask={canCreateTask}
@@ -1725,13 +1916,10 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                     tabDefs={tabDefs}
                     onClose={() => setOpenPanel(null)}
                     onNewTask={() => setShowNewTask(true)}
-                    onNewMaterial={() => setShowNewMaterial(true)}
                     onAddMember={() => setShowAddMember(true)}
                     onSubmitTask={submitTask}
                     onPromote={promoteToAdmin}
-                    gradeDrafts={gradeDrafts}
-                    setGradeDrafts={setGradeDrafts}
-                    onSaveGrade={saveGrade}
+                    onOpenProfile={openProfile}
                 />
             )}
 
@@ -1751,10 +1939,14 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                     );
                 })()}
 
-            {showCreateGroup && <CreateGroupModal onClose={() => setShowCreateGroup(false)} onCreate={createGroup} />}
+            {showCreateSquad && <CreateSquadModal onClose={() => setShowCreateSquad(false)} onCreate={createSquad} />}
             {showAddMember && <AddMemberModal onClose={() => setShowAddMember(false)} onAdd={addMember} />}
-            {showNewTask && <NewTaskModal isClassroom={isClassroom} onClose={() => setShowNewTask(false)} onCreate={createTask} />}
-            {showNewMaterial && <NewMaterialModal onClose={() => setShowNewMaterial(false)} onCreate={addMaterial} />}
+            {showNewTask && <NewTaskModal onClose={() => setShowNewTask(false)} onCreate={createTask} />}
+
+            {/* Logout confirmation — same popup as the Dashboard */}
+            {showLogoutConfirm && (
+                <LogoutConfirmModal onConfirm={handleConfirmLogout} onCancel={() => setShowLogoutConfirm(false)} />
+            )}
         </div>
     );
 }

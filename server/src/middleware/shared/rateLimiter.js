@@ -60,3 +60,24 @@ export const searchRateLimiter = rateLimit({
         return req.user?.id?.toString() || ipKeyGenerator(req);
     },
 });
+
+export const studyEventWriteRateLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 60,
+    keyGenerator: (req) => req.user?.id ?? ipKeyGenerator(req),
+    message: { success: false, message: "Too many study event changes. Please try again later." },
+});
+
+export const sprintTaskWriteRateLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 120,
+    keyGenerator: (req) => req.user?.id ?? ipKeyGenerator(req),
+    message: { success: false, message: "Too many sprint board changes. Please try again later." },
+});
+
+export const googleCalendarRateLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 10,
+    keyGenerator: (req) => req.user?.id ?? ipKeyGenerator(req),
+    message: { success: false, message: "Too many Google Calendar connection attempts. Please try again later." },
+});

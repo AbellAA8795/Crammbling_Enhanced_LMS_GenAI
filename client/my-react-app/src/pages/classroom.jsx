@@ -7,6 +7,7 @@ import GroupCollab from "./group_collab";
 import Personalized from "./personalized";
 import QuizArena from "./QuizArena";
 import { useTheme, themeStyle, withAlpha, CloseIcon, MenuIcon } from "./Theme";
+import { useHubClasses, useOpenRequest, clearOpenRequest, clockNow } from "./Classhub";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import Settings from "../components/Settings";
 
@@ -152,15 +153,14 @@ const NAV_ITEMS = [
 /* ------------------------------------------------------------------ */
 const CURRENT_USER = { id: "you", name: "You", email: "you@univ.edu" };
 
+/* Class colours are theme roles, not fixed hex values, so every class
+   automatically re-tints itself when the theme changes. */
 const CLASS_COLORS = [
-    "#1967d2", // blue
-    "#188038", // green
-    "#d93025", // red
-    "#e37400", // orange
-    "#9334e6", // purple
-    "#00838f", // teal
-    "#c5221f", // deep red
-    "#3949ab", // indigo
+    "var(--t-ac)",
+    "var(--t-ok)",
+    "var(--t-warn)",
+    "var(--t-ac2)",
+    "var(--t-ok2)",
 ];
 
 function colorForString(s) {
@@ -191,307 +191,79 @@ function toISODate(d) {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Sample data                                                         */
-/* ------------------------------------------------------------------ */
-const INITIAL_CLASSES = [
-    {
-        id: "cls_cs240",
-        name: "Data Structures & Algorithms",
-        section: "CS240 — Section A",
-        subject: "CS240",
-        room: "Room 304",
-        code: "alg0k2",
-        color: "#1967d2",
-        owner: "Prof. Reyes",
-        teachers: [{ id: "t1", name: "Prof. Reyes", email: "reyes@univ.edu" }],
-        students: [
-            { id: "you", name: "You" },
-            { id: "s1", name: "Maya K." },
-            { id: "s2", name: "Alex Chen" },
-            { id: "s3", name: "Priya N." },
-            { id: "s4", name: "Owen T." },
-            { id: "s5", name: "Riley P." },
-        ],
-        topics: ["Graphs", "Trees", "Sorting & Heaps"],
-        classwork: [
-            {
-                id: "cw1",
-                type: "assignment",
-                topic: "Graphs",
-                title: "Assignment 3: Dijkstra Implementation",
-                description: "Implement shortest path with a min-heap. Include a write-up of the time complexity.",
-                due: "Mon, Mar 23, 11:59 PM",
-                points: 100,
-                posted: "Mar 18",
-                attachments: [{ name: "Assignment_3_Starter.zip", size: "48 KB" }],
-                submitted: false,
-                grade: null,
-            },
-            {
-                id: "cw2",
-                type: "quiz",
-                topic: "Trees",
-                title: "Quiz 2: Balanced Tree Rotations",
-                description: "Covers AVL and Red-Black rotations. Timed — 25 minutes.",
-                due: "Fri, Mar 20, 9:00 AM",
-                points: 40,
-                posted: "Mar 16",
-                attachments: [],
-                submitted: false,
-                grade: null,
-            },
-            {
-                id: "cw3",
-                type: "material",
-                topic: "Graphs",
-                title: "Chapter 5 Slides — Graph Traversals",
-                description: "BFS, DFS, and topological sort reference deck.",
-                posted: "Mar 15",
-                attachments: [{ name: "Chapter_5_Graph_Traversals.pdf", size: "3.1 MB" }],
-            },
-            {
-                id: "cw4",
-                type: "question",
-                topic: "Sorting & Heaps",
-                title: "Which heap operation dominates heapify cost?",
-                description: "Answer briefly and justify.",
-                due: "Wed, Mar 25, 11:59 PM",
-                points: 10,
-                posted: "Mar 19",
-                attachments: [],
-                submitted: true,
-                grade: 10,
-            },
-            {
-                id: "cw5",
-                type: "assignment",
-                topic: "Trees",
-                title: "Assignment 2: BST Deletion",
-                description: "Handle all three deletion cases and write unit tests.",
-                due: "Fri, Mar 14, 11:59 PM",
-                points: 100,
-                posted: "Mar 08",
-                attachments: [],
-                submitted: true,
-                grade: 92,
-            },
-        ],
-        stream: [
-            {
-                id: "p1",
-                type: "announcement",
-                authorId: "t1",
-                authorName: "Prof. Reyes",
-                authorRole: "teacher",
-                text: "Reminder: Midterm covers chapters 1–6. Bring your student ID.",
-                time: "Mar 19",
-                comments: [
-                    { id: "c1", authorId: "s1", authorName: "Maya K.", text: "Will graph algorithms be on it?", time: "Mar 19" },
-                    { id: "c2", authorId: "t1", authorName: "Prof. Reyes", text: "Yes, sections 5.1–5.4.", time: "Mar 19" },
-                ],
-            },
-            {
-                id: "p2",
-                type: "assignment",
-                authorId: "t1",
-                authorName: "Prof. Reyes",
-                authorRole: "teacher",
-                text: "Assignment 3 is now live. Start early — it's the heaviest one this term.",
-                time: "Mar 18",
-                classworkId: "cw1",
-                comments: [],
-            },
-            {
-                id: "p3",
-                type: "material",
-                authorId: "t1",
-                authorName: "Prof. Reyes",
-                authorRole: "teacher",
-                text: "Added the Chapter 5 slides to Classwork.",
-                time: "Mar 15",
-                classworkId: "cw3",
-                comments: [],
-            },
-        ],
-    },
-    {
-        id: "cls_math210",
-        name: "Discrete Mathematics",
-        section: "MATH210 — Section B",
-        subject: "MATH210",
-        room: "Hall C",
-        code: "dsc7t4",
-        color: "#188038",
-        owner: "Dr. Navarro",
-        teachers: [{ id: "t2", name: "Dr. Navarro", email: "navarro@univ.edu" }],
-        students: [
-            { id: "you", name: "You" },
-            { id: "s6", name: "Devon M." },
-            { id: "s7", name: "Riley P." },
-            { id: "s8", name: "Sam W." },
-        ],
-        topics: ["Set Theory", "Induction", "Combinatorics"],
-        classwork: [
-            {
-                id: "cw_m1",
-                type: "assignment",
-                topic: "Induction",
-                title: "Assignment 4: Strong Induction Proofs",
-                description: "Problems 1–8 from the handout. Show every step.",
-                due: "Fri, Mar 27, 11:59 PM",
-                points: 60,
-                posted: "Mar 20",
-                attachments: [{ name: "Induction_Handout.pdf", size: "820 KB" }],
-                submitted: false,
-                grade: null,
-            },
-            {
-                id: "cw_m2",
-                type: "material",
-                topic: "Set Theory",
-                title: "Set Theory Review Deck",
-                description: "Definitions, notation, and worked examples.",
-                posted: "Mar 12",
-                attachments: [{ name: "Set_Theory_Review.pdf", size: "1.4 MB" }],
-            },
-            {
-                id: "cw_m3",
-                type: "assignment",
-                topic: "Set Theory",
-                title: "Assignment 2: Set Theory Proofs",
-                description: "Prove the given identities using set builder notation.",
-                due: "Fri, Mar 14, 11:59 PM",
-                points: 50,
-                posted: "Mar 06",
-                attachments: [],
-                submitted: true,
-                grade: 45,
-            },
-        ],
-        stream: [
-            {
-                id: "p_m1",
-                type: "announcement",
-                authorId: "t2",
-                authorName: "Dr. Navarro",
-                authorRole: "teacher",
-                text: "Grades for Assignment 2 are posted. See me during office hours if you want to review yours.",
-                time: "Mar 17",
-                comments: [],
-            },
-        ],
-    },
-    {
-        id: "cls_phys101",
-        name: "Intro to Physics",
-        section: "PHYS101 — Section C",
-        subject: "PHYS101",
-        room: "Lab 2",
-        code: "phy9x1",
-        color: "#e37400",
-        owner: "Prof. Tan",
-        teachers: [{ id: "t3", name: "Prof. Tan", email: "tan@univ.edu" }],
-        students: [
-            { id: "you", name: "You" },
-            { id: "s9", name: "Kai L." },
-            { id: "s10", name: "Jules B." },
-        ],
-        topics: ["Kinematics", "Forces", "Energy"],
-        classwork: [
-            {
-                id: "cw_p1",
-                type: "quiz",
-                topic: "Kinematics",
-                title: "Quiz 1: 1D Motion",
-                description: "20 minutes, closed book.",
-                due: "Tue, Mar 24, 10:00 AM",
-                points: 25,
-                posted: "Mar 18",
-                attachments: [],
-                submitted: false,
-                grade: null,
-            },
-            {
-                id: "cw_p2",
-                type: "material",
-                topic: "Forces",
-                title: "Free-Body Diagram Cheat Sheet",
-                description: "How to draw FBDs for the common cases.",
-                posted: "Mar 10",
-                attachments: [{ name: "FBD_Cheatsheet.pdf", size: "540 KB" }],
-            },
-        ],
-        stream: [
-            {
-                id: "p_p1",
-                type: "announcement",
-                authorId: "t3",
-                authorName: "Prof. Tan",
-                authorRole: "teacher",
-                text: "Lab this Thursday is cancelled. We'll make it up next week.",
-                time: "Mar 18",
-                comments: [],
-            },
-        ],
-    },
-    {
-        // A class the user co-teaches, so the "Create" flow is demonstrable.
-        id: "cls_study",
-        name: "Peer Study Hall",
-        section: "Open Section",
-        subject: "STUDY",
-        room: "Library — Room B",
-        code: "peer42",
-        color: "#9334e6",
-        owner: "You",
-        teachers: [
-            { id: "you", name: "You", email: "you@univ.edu" },
-            { id: "t4", name: "Prof. Reyes", email: "reyes@univ.edu" },
-        ],
-        students: [
-            { id: "s11", name: "Maya K." },
-            { id: "s12", name: "Devon M." },
-            { id: "s13", name: "Priya N." },
-        ],
-        topics: ["General"],
-        classwork: [
-            {
-                id: "cw_s1",
-                type: "material",
-                topic: "General",
-                title: "How to run a good study session",
-                description: "Short checklist we'll use each week.",
-                posted: "Mar 05",
-                attachments: [],
-            },
-        ],
-        stream: [
-            {
-                id: "p_s1",
-                type: "announcement",
-                authorId: "you",
-                authorName: "You",
-                authorRole: "teacher",
-                text: "Welcome! Bring one thing you're stuck on. We'll go around the room.",
-                time: "Mar 05",
-                comments: [],
-            },
-        ],
-    },
-];
+/* Sample classes now live in ./classHub so Group Collab can see them too. */
 
 /* ------------------------------------------------------------------ */
 /*  Small shared UI                                                    */
 /* ------------------------------------------------------------------ */
-function Badge({ color, children }) {
+/* ---------------------------------------------------------
+   Dashboard-style design kit (theme-aware, flat + pixel-sharp):
+   hard pixel shadows, micro-caps labels, tinted tags, panels with
+   a glyph header bar, pixel avatars and segmented meters.
+--------------------------------------------------------- */
+const PIXEL_SHADOW = "3px 3px 0px var(--t-shadow)";
+const LABEL = "text-[10px] font-bold uppercase tracking-wider text-[color:var(--t-tx2)]";
+const PRIMARY_BTN =
+    "bg-[var(--t-ac)] text-[color:var(--t-onac)] font-bold uppercase tracking-wider border-2 border-solid border-[color:var(--t-ac2)] border-b-4 border-b-[color:color-mix(in_srgb,_var(--t-ac)_55%,_#000)] hover:brightness-110 active:translate-y-[2px] active:border-b-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150";
+const ACTION_BTN =
+    "text-[10px] font-bold uppercase tracking-wider py-1 px-2 border border-solid border-[color:var(--t-ac)] text-[color:var(--t-ac)] hover:bg-[var(--t-ac)] hover:text-[color:var(--t-onac)] transition-colors duration-150";
+const SEGMENTS = "repeating-linear-gradient(90deg, transparent 0 9px, rgba(0,0,0,0.3) 9px 10px)";
+const MODAL_SHADOW = "6px 6px 0px var(--t-shadow), 0 0 40px color-mix(in srgb, var(--t-glow) 18%, transparent)";
+
+/* Tinted tag chip (same idea as the Dashboard's tag-lime / tag-gold / tag-cyan). */
+function Badge({ color, children, className = "" }) {
     return (
         <span
-            className="text-[10px] font-bold py-0.5 px-2 border border-solid shrink-0"
-            style={{ backgroundColor: withAlpha(color, "22"), borderColor: withAlpha(color, "55"), color }}
+            className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider py-0.5 px-2 border border-solid shrink-0 ${className}`}
+            style={{ backgroundColor: withAlpha(color, "26"), borderColor: withAlpha(color, "66"), color }}
         >
             {children}
         </span>
+    );
+}
+
+/* Header bar shared by every panel: glyph + title + optional right slot. */
+function PanelHeader({ icon = "◆", title, right }) {
+    return (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-solid border-[color:var(--t-bd0)] bg-[color-mix(in_srgb,_var(--t-ac)_7%,_transparent)]">
+            <span className="flex items-center gap-2 min-w-0">
+                <span className="text-[color:var(--t-ac)] text-[13px] leading-none">{icon}</span>
+                <span className="text-[color:var(--t-tx0)] text-xs font-bold uppercase tracking-wider truncate">{title}</span>
+            </span>
+            {right}
+        </div>
+    );
+}
+
+/* Square avatar with a pixel "hair" strip, like the Dashboard player avatar. */
+function PixelAvatar({ color, text, className = "w-9 h-9 text-[11px]" }) {
+    return (
+        <div
+            className={`relative shrink-0 flex items-center justify-center font-bold border-2 border-solid ${className}`}
+            style={{ backgroundColor: withAlpha(color, "26"), borderColor: color, color }}
+        >
+            <span className="absolute top-0 left-0 w-full h-[3px]" style={{ backgroundColor: color }} />
+            {text}
+        </div>
+    );
+}
+
+/* Modal title row: glyph + micro-caps title + close button. */
+function ModalHeader({ icon, title, onClose }) {
+    return (
+        <div className="flex justify-between items-center mb-1">
+            <span className="flex items-center gap-2 min-w-0 text-[color:var(--t-tx0)] text-sm font-bold uppercase tracking-wider">
+                <span className="text-[color:var(--t-ac)]">{icon}</span>
+                <span className="truncate">{title}</span>
+            </span>
+            <button
+                type="button"
+                onClick={onClose}
+                className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors"
+            >
+                ×
+            </button>
+        </div>
     );
 }
 
@@ -507,6 +279,64 @@ function classworkTypeLabel(type) {
     if (type === "question") return "Question";
     if (type === "material") return "Material";
     return "Assignment";
+}
+
+/* ------------------------------------------------------------------ */
+/*  Due-date helpers: parse the due value and describe time remaining  */
+/* ------------------------------------------------------------------ */
+const MONTHS = "janfebmaraprmayjunjulaugsepoctnovdec";
+
+function parseDueAt(item) {
+    if (item.dueAt) {
+        const d = new Date(item.dueAt);
+        if (!isNaN(d)) return d;
+    }
+    if (!item.due) return null;
+    // Handles "Mon, Mar 23, 11:59 PM" and "Wed, Oct 14" (no time = end of day).
+    // The strings carry no year, so the current year is assumed.
+    const m = String(item.due).match(
+        /(?:[A-Za-z]{3},\s*)?([A-Za-z]{3})[a-z]*\s+(\d{1,2})(?:,\s*(\d{4}))?(?:,?\s+(\d{1,2}):(\d{2})\s*(AM|PM))?/i
+    );
+    if (!m) {
+        const d = new Date(item.due);
+        return isNaN(d) ? null : d;
+    }
+    const month = MONTHS.indexOf(m[1].toLowerCase()) / 3;
+    if (!Number.isInteger(month) || month < 0) return null;
+    let hour = 23;
+    let min = 59;
+    if (m[4]) {
+        hour = Number(m[4]) % 12;
+        if (m[6].toUpperCase() === "PM") hour += 12;
+        min = Number(m[5]);
+    }
+    const year = m[3] ? Number(m[3]) : new Date().getFullYear();
+    return new Date(year, month, Number(m[2]), hour, min);
+}
+
+/* Returns { text, color } describing how long is left, or null if there is no due date. */
+function dueInfo(item, now) {
+    const d = parseDueAt(item);
+    if (!d) return null;
+    const diff = d.getTime() - now;
+    const mins = Math.floor(Math.abs(diff) / 60000);
+    const days = Math.floor(mins / 1440);
+    const hrs = Math.floor((mins % 1440) / 60);
+    const span = days > 0 ? `${days} ${days === 1 ? "day" : "days"}` : hrs > 0 ? `${hrs}h ${mins % 60}m` : `${mins % 60}m`;
+    if (diff < 0) return { text: `Overdue by ${span}`, color: "var(--t-err)" };
+    if (diff < 24 * 3600000) return { text: `${span} left`, color: "var(--t-err)" };
+    if (diff < 3 * 24 * 3600000) return { text: `${span} left`, color: "var(--t-warn)" };
+    return { text: `${span} left`, color: "var(--t-ok2)" };
+}
+
+/* Re-renders its caller every so often so countdowns stay current. */
+function useNow(intervalMs = 30000) {
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        const id = setInterval(() => setNow(Date.now()), intervalMs);
+        return () => clearInterval(id);
+    }, [intervalMs]);
+    return now;
 }
 
 /* ------------------------------------------------------------------ */
@@ -598,19 +428,18 @@ function ClassBanner({ color, name, section, tall = false }) {
         <div
             className={`relative w-full ${tall ? "h-28 sm:h-32" : "h-20"} overflow-hidden`}
             style={{
-                background: `linear-gradient(135deg, ${color} 0%, color-mix(in srgb, ${color} 65%, black) 100%)`,
+                background: `linear-gradient(135deg, color-mix(in srgb, ${color} 26%, var(--t-bg2)) 0%, color-mix(in srgb, ${color} 8%, var(--t-bg1)) 100%)`,
             }}
         >
-            <div
-                className="absolute inset-0 opacity-25"
-                style={{
-                    backgroundImage:
-                        "repeating-linear-gradient(45deg, rgba(255,255,255,0.12) 0 10px, transparent 10px 20px)",
-                }}
-            />
-            <div className="absolute inset-0 flex flex-col justify-end p-4 text-white">
-                <span className={`font-bold truncate ${tall ? "text-xl sm:text-2xl" : "text-base"}`}>{name}</span>
-                {section && <span className="text-[11px] opacity-90 truncate">{section}</span>}
+            {/* pixel staircase motif */}
+            <div className="absolute right-3 bottom-0 flex items-end gap-1" aria-hidden="true">
+                {[1, 2, 3, 4].map((i) => (
+                    <span key={i} className="block w-2.5" style={{ height: i * 7, backgroundColor: color, opacity: 0.12 + i * 0.1 }} />
+                ))}
+            </div>
+            <div className="absolute inset-0 flex flex-col justify-end p-4 pr-24">
+                <span className={`font-bold uppercase tracking-wide truncate text-[color:var(--t-tx0)] ${tall ? "text-xl sm:text-2xl" : "text-base"}`}>{name}</span>
+                {section && <span className="text-[11px] truncate text-[color:var(--t-tx0)] opacity-80">{section}</span>}
             </div>
         </div>
     );
@@ -624,25 +453,19 @@ function ClassCard({ cls, onOpen }) {
         <button
             onClick={() => onOpen(cls.id)}
             className="group flex flex-col text-left self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] overflow-hidden transition-all duration-150 hover:-translate-y-0.5 hover:border-[color:var(--t-ac)] active:scale-[0.99]"
-            style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
+            style={{ boxShadow: PIXEL_SHADOW }}
         >
             <ClassBanner color={cls.color} name={cls.name} section={cls.section} />
             <div className="flex items-start justify-between gap-3 p-4">
                 <div className="min-w-0">
-                    <p className="text-[color:var(--t-tx0)] text-sm font-bold truncate">{cls.name}</p>
+                    <p className="text-[color:var(--t-tx0)] text-sm font-bold uppercase tracking-wide truncate">{cls.name}</p>
                     <p className="text-[color:var(--t-tx2)] text-[11px] truncate mt-0.5">{cls.section}</p>
-                    <p className="text-[color:var(--t-tx1)] text-[11px] truncate mt-0.5">{cls.owner}</p>
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                        <Badge color="var(--t-ac2)" className="!text-[9px] !py-0 !px-1.5">{cls.owner}</Badge>
+                        <span className="text-[color:var(--t-tx2)] text-[10px]">{(cls.students || []).length} students</span>
+                    </div>
                 </div>
-                <div
-                    className="w-10 h-10 shrink-0 flex items-center justify-center text-xs font-bold"
-                    style={{
-                        backgroundColor: withAlpha(cls.color, "33"),
-                        color: cls.color,
-                        border: `1px solid ${withAlpha(cls.color, "55")}`,
-                    }}
-                >
-                    {initialsFor(cls.name)}
-                </div>
+                <PixelAvatar color={cls.color} text={initialsFor(cls.name)} className="w-10 h-10 text-xs" />
             </div>
         </button>
     );
@@ -676,19 +499,10 @@ function CreateClassModal({ onClose, onCreate }) {
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
             <form
                 onSubmit={submit}
-                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_95%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-5 w-full max-w-md flex flex-col gap-3"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
+                className="relative bg-[var(--t-mbg)] border border-solid border-[color:var(--t-mbd2)] border-t-[3px] border-t-[color:var(--t-ac)] p-5 w-full max-w-md flex flex-col gap-3"
+                style={{ boxShadow: MODAL_SHADOW }}
             >
-                <div className="flex justify-between items-center mb-1">
-                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">CREATE CLASS</span>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors"
-                    >
-                        ×
-                    </button>
-                </div>
+                <ModalHeader icon="⚑" title="CREATE CLASS" onClose={onClose} />
 
                 <label className="flex flex-col gap-1">
                     <span className="text-[color:var(--t-mtx)] text-[11px]">Class name (required)</span>
@@ -713,7 +527,7 @@ function CreateClassModal({ onClose, onCreate }) {
                 <button
                     type="submit"
                     disabled={!name.trim()}
-                    className="mt-1 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2.5 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 active:scale-[0.98]"
+                    className={`mt-1 text-xs py-2.5 ${PRIMARY_BTN}`}
                 >
                     CREATE
                 </button>
@@ -741,19 +555,10 @@ function JoinClassModal({ onClose, onJoin }) {
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
             <form
                 onSubmit={submit}
-                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_95%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-5 w-full max-w-sm flex flex-col gap-3"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
+                className="relative bg-[var(--t-mbg)] border border-solid border-[color:var(--t-mbd2)] border-t-[3px] border-t-[color:var(--t-ac)] p-5 w-full max-w-sm flex flex-col gap-3"
+                style={{ boxShadow: MODAL_SHADOW }}
             >
-                <div className="flex justify-between items-center mb-1">
-                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">JOIN CLASS</span>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors"
-                    >
-                        ×
-                    </button>
-                </div>
+                <ModalHeader icon="⛆" title="JOIN CLASS" onClose={onClose} />
 
                 <p className="text-[color:var(--t-mtx)] text-[11px] -mt-1">Ask your teacher for the class code, then enter it here.</p>
 
@@ -773,7 +578,7 @@ function JoinClassModal({ onClose, onJoin }) {
                 <button
                     type="submit"
                     disabled={!code.trim()}
-                    className="mt-1 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2.5 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 active:scale-[0.98]"
+                    className={`mt-1 text-xs py-2.5 ${PRIMARY_BTN}`}
                 >
                     JOIN
                 </button>
@@ -788,70 +593,148 @@ function JoinClassModal({ onClose, onJoin }) {
 function TurnInModal({ cls, item, onClose, onTurnIn }) {
     const [note, setNote] = useState("");
     const [attached, setAttached] = useState(false);
+    const now = useNow();
+
+    if (!cls || !item || !item.id) return null;
+
+    const isTeacher = cls.teachers.some((t) => t.id === CURRENT_USER.id);
+    const isMaterial = item.type === "material";
+    const graded = item.grade != null;
+    const done = !!item.submitted;
+    const canSubmit = !isMaterial && !isTeacher && !done;
+    const info = !isMaterial && !done && !graded ? dueInfo(item, now) : null;
 
     function submit(e) {
         e.preventDefault();
+        if (!canSubmit) return;
         onTurnIn(cls.id, item.id, { note: note.trim(), attached });
     }
 
     const field =
         "w-full bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2.5 px-3 outline-none placeholder:text-[color:var(--t-ph)] focus:border-[color:var(--t-ac)] transition-colors";
+    const box = "bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] p-3";
+
+    const showWorkPanel = !isMaterial && !isTeacher;
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
             <form
                 onSubmit={submit}
-                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_95%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-5 w-full max-w-md flex flex-col gap-3"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
+                className={`relative bg-[var(--t-mbg)] border border-solid border-[color:var(--t-mbd2)] border-t-[3px] border-t-[color:var(--t-ac)] p-5 w-full ${showWorkPanel ? "max-w-4xl" : "max-w-lg"} flex flex-col gap-4 max-h-[92vh] overflow-y-auto`}
+                style={{ boxShadow: MODAL_SHADOW }}
             >
-                <div className="flex justify-between items-center mb-1">
-                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">TURN IN</span>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors"
-                    >
-                        ×
-                    </button>
+                <ModalHeader icon={<ClassworkTypeIcon type={item.type} className="w-4 h-4" />} title={classworkTypeLabel(item.type)} onClose={onClose} />
+
+                <div className={`grid grid-cols-1 gap-5 ${showWorkPanel ? "md:grid-cols-[1fr_320px]" : ""}`}>
+                    {/* LEFT: assignment information + description */}
+                    <div className="flex flex-col gap-3 min-w-0">
+                        <div>
+                            <p className="text-[color:var(--t-tx0)] text-base font-bold break-words">{item.title}</p>
+                            <p className="text-[color:var(--t-tx2)] text-[11px] mt-1">
+                                {cls.name}
+                                {item.topic ? ` · ${item.topic}` : ""}
+                            </p>
+                        </div>
+
+                        {info && (
+                            <div className={`${box} flex items-center justify-between gap-3`}>
+                                <span className="text-sm font-semibold" style={{ color: info.color }}>{info.text}</span>
+                                <span className="text-[11px] text-[color:var(--t-tx2)] text-right">Due {item.due}</span>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-3 gap-2">
+                            <div className={box}>
+                                <p className={LABEL}>Points</p>
+                                <p className="text-[color:var(--t-tx0)] text-sm font-bold mt-0.5">{item.points ?? "—"}</p>
+                            </div>
+                            <div className={box}>
+                                <p className={LABEL}>Posted</p>
+                                <p className="text-[color:var(--t-tx0)] text-sm font-bold mt-0.5">{item.posted || "—"}</p>
+                            </div>
+                            <div className={box}>
+                                <p className={LABEL}>Status</p>
+                                <p className="text-[color:var(--t-tx0)] text-sm font-bold mt-0.5">
+                                    {isMaterial ? "Material" : graded ? "Graded" : done ? "Turned in" : "Assigned"}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                            <span className={LABEL}>Instructions</span>
+                            <p className="text-[color:var(--t-tx1)] text-xs leading-relaxed whitespace-pre-wrap break-words">
+                                {item.description || "No instructions were provided."}
+                            </p>
+                        </div>
+
+                        {(item.attachments || []).length > 0 && (
+                            <div className="flex flex-col gap-1.5">
+                                <span className={LABEL}>Attachments</span>
+                                {item.attachments.map((a) => (
+                                    <div key={a.name} className={`${box} flex items-center gap-2`}>
+                                        <Icon.Attach className="w-3.5 h-3.5 shrink-0 text-[color:var(--t-ac2)]" />
+                                        <span className="text-[color:var(--t-tx0)] text-xs font-bold truncate flex-1">{a.name}</span>
+                                        <span className="text-[color:var(--t-tx2)] text-[10px] shrink-0">{a.size}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* RIGHT: the student's work + turn in */}
+                    {showWorkPanel && (
+                        <div className="flex flex-col gap-3 md:border-l md:border-solid md:border-[color:var(--t-mbd)] md:pl-5">
+                            <span className={LABEL}>Your work</span>
+
+                            {graded && (
+                                <div className="flex items-center justify-between py-2.5 px-3 border border-solid border-[color:var(--t-ok2)] bg-[color-mix(in_srgb,_var(--t-ok2)_14%,_transparent)]">
+                                    <span className="text-[color:var(--t-ok2)] text-xs font-bold uppercase tracking-wider">Your grade</span>
+                                    <span className="text-[color:var(--t-ok2)] text-lg font-black">{item.grade}/{item.points}</span>
+                                </div>
+                            )}
+
+                            {done && (
+                                <div className="flex flex-col gap-1 py-2.5 px-3 border border-solid border-[color:var(--t-ok)] bg-[color-mix(in_srgb,_var(--t-ok)_12%,_transparent)]">
+                                    <span className="text-[color:var(--t-ok2)] text-xs font-bold uppercase tracking-wider">✓ Turned in</span>
+                                    {item.submissionAttached && <span className="text-[color:var(--t-tx1)] text-[11px]">submission.pdf attached</span>}
+                                    {item.submissionNote && <span className="text-[color:var(--t-tx1)] text-[11px] break-words">“{item.submissionNote}”</span>}
+                                </div>
+                            )}
+
+                            {canSubmit && (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAttached((v) => !v)}
+                                        className={`flex items-center justify-center gap-2 text-[11px] font-bold py-3 px-3 border border-dashed transition-all duration-150 active:scale-95 ${attached
+                                            ? "bg-[color-mix(in_srgb,_var(--t-ok)_16%,_transparent)] border-[color:var(--t-ok)] text-[color:var(--t-ok2)]"
+                                            : "bg-[var(--t-in0)] border-[color:var(--t-mbd)] text-[color:var(--t-mtx)] hover:border-[color:var(--t-ac2)] hover:text-[color:var(--t-ac2)]"
+                                            }`}
+                                    >
+                                        <Icon.Attach className="w-3.5 h-3.5" />
+                                        {attached ? "submission.pdf attached" : "Attach your work"}
+                                    </button>
+
+                                    <label className="flex flex-col gap-1">
+                                        <span className="text-[color:var(--t-mtx)] text-[11px]">Private comment (optional)</span>
+                                        <textarea
+                                            value={note}
+                                            onChange={(e) => setNote(e.target.value)}
+                                            rows={4}
+                                            placeholder="Add a note for your teacher…"
+                                            className={`${field} resize-none`}
+                                        />
+                                    </label>
+
+                                    <button type="submit" className={`mt-1 text-xs py-2.5 ${PRIMARY_BTN}`}>
+                                        TURN IN
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
-
-                <div className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] p-3">
-                    <p className="text-[color:var(--t-tx0)] text-xs font-bold truncate">{item.title}</p>
-                    <p className="text-[color:var(--t-tx2)] text-[10px] mt-1">
-                        {classworkTypeLabel(item.type)} · Due {item.due || "—"} · {item.points ?? "—"} pts
-                    </p>
-                </div>
-
-                <button
-                    type="button"
-                    onClick={() => setAttached((v) => !v)}
-                    className={`flex items-center gap-2 self-start text-[11px] font-bold py-2 px-3 border border-solid transition-all duration-150 active:scale-95 ${attached
-                        ? "bg-[color-mix(in_srgb,_var(--t-ok)_16%,_transparent)] border-[color:var(--t-ok)] text-[color:var(--t-ok2)]"
-                        : "bg-[var(--t-in0)] border-[color:var(--t-mbd)] text-[color:var(--t-mtx)] hover:border-[color:var(--t-ac2)] hover:text-[color:var(--t-ac2)]"
-                        }`}
-                >
-                    <Icon.Attach className="w-3.5 h-3.5" />
-                    {attached ? "submission.pdf attached" : "Attach a file"}
-                </button>
-
-                <label className="flex flex-col gap-1">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Private comment (optional)</span>
-                    <textarea
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        rows={3}
-                        placeholder="Add a note for your teacher…"
-                        className={`${field} resize-none`}
-                    />
-                </label>
-
-                <button
-                    type="submit"
-                    className="mt-1 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2.5 hover:opacity-90 transition-all duration-150 active:scale-[0.98]"
-                >
-                    TURN IN
-                </button>
             </form>
         </div>
     );
@@ -881,7 +764,8 @@ function CreatePostModal({ cls, onClose, onCreate }) {
                 text: description.trim(),
                 title: title.trim(),
                 description: description.trim(),
-                due: due ? new Date(due).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "",
+                due: due ? new Date(`${due}T23:59:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "",
+                dueAt: due ? `${due}T23:59:00` : "",
                 points: type === "material" ? null : Number(points) || 0,
                 topic,
             });
@@ -904,19 +788,10 @@ function CreatePostModal({ cls, onClose, onCreate }) {
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
             <form
                 onSubmit={submit}
-                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_95%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-5 w-full max-w-lg flex flex-col gap-3 max-h-[92vh] overflow-y-auto"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
+                className="relative bg-[var(--t-mbg)] border border-solid border-[color:var(--t-mbd2)] border-t-[3px] border-t-[color:var(--t-ac)] p-5 w-full max-w-lg flex flex-col gap-3 max-h-[92vh] overflow-y-auto"
+                style={{ boxShadow: MODAL_SHADOW }}
             >
-                <div className="flex justify-between items-center mb-1">
-                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">POST TO {cls.name.toUpperCase()}</span>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors"
-                    >
-                        ×
-                    </button>
-                </div>
+                <ModalHeader icon="✉" title={`POST TO ${cls.name.toUpperCase()}`} onClose={onClose} />
 
                 <div className="flex flex-wrap gap-1.5">
                     {TYPES.map((t) => (
@@ -990,7 +865,7 @@ function CreatePostModal({ cls, onClose, onCreate }) {
 
                 <button
                     type="submit"
-                    className="mt-1 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2.5 hover:opacity-90 transition-all duration-150 active:scale-[0.98]"
+                    className={`mt-1 text-xs py-2.5 ${PRIMARY_BTN}`}
                 >
                     POST
                 </button>
@@ -1017,28 +892,19 @@ function StreamPost({ post, classwork, isTeacher, onAddComment }) {
     const t = classwork?.type || post.type;
 
     return (
-        <div className="flex flex-col self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)]">
+        <div className="flex flex-col self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)]" style={{ boxShadow: PIXEL_SHADOW }}>
             <div className="flex items-start gap-3 p-4">
-                <div
-                    className="w-9 h-9 shrink-0 flex items-center justify-center text-[11px] font-bold"
-                    style={{
-                        backgroundColor: withAlpha(isTeacher ? "var(--t-ac2)" : "var(--t-ac)", "33"),
-                        color: isTeacher ? "var(--t-ac2)" : "var(--t-ac)",
-                        border: `1px solid ${withAlpha(isTeacher ? "var(--t-ac2)" : "var(--t-ac)", "55")}`,
-                    }}
-                >
-                    {initialsFor(post.authorName)}
-                </div>
+                <PixelAvatar color={isTeacher ? "var(--t-ac2)" : "var(--t-ac)"} text={initialsFor(post.authorName)} />
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[color:var(--t-tx0)] text-sm font-bold">{post.authorName}</span>
+                        <span className="text-[color:var(--t-tx0)] text-sm font-bold uppercase tracking-wide">{post.authorName}</span>
                         <span className="text-[color:var(--t-tx2)] text-[10px]">{post.time}</span>
                         {post.authorRole === "teacher" && <Badge color="var(--t-ac2)">TEACHER</Badge>}
                     </div>
                     <p className="text-[color:var(--t-tx1)] text-[13px] whitespace-pre-wrap mt-1">{post.text}</p>
 
                     {classwork && (
-                        <div className="mt-3 flex flex-col gap-2 p-3 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)]">
+                        <div className="mt-3 flex flex-col gap-2 p-3 bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] border-l-[3px] border-l-[color:var(--t-ac2)]">
                             <div className="flex items-center gap-2">
                                 <ClassworkTypeIcon type={t} className="w-4 h-4 text-[color:var(--t-ac2)]" />
                                 <span className="text-[color:var(--t-tx0)] text-xs font-bold truncate">{classwork.title}</span>
@@ -1047,8 +913,8 @@ function StreamPost({ post, classwork, isTeacher, onAddComment }) {
                                 <p className="text-[color:var(--t-tx2)] text-[11px]">{classwork.description}</p>
                             )}
                             <div className="flex flex-wrap items-center gap-3 text-[10px] font-bold">
-                                {classwork.due && <span className="text-[color:var(--t-warn)]">Due {classwork.due}</span>}
-                                {classwork.points != null && <span className="text-[color:var(--t-tx2)]">{classwork.points} pts</span>}
+                                {classwork.due && <Badge color="var(--t-warn)">▲ Due {classwork.due}</Badge>}
+                                {classwork.points != null && <Badge color="var(--t-ok)">{classwork.points} PTS</Badge>}
                             </div>
                         </div>
                     )}
@@ -1067,16 +933,7 @@ function StreamPost({ post, classwork, isTeacher, onAddComment }) {
                         <div className="mt-3 flex flex-col gap-2">
                             {(post.comments || []).map((c) => (
                                 <div key={c.id} className="flex items-start gap-2.5">
-                                    <div
-                                        className="w-7 h-7 shrink-0 flex items-center justify-center text-[10px] font-bold"
-                                        style={{
-                                            backgroundColor: withAlpha("var(--t-ac2)", "22"),
-                                            color: "var(--t-ac2)",
-                                            border: `1px solid ${withAlpha("var(--t-ac2)", "4D")}`,
-                                        }}
-                                    >
-                                        {initialsFor(c.authorName)}
-                                    </div>
+                                    <PixelAvatar color="var(--t-ac2)" text={initialsFor(c.authorName)} className="w-7 h-7 text-[10px]" />
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <span className="text-[color:var(--t-tx0)] text-[12px] font-bold">{c.authorName}</span>
@@ -1092,12 +949,12 @@ function StreamPost({ post, classwork, isTeacher, onAddComment }) {
                                     value={comment}
                                     onChange={(e) => setComment(e.target.value)}
                                     placeholder="Add a class comment…"
-                                    className="flex-1 min-w-0 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac2)]"
+                                    className="flex-1 min-w-0 bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] placeholder-[color:var(--t-tx2)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac2)]"
                                 />
                                 <button
                                     type="submit"
                                     disabled={!comment.trim()}
-                                    className="shrink-0 bg-[var(--t-ac2)] text-[color:var(--t-onac)] text-[11px] font-bold py-2 px-3 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 active:scale-95"
+                                    className="shrink-0 bg-[var(--t-ac2)] text-[color:var(--t-onac)] text-[11px] font-bold uppercase tracking-wider py-2 px-3 border-b-2 border-solid border-b-[color:color-mix(in_srgb,_var(--t-ac2)_55%,_#000)] hover:brightness-110 active:translate-y-px disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150"
                                 >
                                     Post
                                 </button>
@@ -1113,31 +970,36 @@ function StreamPost({ post, classwork, isTeacher, onAddComment }) {
 /* ------------------------------------------------------------------ */
 /*  Classwork row                                                      */
 /* ------------------------------------------------------------------ */
-function ClassworkRow({ item, onOpen, onTurnIn }) {
+function ClassworkRow({ item, onOpen, highlighted = false }) {
+    const now = useNow();
+    const rowRef = useRef(null);
+    useEffect(() => {
+        if (highlighted) rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, [highlighted]);
     const done = !!item.submitted;
     const graded = item.grade != null;
     const label = classworkTypeLabel(item.type);
+    const info = item.type !== "material" && !done && !graded ? dueInfo(item, now) : null;
 
     return (
         <button
+            ref={rowRef}
             onClick={() => onOpen(item.id)}
-            className="group flex items-center gap-3 w-full text-left bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-3 hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-[0.995]"
+            style={highlighted ? { boxShadow: "0 0 0 2px var(--t-ac), 0 0 24px color-mix(in srgb, var(--t-ac) 40%, transparent)" } : undefined}
+            className="group flex items-center gap-3 w-full text-left bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] border-l-[3px] border-l-[color:var(--t-ac2)] p-3 hover:border-[color:var(--t-ac)] hover:border-l-[color:var(--t-ac)] transition-all duration-150 active:scale-[0.995]"
         >
             <div
-                className="w-9 h-9 shrink-0 flex items-center justify-center"
-                style={{
-                    backgroundColor: withAlpha("var(--t-ac2)", "22"),
-                    color: "var(--t-ac2)",
-                    border: `1px solid ${withAlpha("var(--t-ac2)", "55")}`,
-                }}
+                className="relative w-9 h-9 shrink-0 flex items-center justify-center border-2 border-solid"
+                style={{ backgroundColor: withAlpha("var(--t-ac2)", "26"), color: "var(--t-ac2)", borderColor: "var(--t-ac2)" }}
             >
+                <span className="absolute top-0 left-0 w-full h-[3px]" style={{ backgroundColor: "var(--t-ac2)" }} />
                 <ClassworkTypeIcon type={item.type} className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
                 <span className="text-[color:var(--t-tx0)] text-sm font-bold truncate block">{item.title}</span>
                 <span className="text-[color:var(--t-tx2)] text-[11px] truncate block">
                     {label} · Posted {item.posted}
-                    {item.due ? ` · Due ${item.due}` : ""}
+                    {item.points != null ? ` · ${item.points} pts` : ""}
                 </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -1145,26 +1007,48 @@ function ClassworkRow({ item, onOpen, onTurnIn }) {
                     <Badge color="var(--t-ok2)">{item.grade}/{item.points}</Badge>
                 ) : done ? (
                     <Badge color="var(--t-ok)">TURNED IN</Badge>
+                ) : info ? (
+                    <div className="flex flex-col items-end text-right">
+                        <span className="text-xs font-semibold leading-tight" style={{ color: info.color }}>{info.text}</span>
+                        <span className="text-[10px] text-[color:var(--t-tx2)] leading-tight mt-0.5">Due {item.due}</span>
+                    </div>
                 ) : item.type !== "material" ? (
-                    <Badge color="var(--t-warn)">ASSIGNED</Badge>
+                    <span className="text-[color:var(--t-tx2)] text-[11px] font-bold uppercase tracking-wider">No due date</span>
                 ) : null}
-                {!done && item.type !== "material" && (
-                    <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onTurnIn(item.id);
-                        }}
-                        className="text-[10px] font-bold py-1 px-2 border border-solid border-[color:var(--t-ac)] text-[color:var(--t-ac)] hover:bg-[var(--t-ac)] hover:text-[color:var(--t-onac)] transition-all duration-150"
-                    >
-                        Turn in
-                    </span>
-                )}
-                <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">
-                    {item.points != null ? `${item.points} pts` : ""}
+            </div>
+        </button>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Missing-work row (Grades tab): whole card opens the details popup  */
+/* ------------------------------------------------------------------ */
+function MissingRow({ item, onOpen }) {
+    const now = useNow();
+    const info = dueInfo(item, now);
+    const tint = info ? info.color : "var(--t-warn)";
+
+    return (
+        <button
+            onClick={() => onOpen(item.id)}
+            className="flex items-center justify-between gap-3 w-full text-left p-3 border border-solid border-[color:var(--t-bd0)] bg-[color-mix(in_srgb,_var(--card-tint)_14%,_transparent)] hover:bg-[color-mix(in_srgb,_var(--card-tint)_6%,_transparent)] transition-colors duration-150 active:scale-[0.995]"
+            style={{ "--card-tint": tint }}
+        >
+            <div className="min-w-0">
+                <span className="text-[color:var(--t-tx0)] text-sm font-bold truncate block">{item.title}</span>
+                <span className="text-[color:var(--t-tx2)] text-[11px] truncate block">
+                    {classworkTypeLabel(item.type)}
+                    {item.points != null ? ` · ${item.points} pts` : ""}
                 </span>
             </div>
+            {info ? (
+                <div className="flex flex-col items-end text-right shrink-0">
+                    <span className="text-xs font-semibold leading-tight" style={{ color: info.color }}>{info.text}</span>
+                    <span className="text-[10px] text-[color:var(--t-tx2)] leading-tight mt-0.5">Due {item.due}</span>
+                </div>
+            ) : (
+                <span className="shrink-0 text-[color:var(--t-tx2)] text-[11px] font-bold uppercase tracking-wider">No due date</span>
+            )}
         </button>
     );
 }
@@ -1182,27 +1066,20 @@ function ClassDetail({
     onCreatePost,
     onCopyCode,
     copiedCode,
+    highlightId = null,
 }) {
     const isTeacher = cls.teachers.some((t) => t.id === CURRENT_USER.id);
 
     // --- Stream tab
     const renderStream = () => (
-        <div className="flex flex-col gap-3 max-w-3xl">
+        <div className="flex flex-col gap-3 w-full">
             {isTeacher && (
                 <button
                     onClick={onCreatePost}
                     className="flex items-center gap-3 self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-3 text-left hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-[0.995]"
+                    style={{ boxShadow: PIXEL_SHADOW }}
                 >
-                    <div
-                        className="w-9 h-9 shrink-0 flex items-center justify-center text-[11px] font-bold"
-                        style={{
-                            backgroundColor: withAlpha("var(--t-ac)", "33"),
-                            color: "var(--t-ac)",
-                            border: `1px solid ${withAlpha("var(--t-ac)", "55")}`,
-                        }}
-                    >
-                        {initialsFor(CURRENT_USER.name)}
-                    </div>
+                    <PixelAvatar color="var(--t-ac)" text={initialsFor(CURRENT_USER.name)} />
                     <span className="text-[color:var(--t-tx2)] text-xs">Announce something to your class…</span>
                 </button>
             )}
@@ -1235,11 +1112,11 @@ function ClassDetail({
         const topics = Object.keys(byTopic);
 
         return (
-            <div className="flex flex-col gap-6 max-w-3xl">
+            <div className="flex flex-col gap-6 w-full">
                 {isTeacher && (
                     <button
                         onClick={onCreatePost}
-                        className="self-start flex items-center gap-2 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2 px-3.5 hover:opacity-90 transition-all duration-150 active:scale-95"
+                        className={`self-start flex items-center gap-2 text-xs py-2 px-3.5 ${PRIMARY_BTN}`}
                     >
                         <Icon.Plus className="w-3.5 h-3.5" />
                         Create
@@ -1250,17 +1127,20 @@ function ClassDetail({
                 )}
                 {topics.map((t) => (
                     <section key={t} className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[color:var(--t-tx0)] text-sm font-bold">{t}</span>
-                            <span className="text-[color:var(--t-tx2)] text-[11px]">{byTopic[t].length} item{byTopic[t].length === 1 ? "" : "s"}</span>
+                        <div className="flex items-center justify-between border-b border-solid border-[color:var(--t-bd0)] pb-1.5">
+                            <span className="flex items-center gap-2 text-[color:var(--t-tx0)] text-xs font-bold uppercase tracking-wider">
+                                <span className="text-[color:var(--t-ac)]">▤</span>
+                                {t}
+                            </span>
+                            <Badge color="var(--t-warn)">{byTopic[t].length} item{byTopic[t].length === 1 ? "" : "s"}</Badge>
                         </div>
                         <div className="flex flex-col gap-2">
                             {byTopic[t].map((item) => (
                                 <ClassworkRow
                                     key={item.id}
                                     item={item}
-                                    onOpen={() => { }}
-                                    onTurnIn={(id) => onTurnIn(id)}
+                                    onOpen={(id) => onTurnIn(id)}
+                                    highlighted={item.id === highlightId}
                                 />
                             ))}
                         </div>
@@ -1272,51 +1152,37 @@ function ClassDetail({
 
     // --- People tab
     const renderPeople = () => (
-        <div className="flex flex-col gap-6 max-w-2xl">
+        <div className="flex flex-col gap-6 w-full">
             <section className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 border-b border-solid border-[color:var(--t-ac)] pb-2">
-                    <span className="text-[color:var(--t-ac)] text-sm font-bold">Teachers</span>
+                    <span className="text-[color:var(--t-ac)] text-xs font-bold uppercase tracking-wider">⚑ Teachers</span>
                 </div>
-                {cls.teachers.map((t) => (
-                    <div key={t.id} className="flex items-center gap-3 py-2">
-                        <div
-                            className="w-9 h-9 shrink-0 flex items-center justify-center text-[11px] font-bold"
-                            style={{
-                                backgroundColor: withAlpha("var(--t-ac2)", "33"),
-                                color: "var(--t-ac2)",
-                                border: `1px solid ${withAlpha("var(--t-ac2)", "55")}`,
-                            }}
-                        >
-                            {initialsFor(t.name)}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-6">
+                    {cls.teachers.map((t) => (
+                        <div key={t.id} className="flex items-center gap-3 py-2">
+                            <PixelAvatar color="var(--t-ac2)" text={initialsFor(t.name)} />
+                            <div className="min-w-0">
+                                <span className="text-[color:var(--t-tx0)] text-sm block truncate">{t.name}</span>
+                                <span className="text-[color:var(--t-tx2)] text-[11px] truncate block">{t.email}</span>
+                            </div>
                         </div>
-                        <div className="min-w-0">
-                            <span className="text-[color:var(--t-tx0)] text-sm block truncate">{t.name}</span>
-                            <span className="text-[color:var(--t-tx2)] text-[11px] truncate block">{t.email}</span>
-                        </div>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </section>
 
             <section className="flex flex-col gap-2">
                 <div className="flex items-center justify-between border-b border-solid border-[color:var(--t-ac)] pb-2">
-                    <span className="text-[color:var(--t-ac)] text-sm font-bold">Classmates</span>
-                    <span className="text-[color:var(--t-tx2)] text-[11px]">{cls.students.length} students</span>
+                    <span className="text-[color:var(--t-ac)] text-xs font-bold uppercase tracking-wider">⛆ Classmates</span>
+                    <Badge color="var(--t-warn)">{cls.students.length} students</Badge>
                 </div>
-                {cls.students.map((s) => (
-                    <div key={s.id} className="flex items-center gap-3 py-2">
-                        <div
-                            className="w-9 h-9 shrink-0 flex items-center justify-center text-[11px] font-bold"
-                            style={{
-                                backgroundColor: withAlpha("var(--t-ac)", "33"),
-                                color: "var(--t-ac)",
-                                border: `1px solid ${withAlpha("var(--t-ac)", "55")}`,
-                            }}
-                        >
-                            {initialsFor(s.name)}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-6">
+                    {cls.students.map((s) => (
+                        <div key={s.id} className="flex items-center gap-3 py-2">
+                            <PixelAvatar color="var(--t-ac)" text={initialsFor(s.name)} />
+                            <span className="text-[color:var(--t-tx0)] text-sm truncate">{s.name}</span>
                         </div>
-                        <span className="text-[color:var(--t-tx0)] text-sm truncate">{s.name}</span>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </section>
         </div>
     );
@@ -1330,34 +1196,38 @@ function ClassDetail({
         const missing = cls.classwork.filter((c) => c.type !== "material" && !c.submitted);
 
         return (
-            <div className="flex flex-col gap-4 max-w-3xl">
+            <div className="flex flex-col gap-4 w-full">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-4">
-                        <p className="text-[color:var(--t-tx2)] text-[10px] font-bold">OVERALL GRADE</p>
+                    <div className="bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] p-4">
+                        <p className={LABEL}>OVERALL GRADE</p>
                         <p className="text-[color:var(--t-ok2)] text-2xl font-bold mt-1">{pct}%</p>
                         <p className="text-[color:var(--t-tx2)] text-[11px] mt-1">
                             {earned} / {totalPoints} pts
                         </p>
+                        <div className="relative h-2.5 mt-2 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)]">
+                            <div className="h-full bg-[var(--t-ok)]" style={{ width: `${Math.min(pct, 100)}%` }} />
+                            <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: SEGMENTS }} />
+                        </div>
                     </div>
-                    <div className="bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-4">
-                        <p className="text-[color:var(--t-tx2)] text-[10px] font-bold">GRADED</p>
+                    <div className="bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] p-4">
+                        <p className={LABEL}>GRADED</p>
                         <p className="text-[color:var(--t-tx0)] text-2xl font-bold mt-1">{graded.length}</p>
                         <p className="text-[color:var(--t-tx2)] text-[11px] mt-1">assignments returned</p>
                     </div>
-                    <div className="bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-4">
-                        <p className="text-[color:var(--t-tx2)] text-[10px] font-bold">MISSING</p>
+                    <div className="bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] p-4">
+                        <p className={LABEL}>MISSING</p>
                         <p className="text-[color:var(--t-warn)] text-2xl font-bold mt-1">{missing.length}</p>
                         <p className="text-[color:var(--t-tx2)] text-[11px] mt-1">not turned in</p>
                     </div>
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">Graded work</span>
+                    <span className="text-[color:var(--t-tx0)] text-xs font-bold uppercase tracking-wider">▤ Graded work</span>
                     {graded.length === 0 && <p className="text-[color:var(--t-tx2)] text-xs py-4">Nothing graded yet.</p>}
                     {graded.map((c) => (
                         <div
                             key={c.id}
-                            className="flex items-center justify-between gap-3 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-3"
+                            className="flex items-center justify-between gap-3 bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] border-l-[3px] border-l-[color:var(--t-ok2)] p-3"
                         >
                             <div className="min-w-0">
                                 <span className="text-[color:var(--t-tx0)] text-sm font-bold truncate block">{c.title}</span>
@@ -1370,25 +1240,9 @@ function ClassDetail({
 
                 {missing.length > 0 && (
                     <div className="flex flex-col gap-2">
-                        <span className="text-[color:var(--t-warn)] text-sm font-bold">Missing</span>
+                        <span className="text-[color:var(--t-warn)] text-xs font-bold uppercase tracking-wider">▲ Missing</span>
                         {missing.map((c) => (
-                            <div
-                                key={c.id}
-                                className="flex items-center justify-between gap-3 bg-[color-mix(in_srgb,_var(--t-warn)_12%,_transparent)] border border-solid border-[color:color-mix(in_srgb,_var(--t-warn)_45%,_transparent)] p-3"
-                            >
-                                <div className="min-w-0">
-                                    <span className="text-[color:var(--t-tx0)] text-sm font-bold truncate block">{c.title}</span>
-                                    <span className="text-[color:var(--t-tx2)] text-[11px]">Due {c.due || "—"}</span>
-                                </div>
-                                <span
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={() => onTurnIn(c.id)}
-                                    className="text-[10px] font-bold py-1 px-2 border border-solid border-[color:var(--t-warn)] text-[color:var(--t-warn)] hover:bg-[var(--t-warn)] hover:text-[color:var(--t-onwarn)] transition-all duration-150"
-                                >
-                                    Turn in
-                                </span>
-                            </div>
+                            <MissingRow key={c.id} item={c} onOpen={(id) => onTurnIn(id)} />
                         ))}
                     </div>
                 )}
@@ -1411,7 +1265,7 @@ function ClassDetail({
                 <button
                     onClick={onBack}
                     aria-label="Back to classes"
-                    className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/30 text-white text-[11px] font-bold py-1.5 px-2.5 hover:bg-black/50 transition-colors"
+                    className="absolute top-3 left-3 flex items-center gap-1.5 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd1)] text-[color:var(--t-tx0)] text-[11px] font-bold uppercase tracking-wider py-1.5 px-2.5 hover:border-[color:var(--t-ac)] hover:text-[color:var(--t-ac)] transition-colors"
                 >
                     <Icon.Back className="w-3.5 h-3.5" />
                     Classes
@@ -1419,7 +1273,7 @@ function ClassDetail({
                 <div className="absolute top-3 right-3 flex items-center gap-2">
                     <button
                         onClick={onCopyCode}
-                        className="flex items-center gap-1.5 bg-black/30 text-white text-[11px] font-bold py-1.5 px-2.5 hover:bg-black/50 transition-colors"
+                        className="flex items-center gap-1.5 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd1)] text-[color:var(--t-tx0)] text-[11px] font-bold uppercase tracking-wider py-1.5 px-2.5 hover:border-[color:var(--t-ac)] hover:text-[color:var(--t-ac)] transition-colors"
                         title="Copy class code"
                     >
                         <Icon.Copy className="w-3.5 h-3.5" />
@@ -1431,19 +1285,19 @@ function ClassDetail({
             {/* Meta strip */}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 sm:px-8 py-3 border-b border-solid border-[color:var(--t-bd0)] bg-[var(--t-bg1)]">
                 <span className="text-[color:var(--t-tx1)] text-xs">
-                    <span className="text-[color:var(--t-tx2)]">Room · </span>
+                    <span className={LABEL}>Room · </span>
                     {cls.room || "—"}
                 </span>
                 <span className="text-[color:var(--t-tx1)] text-xs">
-                    <span className="text-[color:var(--t-tx2)]">Subject · </span>
+                    <span className={LABEL}>Subject · </span>
                     {cls.subject}
                 </span>
                 <span className="text-[color:var(--t-tx1)] text-xs">
-                    <span className="text-[color:var(--t-tx2)]">Teacher · </span>
+                    <span className={LABEL}>Teacher · </span>
                     {cls.owner}
                 </span>
                 <span className="text-[color:var(--t-tx1)] text-xs">
-                    <span className="text-[color:var(--t-tx2)]">Code · </span>
+                    <span className={LABEL}>Code · </span>
                     {cls.code}
                 </span>
             </div>
@@ -1456,7 +1310,7 @@ function ClassDetail({
                         <button
                             key={t.key}
                             onClick={() => setTab(t.key)}
-                            className={`flex items-center gap-2 py-3 px-3 text-xs font-bold whitespace-nowrap border-b-2 -mb-px transition-all duration-150 ${active
+                            className={`flex items-center gap-2 py-3 px-3 text-[11px] uppercase tracking-wider font-bold whitespace-nowrap border-b-2 -mb-px transition-all duration-150 ${active
                                 ? "border-[color:var(--t-ac)] text-[color:var(--t-ac)]"
                                 : "border-transparent text-[color:var(--t-tx1)] hover:text-[color:var(--t-tx0)]"
                                 }`}
@@ -1500,20 +1354,23 @@ function ClassList({ classes, onOpen, onCreateClass, onJoinClass }) {
             <div className="px-4 sm:px-8 py-6 flex flex-col gap-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h1 className="text-[color:var(--t-tx0)] text-xl sm:text-2xl font-bold">Classes</h1>
-                        <p className="text-[color:var(--t-tx2)] text-xs mt-1">{classes.length} enrolled</p>
+                        <p className={LABEL}>Classroom HQ</p>
+                        <div className="flex flex-wrap items-center gap-2.5 mt-1">
+                            <h1 className="text-[color:var(--t-tx0)] text-[22px] sm:text-[26px] leading-none font-bold uppercase tracking-wide">Classes</h1>
+                            <Badge color="var(--t-ok)">[{classes.length} ENROLLED]</Badge>
+                        </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={onJoinClass}
-                            className="flex items-center gap-1.5 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs font-bold py-2 px-3 hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-95"
+                            className="flex items-center gap-1.5 bg-[var(--t-bg0)] border-2 border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs font-bold uppercase tracking-wider py-2 px-3 hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-95"
                         >
                             <Icon.Link className="w-3.5 h-3.5" />
                             Join class
                         </button>
                         <button
                             onClick={onCreateClass}
-                            className="flex items-center gap-1.5 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2 px-3.5 hover:opacity-90 transition-all duration-150 active:scale-95"
+                            className={`flex items-center gap-1.5 text-xs py-2 px-3.5 ${PRIMARY_BTN}`}
                         >
                             <Icon.Plus className="w-3.5 h-3.5" />
                             Create class
@@ -1533,12 +1390,9 @@ function ClassList({ classes, onOpen, onCreateClass, onJoinClass }) {
                         )}
                     </div>
 
-                    <aside className="flex flex-col gap-3 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-4">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[color:var(--t-tx0)] text-sm font-bold">To-do</span>
-                            <span className="text-[color:var(--t-tx2)] text-[11px]">{todo.length} upcoming</span>
-                        </div>
-                        <div className="flex flex-col gap-2">
+                    <aside className="flex flex-col bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)]" style={{ boxShadow: PIXEL_SHADOW }}>
+                        <PanelHeader icon="⚑" title="To-do" right={<Badge color="var(--t-warn)">{todo.length} upcoming</Badge>} />
+                        <div className="flex flex-col gap-2 p-3">
                             {todo.length === 0 && (
                                 <p className="text-[color:var(--t-tx2)] text-xs py-4 text-center">Nothing due. You're all caught up.</p>
                             )}
@@ -1546,16 +1400,14 @@ function ClassList({ classes, onOpen, onCreateClass, onJoinClass }) {
                                 <button
                                     key={`${cls.id}-${item.id}`}
                                     onClick={() => onOpen(cls.id)}
-                                    className="flex items-start gap-2.5 text-left p-2.5 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] hover:border-[color:var(--t-ac)] transition-all duration-150"
+                                    className="flex items-start gap-2.5 text-left p-2.5 border border-solid border-[color:var(--t-bd0)] bg-[color-mix(in_srgb,_var(--card-tint)_14%,_transparent)] hover:bg-[color-mix(in_srgb,_var(--card-tint)_6%,_transparent)] transition-colors duration-150"
+                                    style={{ "--card-tint": cls.color }}
                                 >
                                     <div
-                                        className="w-8 h-8 shrink-0 flex items-center justify-center"
-                                        style={{
-                                            backgroundColor: withAlpha(cls.color, "33"),
-                                            color: cls.color,
-                                            border: `1px solid ${withAlpha(cls.color, "55")}`,
-                                        }}
+                                        className="relative w-8 h-8 shrink-0 flex items-center justify-center border-2 border-solid"
+                                        style={{ backgroundColor: withAlpha(cls.color, "26"), color: cls.color, borderColor: cls.color }}
                                     >
+                                        <span className="absolute top-0 left-0 w-full h-[3px]" style={{ backgroundColor: cls.color }} />
                                         <ClassworkTypeIcon type={item.type} className="w-3.5 h-3.5" />
                                     </div>
                                     <div className="min-w-0">
@@ -1646,7 +1498,7 @@ function ClassroomPage({ onNavigate } = {}) {
     const [showQuiz, setShowQuiz] = useState(false);
     const [notifOpen, setNotifOpen] = useState(false);
 
-    const [classes, setClasses] = useState(INITIAL_CLASSES);
+    const [classes, setClasses] = useHubClasses(); // shared with Group Collab (see classHub.js)
     const [activeClassId, setActiveClassId] = useState(null);
     const [tab, setTab] = useState("stream");
 
@@ -1657,6 +1509,26 @@ function ClassroomPage({ onNavigate } = {}) {
     const [copiedCode, setCopiedCode] = useState(false);
 
     const activeClass = classes.find((c) => c.id === activeClassId) || null;
+
+    // Arriving from a task message in Group Collab: open that class on the Classwork tab
+    // and flash the task. Works whether this page just mounted or was already open.
+    const [highlightId, setHighlightId] = useState(null);
+    const openRequest = useOpenRequest();
+    useEffect(() => {
+        if (!openRequest) return;
+        if (classes.some((c) => c.id === openRequest.classId)) {
+            setShowQuiz(false);
+            setActiveClassId(openRequest.classId);
+            setTab(openRequest.tab || "classwork");
+            setHighlightId(openRequest.classworkId || null);
+        }
+        clearOpenRequest();
+    }, [openRequest, classes]);
+    useEffect(() => {
+        if (!highlightId) return;
+        const id = setTimeout(() => setHighlightId(null), 3500);
+        return () => clearTimeout(id);
+    }, [highlightId]);
 
     useEffect(() => {
         function onKeyDown(e) {
@@ -1724,6 +1596,7 @@ function ClassroomPage({ onNavigate } = {}) {
             topics: ["General"],
             classwork: [],
             stream: [],
+            createdClock: clockNow(),
         };
         setClasses((prev) => [fresh, ...prev]);
         setShowCreateClass(false);
@@ -1798,11 +1671,17 @@ function ClassroomPage({ onNavigate } = {}) {
                 title: fields.title,
                 description: fields.description || "",
                 due: fields.due || "",
+                dueAt: fields.dueAt || "",
                 points: fields.points,
                 posted: "Now",
                 attachments: [],
                 submitted: false,
                 grade: null,
+                // Group Collab turns every task posted here into a clickable chat message
+                notify: true,
+                by: CURRENT_USER.name,
+                byId: CURRENT_USER.id,
+                postedClock: clockNow(),
             };
             updateClass(activeClass.id, (c) => ({ ...c, classwork: [item, ...c.classwork] }));
         }
@@ -1940,13 +1819,13 @@ function ClassroomPage({ onNavigate } = {}) {
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                        <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:var(--t-bd0)]">
+                        <div className="flex shrink-0 items-center bg-[color-mix(in_srgb,_var(--t-warn)_14%,_transparent)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:color-mix(in_srgb,_var(--t-warn)_45%,_transparent)]">
                             <img src={NAV_IMG.streak} className="w-3 h-3.5 object-fill" alt="" />
-                            <span className="text-[color:var(--t-warn)] text-[11px] font-bold hidden xs:inline">14 STREAK</span>
+                            <span className="text-[color:var(--t-warn)] text-[11px] font-bold tracking-wider hidden xs:inline">▲ 14 STREAK</span>
                         </div>
-                        <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:var(--t-bd0)]">
+                        <div className="flex shrink-0 items-center bg-[color-mix(in_srgb,_var(--t-ac)_14%,_transparent)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:color-mix(in_srgb,_var(--t-ac)_45%,_transparent)]">
                             <img src={NAV_IMG.xp} className="w-[15px] h-[13px] object-fill" alt="" />
-                            <span className="text-[color:var(--t-ac)] text-[11px] font-bold hidden xs:inline">3,420 XP</span>
+                            <span className="text-[color:var(--t-ac)] text-[11px] font-bold tracking-wider hidden xs:inline">3,420 XP</span>
                         </div>
 
                         <button
@@ -2000,6 +1879,7 @@ function ClassroomPage({ onNavigate } = {}) {
                             onCreatePost={() => setShowCreatePost(true)}
                             onCopyCode={copyCode}
                             copiedCode={copiedCode}
+                            highlightId={highlightId}
                         />
                     ) : (
                         <ClassList

@@ -88,14 +88,12 @@ const TYPE_STYLES = {
 const BADGE_COLOR_BY_COLUMN = {
   backlog: "var(--t-err)", // red
   active: "var(--t-ac2)", // cyan (unchanged)
-  review: "var(--t-warn)", // yellow
   done: "var(--t-ok2)", // green
 };
 
 const SPRINT_STATUS_OPTIONS = [
   { id: "backlog", label: "Backlog" },
   { id: "active", label: "Active Raid" },
-  { id: "review", label: "Boss Checkpoint" },
   { id: "done", label: "Completed" },
 ];
 
@@ -169,55 +167,9 @@ const SUBTABS = [
 
 const SUBJECT_FILTERS = ["All Subjects", "CS240", "MATH210"];
 
-const QUIZ_FORGE_STATS = [
-  {
-    icon: IMG.qfStatus,
-    label: "STATUS",
-    dot: "var(--t-ok2)",
-    title: "Active Semester",
-    titleColor: "var(--t-tx0)",
-    badge: "SP-2025",
-    badgeColor: "var(--t-ok2)",
-    badgeBg: "color-mix(in srgb, var(--t-ok) 22%, transparent)",
-    sub: "Week 9 of 16 Complete",
-    explain: "Which term you're in and how far through it you are. Updates automatically as the weeks pass — nothing to click here.",
-  },
-  {
-    icon: IMG.qfFocus,
-    label: "CURRENT FOCUS",
-    dot: "var(--t-ac)",
-    title: "Syllabus Parsing",
-    titleColor: "var(--t-ac)",
-    sub: "CS240 • Algorithms & Heaps",
-    explain: "The topic Quiz Forge is actively pulling from right now, based on your most recently ingested syllabus/document.",
-  },
-  {
-    icon: IMG.qfDeadline,
-    label: "NEXT DEADLINE",
-    dot: "var(--t-warn)",
-    title: "2d Remainder",
-    titleColor: "var(--t-warn)",
-    note: "(CS240 Midterm)",
-    sub: "Boss Encounter: Thurs 09:00",
-    explain: "A countdown to your nearest exam/checkpoint, pulled straight from the Study Calendar — add or edit events there to change it.",
-  },
-  {
-    icon: IMG.qfTomes,
-    label: "INGESTED TOMES",
-    dot: "var(--t-ok3)",
-    title: "3 Shards",
-    titleColor: "var(--t-tx0)",
-    badge: "84 Chunks",
-    badgeColor: "var(--t-ok3)",
-    badgeBg: "color-mix(in srgb, var(--t-ok) 30%, transparent)",
-    sub: "Ready for Crafting Bench",
-    explain: "How many documents you've uploaded ('Shards') and how many text chunks were extracted from them ('Chunks') — these are what get turned into quiz questions when you hit 'Forge Quiz' below.",
-  },
-];
-
 const INITIAL_FORGE_FOLDERS = [
-  { id: "fo1", name: "CS240" },
-  { id: "fo2", name: "Discrete Math" },
+  { id: "fo1", name: "CS240", parentId: null },
+  { id: "fo2", name: "Discrete Math", parentId: null },
 ];
 
 const INITIAL_FORGE_FILES = [
@@ -269,15 +221,6 @@ const INITIAL_SPRINT_COLUMNS = [
       { id: "c4", subject: "CS240", subjectColor: "var(--t-ac2)", progress: 75, title: "CS240 Algorithm Bounds Review", due: "Due tomorrow", xp: 250 },
       { id: "c5", subject: "QUIZ PREP", subjectColor: "var(--t-warn)", meta: "Target 90%", title: "Tree Rebalance 10-Question Drill", desc: "AVL factor recalculation & zig-zag cases." },
       { id: "c6", subject: "PVP SPARRING", subjectColor: "var(--t-ok2)", meta: "Fri 16:30", title: "Clan Match with @EnderKnight", desc: "Graph Coloring Duel (Live session)." },
-    ],
-  },
-  {
-    id: "review",
-    title: "BOSS CHECKPOINT / IN REVIEW",
-    dot: "var(--t-warn)",
-    cards: [
-      { id: "c7", subject: "BOSS EXAM", subjectColor: "var(--t-onerrc)", subjectBg: "var(--t-errc)", meta: "Fri Mar 20", metaColor: "var(--t-warn)", title: "Discrete Math Midterm Simulation", desc: "Combinatorics & recurrence simulation." },
-      { id: "c8", subject: "CLAN SPRINT", subjectColor: "var(--t-ac2)", meta: "Ready", metaColor: "var(--t-ok2)", title: "Graph Traversal Debrief", desc: "DFS/BFS peer solutions review." },
     ],
   },
   {
@@ -341,6 +284,148 @@ function formatDateLabel(d) {
   return `${MONTH_NAMES[d.getMonth()].slice(0, 3)} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const SHORT_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const FULL_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const RRULE_DAYS = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+const capitalize = (s) => s.charAt(0) + s.slice(1).toLowerCase();
+
+function addDays(d, n) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+// "Due today" / "Due tomorrow" / "Due Mar 23" / "Overdue" for a YYYY-MM-DD string.
+function dueTextFor(dateStr) {
+  const d = parseDateFromInput(dateStr);
+  if (!d) return "";
+  const diff = Math.round((d - TODAY) / 86400000);
+  if (diff < 0) return "Overdue";
+  if (diff === 0) return "Due today";
+  if (diff === 1) return "Due tomorrow";
+  return `Due ${SHORT_MONTHS[d.getMonth()]} ${d.getDate()}`;
+}
+
+/* ---------------------------------------------------------
+   Study events <-> Google Calendar
+   The new-event form mirrors Google Calendar's event fields
+   (title, date, all-day, start/end, repeat, location, guests,
+   Meet, notification, description, colour) so an event maps
+   1:1 onto a Google Calendar API `events.insert` body.
+--------------------------------------------------------- */
+const DEFAULT_EVENT = {
+  label: "",
+  subject: "CS240",
+  type: "review",
+  date: formatDateForInput(TODAY),
+  allDay: false,
+  startTime: "09:00",
+  endTime: "10:00",
+  repeat: "none",
+  location: "",
+  meet: false,
+  guests: [],
+  reminder: "30",
+  description: "",
+  addToGoogle: false,
+};
+
+// Google Calendar colour ids: 7 Peacock, 11 Tomato, 10 Basil.
+const GOOGLE_COLOR_ID = { review: "7", exam: "11", group: "10" };
+
+function repeatOptions(date) {
+  const d = date || TODAY;
+  return [
+    { key: "none", label: "Does not repeat", rrule: null },
+    { key: "daily", label: "Daily", rrule: "RRULE:FREQ=DAILY" },
+    { key: "weekly", label: `Weekly on ${FULL_DAYS[d.getDay()]}`, rrule: `RRULE:FREQ=WEEKLY;BYDAY=${RRULE_DAYS[d.getDay()]}` },
+    { key: "monthly", label: `Monthly on day ${d.getDate()}`, rrule: "RRULE:FREQ=MONTHLY" },
+    { key: "yearly", label: `Annually on ${capitalize(MONTH_NAMES[d.getMonth()])} ${d.getDate()}`, rrule: "RRULE:FREQ=YEARLY" },
+    { key: "weekdays", label: "Every weekday (Monday to Friday)", rrule: "RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR" },
+  ];
+}
+
+// Does a repeating event starting on `start` land on day `d`?
+function occursOn(repeat, start, d) {
+  if (repeat === "daily") return true;
+  if (repeat === "weekdays") return d.getDay() >= 1 && d.getDay() <= 5;
+  if (repeat === "weekly") return d.getDay() === start.getDay();
+  if (repeat === "monthly") return d.getDate() === start.getDate();
+  if (repeat === "yearly") return d.getMonth() === start.getMonth() && d.getDate() === start.getDate();
+  return false;
+}
+
+function evDate(ev) {
+  return ev.date ? parseDateFromInput(ev.date) : new Date(ev.year, ev.month, ev.day);
+}
+
+function googleTimes(ev) {
+  const d = evDate(ev);
+  const allDay = ev.allDay ?? !ev.startTime;
+  if (allDay) return { allDay: true, start: formatDateForInput(d), end: formatDateForInput(addDays(d, 1)) };
+  const day = formatDateForInput(d);
+  return { allDay: false, start: `${day}T${ev.startTime}:00`, end: `${day}T${ev.endTime || ev.startTime}:00` };
+}
+
+// Body for Google Calendar API  events.insert  (pass conferenceDataVersion=1 when `meet` is on).
+function toGoogleEvent(ev) {
+  const t = googleTimes(ev);
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const rule = repeatOptions(evDate(ev)).find((o) => o.key === (ev.repeat || "none"))?.rrule;
+  const mins = ev.reminder == null || ev.reminder === "none" ? null : Number(ev.reminder);
+  const body = {
+    summary: ev.label,
+    description: [ev.description, ev.subject ? `Subject: ${ev.subject}` : ""].filter(Boolean).join("\n\n"),
+    location: ev.location || undefined,
+    colorId: GOOGLE_COLOR_ID[ev.type],
+    start: t.allDay ? { date: t.start } : { dateTime: t.start, timeZone: tz },
+    end: t.allDay ? { date: t.end } : { dateTime: t.end, timeZone: tz },
+    recurrence: rule ? [rule] : undefined,
+    attendees: (ev.guests || []).map((email) => ({ email })),
+    reminders: { useDefault: false, overrides: mins == null ? [] : [{ method: "popup", minutes: mins }] },
+  };
+  if (ev.meet) {
+    body.conferenceData = { createRequest: { requestId: `pz-${ev.id || Date.now()}`, conferenceSolutionKey: { type: "hangoutsMeet" } } };
+  }
+  return body;
+}
+
+// Pre-filled "create event" page on calendar.google.com (works without signing in to anything here).
+function googleCalendarUrl(ev) {
+  const t = googleTimes(ev);
+  const compact = (s) => s.replace(/[-:]/g, "");
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: ev.label || "Study event",
+    dates: `${compact(t.start)}/${compact(t.end)}`,
+  });
+  const details = [ev.description, ev.subject ? `Subject: ${ev.subject}` : ""].filter(Boolean).join("\n\n");
+  const rule = repeatOptions(evDate(ev)).find((o) => o.key === (ev.repeat || "none"))?.rrule;
+  if (details) params.set("details", details);
+  if (ev.location) params.set("location", ev.location);
+  if (rule) params.set("recur", rule);
+  if (ev.guests && ev.guests.length) params.set("add", ev.guests.join(","));
+  params.set("ctz", Intl.DateTimeFormat().resolvedOptions().timeZone);
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+// One-line summary shown under an event in "Upcoming Study Events".
+function buildEventMeta(ev, date) {
+  const rep = repeatOptions(date).find((o) => o.key === ev.repeat);
+  const guests = ev.guests ? ev.guests.length : 0;
+  return [
+    `${SHORT_DAYS[date.getDay()]}, ${SHORT_MONTHS[date.getMonth()]} ${date.getDate()}`,
+    ev.allDay ? "All day" : `${ev.startTime}\u2013${ev.endTime}`,
+    rep && rep.key !== "none" ? rep.label : null,
+    ev.location || null,
+    ev.meet ? "Google Meet" : null,
+    guests ? `${guests} ${guests === 1 ? "guest" : "guests"}` : null,
+  ]
+    .filter(Boolean)
+    .join(" \u2022 ");
+}
+
 /* ---------------------------------------------------------
    Main component
 --------------------------------------------------------- */
@@ -361,13 +446,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
   const [upcoming, setUpcoming] = useState(INITIAL_UPCOMING);
   const [completed, setCompleted] = useState({});
   const [showAddEvent, setShowAddEvent] = useState(false);
-  const [newEvent, setNewEvent] = useState({
-    label: "",
-    subject: "CS240",
-    type: "review",
-    meta: "",
-    date: formatDateForInput(TODAY),
-  });
+  const [newEvent, setNewEvent] = useState({ ...DEFAULT_EVENT });
   const [notifOpen, setNotifOpen] = useState(false);
   const [openEventMenuId, setOpenEventMenuId] = useState(null);
   const [forgeFiles, setForgeFiles] = useState(INITIAL_FORGE_FILES);
@@ -395,6 +474,8 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
   const [showQuickTask, setShowQuickTask] = useState(false);
   const [quickTaskText, setQuickTaskText] = useState("");
   const [quickTaskBadge, setQuickTaskBadge] = useState("");
+  const [addingDue, setAddingDue] = useState(formatDateForInput(TODAY));
+  const [quickTaskDue, setQuickTaskDue] = useState(formatDateForInput(TODAY));
 
   const fileInputRef = useRef(null);
 
@@ -419,13 +500,24 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 
   const eventsByKey = useMemo(() => {
     const map = {};
-    events.forEach((ev) => {
-      const k = keyFor(ev.year, ev.month, ev.day);
+    const add = (k, ev) => {
       if (!map[k]) map[k] = [];
       map[k].push(ev);
+    };
+    const rangeStart = weeks[0][0].date;
+    const rangeEnd = weeks[weeks.length - 1][6].date;
+    events.forEach((ev) => {
+      add(keyFor(ev.year, ev.month, ev.day), ev);
+      if (ev.repeat && ev.repeat !== "none") {
+        const start = new Date(ev.year, ev.month, ev.day);
+        for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
+          if (d <= start) continue;
+          if (occursOn(ev.repeat, start, d)) add(keyFor(d.getFullYear(), d.getMonth(), d.getDate()), ev);
+        }
+      }
     });
     return map;
-  }, [events]);
+  }, [events, weeks]);
 
   function goPrevMonth() {
     setViewDate(new Date(year, month - 1, 1));
@@ -441,13 +533,21 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     setCompleted((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  function deleteUpcoming(id) {
+  function removeCalendarEntry(id) {
     setUpcoming((prev) => prev.filter((u) => u.id !== id));
     setEvents((prev) => prev.filter((e) => e.id !== id));
     setCompleted((prev) => {
       const { [id]: _drop, ...rest } = prev;
       return rest;
     });
+  }
+
+  function deleteUpcoming(id) {
+    removeCalendarEntry(id);
+    // The Sprint Board task stays; it just loses its calendar link.
+    setSprintColumns((prev) =>
+      prev.map((c) => ({ ...c, cards: c.cards.map((cd) => (cd.eventId === id ? { ...cd, eventId: null } : cd)) }))
+    );
   }
 
   function formatSize(bytes) {
@@ -510,7 +610,9 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     const n = name.trim();
     if (!n) return;
     const id = `fo${Date.now()}`;
-    setForgeFolders((prev) => [...prev, { id, name: n }]);
+    // New folders are created inside whichever folder is currently open.
+    const parentId = forgeFolders.some((fo) => fo.id === activeFolder) ? activeFolder : null;
+    setForgeFolders((prev) => [...prev, { id, name: n, parentId }]);
   }
 
   function renameFolder(id, name) {
@@ -519,11 +621,26 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     setForgeFolders((prev) => prev.map((fo) => (fo.id === id ? { ...fo, name: n } : fo)));
   }
 
-  // Deleting a folder never deletes files: they just become unfiled.
+  // Deleting a folder removes its subfolders too, but never deletes files:
+  // they move up into the deleted folder's parent (or My Library).
   function deleteFolder(id) {
-    setForgeFolders((prev) => prev.filter((fo) => fo.id !== id));
-    setForgeFiles((prev) => prev.map((it) => (it.folderId === id ? { ...it, folderId: null } : it)));
-    setActiveFolder((cur) => (cur === id ? null : cur));
+    const target = forgeFolders.find((fo) => fo.id === id);
+    if (!target) return;
+    const gone = new Set([id]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      forgeFolders.forEach((fo) => {
+        if (fo.parentId && gone.has(fo.parentId) && !gone.has(fo.id)) {
+          gone.add(fo.id);
+          grew = true;
+        }
+      });
+    }
+    const parent = target.parentId || null;
+    setForgeFolders((prev) => prev.filter((fo) => !gone.has(fo.id)));
+    setForgeFiles((prev) => prev.map((it) => (gone.has(it.folderId) ? { ...it, folderId: parent } : it)));
+    setActiveFolder((cur) => (gone.has(cur) ? parent : cur));
   }
 
   function moveFile(fileId, folderId) {
@@ -613,12 +730,31 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
   }
 
   function deleteCard(colId, cardId) {
+    const card = sprintColumns.find((c) => c.id === colId)?.cards.find((cd) => cd.id === cardId);
+    if (card?.eventId) removeCalendarEntry(card.eventId);
     setSprintColumns((prev) =>
       prev.map((c) => (c.id === colId ? { ...c, cards: c.cards.filter((cd) => cd.id !== cardId) } : c))
     );
   }
 
   function editCard(colId, cardId, updates) {
+    const card = sprintColumns.find((c) => c.id === colId)?.cards.find((cd) => cd.id === cardId);
+    if (card?.eventId) {
+      if (updates.title) {
+        setEvents((prev) => prev.map((e) => (e.id === card.eventId ? { ...e, label: updates.title } : e)));
+      }
+      setUpcoming((prev) =>
+        prev.map((u) =>
+          u.id === card.eventId
+            ? {
+              ...u,
+              ...(updates.title ? { title: updates.title } : {}),
+              ...(updates.subject !== undefined ? { subject: updates.subject || "TASK" } : {}),
+            }
+            : u
+        )
+      );
+    }
     setSprintColumns((prev) =>
       prev.map((c) =>
         c.id === colId
@@ -626,6 +762,49 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
           : c
       )
     );
+  }
+
+  // Wipes every quest on the board and the calendar entries that were created for them.
+  function clearAllQuests() {
+    const ids = new Set(sprintColumns.flatMap((c) => c.cards.map((cd) => cd.eventId).filter(Boolean)));
+    setSprintColumns((prev) => prev.map((c) => ({ ...c, cards: [] })));
+    setUpcoming((prev) => prev.filter((u) => !ids.has(u.id)));
+    setEvents((prev) => prev.filter((e) => !ids.has(e.id)));
+    setCompleted((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => !ids.has(k))));
+  }
+
+  // A new sprint task always gets a due date, and that due date lands on the Study Calendar.
+  function addQuest({ colId = "backlog", title, subject = "", dueStr }) {
+    const t = title.trim();
+    if (!t) return;
+    const due = parseDateFromInput(dueStr);
+    const sub = subject.trim().toUpperCase();
+    let eventId = null;
+    if (due) {
+      eventId = `u${Date.now()}`;
+      setUpcoming((prev) => [
+        {
+          id: eventId,
+          img: IMG.ev1,
+          chk: IMG.ev1chk,
+          title: t,
+          subject: sub || "TASK",
+          subjectColor: "var(--t-ac2)",
+          meta: `${SHORT_DAYS[due.getDay()]}, ${SHORT_MONTHS[due.getMonth()]} ${due.getDate()} \u2022 Due \u2022 Sprint Board task`,
+          status: "TASK",
+          statusColor: "var(--t-ac2)",
+        },
+        ...prev,
+      ]);
+      setEvents((prev) => [
+        ...prev,
+        { id: eventId, year: due.getFullYear(), month: due.getMonth(), day: due.getDate(), label: t, type: "review", subject: sub, allDay: true },
+      ]);
+    }
+    addCardToColumn(colId, t, {
+      ...(sub ? { subject: sub } : {}),
+      ...(due ? { dueDate: formatDateForInput(due), eventId } : {}),
+    });
   }
 
   function moveCardToColumn(cardId, fromColId, toColId) {
@@ -643,7 +822,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 
   function submitAddCard(e) {
     e.preventDefault();
-    addCardToColumn(addingColumnId, addingText, addingBadge.trim() ? { subject: addingBadge.trim().toUpperCase() } : {});
+    addQuest({ colId: addingColumnId, title: addingText, subject: addingBadge, dueStr: addingDue });
     setAddingColumnId(null);
     setAddingText("");
     setAddingBadge("");
@@ -653,7 +832,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     if (autoIngesting) return;
     setAutoIngesting(true);
     setTimeout(() => {
-      addCardToColumn("backlog", "Auto-ingested: New drill from latest slides");
+      addQuest({ colId: "backlog", title: "Auto-ingested: New drill from latest slides", dueStr: formatDateForInput(addDays(TODAY, 3)) });
       setAutoIngesting(false);
     }, 1400);
   }
@@ -666,7 +845,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
 
   function submitQuickTask(e) {
     e.preventDefault();
-    addCardToColumn("backlog", quickTaskText, quickTaskBadge.trim() ? { subject: quickTaskBadge.trim().toUpperCase() } : {});
+    addQuest({ colId: "backlog", title: quickTaskText, subject: quickTaskBadge, dueStr: quickTaskDue });
     setQuickTaskText("");
     setQuickTaskBadge("");
     setShowQuickTask(false);
@@ -685,20 +864,18 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     // Fall back to the calendar's selected day, then to TODAY, if the
     // date field was ever left empty.
     const chosenDate = parseDateFromInput(newEvent.date) || selectedDate || TODAY;
-    const evYear = chosenDate.getFullYear();
-    const evMonth = chosenDate.getMonth();
-    const evDay = chosenDate.getDate();
-    const dateLabel = formatDateLabel(chosenDate);
+    const label = newEvent.label.trim();
+    const subject = newEvent.subject.trim();
 
     setUpcoming((prev) => [
       {
         id,
         img: IMG.ev1,
         chk: IMG.ev1chk,
-        title: newEvent.label,
-        subject: newEvent.subject,
+        title: label,
+        subject,
         subjectColor: colorMap[newEvent.type],
-        meta: newEvent.meta || `${dateLabel} • Time to be confirmed`,
+        meta: buildEventMeta(newEvent, chosenDate),
         status: statusMap[newEvent.type],
         statusColor: colorMap[newEvent.type],
       },
@@ -706,14 +883,23 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     ]);
     setEvents((prev) => [
       ...prev,
-      { id, year: evYear, month: evMonth, day: evDay, label: newEvent.label, type: newEvent.type },
+      {
+        ...newEvent,
+        id,
+        label,
+        subject,
+        year: chosenDate.getFullYear(),
+        month: chosenDate.getMonth(),
+        day: chosenDate.getDate(),
+      },
     ]);
-    // New calendar events also land as a quest in the Sprint Board backlog.
-    addCardToColumn("backlog", newEvent.label, {
-      subject: newEvent.subject.toUpperCase(),
-      meta: dateLabel,
+    // New calendar events also land as a quest in the Sprint Board backlog, due on the event date.
+    addCardToColumn("backlog", label, {
+      subject: subject.toUpperCase(),
+      dueDate: formatDateForInput(chosenDate),
+      eventId: id,
     });
-    setNewEvent({ label: "", subject: "CS240", type: "review", meta: "", date: formatDateForInput(TODAY) });
+    setNewEvent({ ...DEFAULT_EVENT });
     setSelectedDate(null);
     setShowAddEvent(false);
   }
@@ -1177,7 +1363,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                               return (
                                                 <div
                                                   key={ev.id}
-                                                  title={ev.label}
+                                                  title={`${ev.label}${!ev.allDay && ev.startTime ? ` \u2022 ${ev.startTime}\u2013${ev.endTime}` : ""}`}
                                                   className="flex flex-col items-start py-1 px-1.5 w-full truncate"
                                                   style={{ backgroundColor: st.bg }}
                                                 >
@@ -1185,7 +1371,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                                     className="text-[10px] sm:text-[11px] font-bold truncate w-full"
                                                     style={{ color: st.text }}
                                                   >
-                                                    {ev.label}
+                                                    {!ev.allDay && ev.startTime ? `${ev.startTime} ` : ""}{ev.label}
                                                   </span>
                                                 </div>
                                               );
@@ -1298,7 +1484,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                             onClick={() => setOpenEventMenuId(null)}
                                           />
                                           <div
-                                            className="pz-anim absolute right-0 top-10 z-50 w-48 bg-[color-mix(in_srgb,_var(--t-mbg)_95%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-1.5 flex flex-col gap-1"
+                                            className="pz-anim absolute right-0 top-10 z-50 w-56 bg-[color-mix(in_srgb,_var(--t-mbg)_95%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-1.5 flex flex-col gap-1"
                                             style={{ boxShadow: "0 14px 36px rgba(0,0,0,0.6), 0 0 24px color-mix(in srgb, var(--t-glow) 30%, transparent)", animation: "pzMenu .16s ease-out" }}
                                           >
                                             <button
@@ -1315,6 +1501,24 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                               </span>
                                               <span className="text-xs font-bold whitespace-nowrap">{isDone ? "Mark as not done" : "Mark as done"}</span>
                                             </button>
+                                            {events.some((x) => x.id === u.id) && (
+                                              <button
+                                                onClick={() => {
+                                                  const ev = events.find((x) => x.id === u.id);
+                                                  window.open(googleCalendarUrl(ev), "_blank", "noopener,noreferrer");
+                                                  setOpenEventMenuId(null);
+                                                }}
+                                                className="group/mi flex items-center gap-2.5 w-full text-left p-1.5 border border-solid border-transparent text-[color:var(--t-tx1)] hover:bg-[color-mix(in_srgb,_var(--t-ac)_10%,_transparent)] hover:border-[color:color-mix(in_srgb,_var(--t-ac)_30%,_transparent)] hover:text-[color:var(--t-ac)] active:scale-[0.98] transition-all duration-150"
+                                              >
+                                                <span className="w-6 h-6 shrink-0 flex items-center justify-center border border-solid border-[color:color-mix(in_srgb,_var(--t-ac)_30%,_transparent)] bg-[color-mix(in_srgb,_var(--t-ac)_13%,_transparent)] text-[color:var(--t-ac)] group-hover/mi:bg-[var(--t-ac)] group-hover/mi:text-[color:var(--t-onac)] transition-colors">
+                                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                                                    <path d="M16 2v4M8 2v4M3 10h18" />
+                                                  </svg>
+                                                </span>
+                                                <span className="text-xs font-bold whitespace-nowrap">Add to Google Calendar</span>
+                                              </button>
+                                            )}
                                             <div className="h-px bg-[var(--t-mbd)] mx-1" />
                                             <button
                                               onClick={() => {
@@ -1419,6 +1623,11 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                         quickTaskBadge={quickTaskBadge}
                         setQuickTaskBadge={setQuickTaskBadge}
                         onSubmitQuickTask={submitQuickTask}
+                        addingDue={addingDue}
+                        setAddingDue={setAddingDue}
+                        quickTaskDue={quickTaskDue}
+                        setQuickTaskDue={setQuickTaskDue}
+                        onClearAll={clearAllQuests}
                       />
                     )}
                   </>
@@ -1456,20 +1665,42 @@ const EVENT_TYPES = [
   { key: "group", label: "Group Session", color: "var(--t-ok)", icon: "👥" },
 ];
 
+const REMINDER_OPTIONS = [
+  { v: "none", label: "No notification" },
+  { v: "10", label: "10 minutes before" },
+  { v: "30", label: "30 minutes before" },
+  { v: "60", label: "1 hour before" },
+  { v: "1440", label: "1 day before" },
+];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const toMin = (t) => {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+};
+const fromMin = (n) => `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
+
 function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
   const [launching, setLaunching] = useState(false);
+  const [guestInput, setGuestInput] = useState("");
+  const [guestError, setGuestError] = useState("");
   const set = (patch) => setNewEvent((p) => ({ ...p, ...patch }));
 
-  const checks = [!!newEvent.label.trim(), !!newEvent.date, !!newEvent.subject.trim(), !!newEvent.meta.trim()];
+  const picked = parseDateFromInput(newEvent.date);
+  const timeInvalid = !newEvent.allDay && !!newEvent.startTime && !!newEvent.endTime && newEvent.endTime <= newEvent.startTime;
+  const hasDetails =
+    !!newEvent.location.trim() || !!newEvent.description.trim() || newEvent.guests.length > 0 || newEvent.meet;
+
+  const checks = [!!newEvent.label.trim(), !!newEvent.date && !timeInvalid, !!newEvent.subject.trim(), hasDetails];
   const done = checks.filter(Boolean).length;
   const pct = (done / checks.length) * 100;
   const complete = done === checks.length;
   const barColor = pct < 50 ? "var(--t-warn)" : pct < 100 ? "var(--t-ac2)" : "var(--t-ok)";
   const typeDef = EVENT_TYPES.find((t) => t.key === newEvent.type) || EVENT_TYPES[0];
 
-  const picked = parseDateFromInput(newEvent.date);
   const left = picked ? Math.round((picked - TODAY) / 86400000) : null;
   const dueHint = left === null ? null : left < 0 ? "In the past" : left === 0 ? "Today" : left === 1 ? "Tomorrow" : `In ${left} days`;
+  const repeats = repeatOptions(picked || TODAY);
 
   function quickDate(offset) {
     const d = new Date(TODAY);
@@ -1477,18 +1708,42 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
     set({ date: formatDateForInput(d) });
   }
 
+  // Like Google Calendar: moving the start moves the end so the duration is kept.
+  function changeStart(v) {
+    if (!v) return;
+    const prev = toMin(newEvent.endTime) - toMin(newEvent.startTime);
+    const dur = prev > 0 ? prev : 60;
+    set({ startTime: v, endTime: fromMin(Math.min(toMin(v) + dur, 23 * 60 + 59)) });
+  }
+
+  function addGuest() {
+    const parts = guestInput.split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean);
+    if (!parts.length) return;
+    const bad = parts.find((p) => !EMAIL_RE.test(p));
+    if (bad) {
+      setGuestError(`"${bad}" isn't a valid email address`);
+      return;
+    }
+    set({ guests: [...new Set([...newEvent.guests, ...parts.map((p) => p.toLowerCase())])] });
+    setGuestInput("");
+    setGuestError("");
+  }
+
   function submit(e) {
     e.preventDefault();
-    if (!newEvent.label.trim() || launching) return;
+    if (!newEvent.label.trim() || launching || timeInvalid) return;
+    // Open Google Calendar right away (inside the click) so the browser doesn't block the tab.
+    if (newEvent.addToGoogle) window.open(googleCalendarUrl(newEvent), "_blank", "noopener,noreferrer");
     setLaunching(true);
     setTimeout(() => onSubmit({ preventDefault() { } }), 450);
   }
 
   const field =
     "w-full bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2.5 px-3 text-left outline-none transition-all duration-200 placeholder:text-[color:var(--t-ph)] focus:border-[color:var(--t-ac)] focus:shadow-[0_0_14px_color-mix(in srgb, var(--t-ac) 20%, transparent)] focus:bg-[var(--t-in1)]";
+  const sectionLabel = "flex items-center gap-1.5 text-[color:var(--t-mtx)] text-[10px] font-bold tracking-wider text-left uppercase";
 
   const Label = ({ children, ok, optional }) => (
-    <span className="flex items-center gap-1.5 text-[color:var(--t-mtx)] text-[10px] font-bold tracking-wider text-left uppercase">
+    <span className={sectionLabel}>
       <span
         className="inline-flex items-center justify-center w-3 h-3 rounded-full text-[8px] leading-none transition-all duration-300"
         style={{
@@ -1510,7 +1765,7 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
       <form
         onSubmit={submit}
-        className="pz-anim relative bg-[color-mix(in_srgb,_var(--t-mbg)_95%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] w-full max-w-md max-h-[94vh] overflow-y-auto"
+        className="pz-anim relative bg-[color-mix(in_srgb,_var(--t-mbg)_95%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] w-full max-w-lg max-h-[94vh] overflow-y-auto"
         style={{
           boxShadow: `0 20px 60px rgba(0,0,0,0.65), 0 0 40px ${withAlpha(typeDef.color, "22")}`,
           animation: launching ? "pzLaunch .45s ease-in forwards" : "pzPop .28s cubic-bezier(.2,.9,.3,1.2)",
@@ -1566,12 +1821,12 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
           {/* Title */}
           <label className="flex flex-col gap-1.5">
             <Label ok={checks[0]}>Title</Label>
-            <input autoFocus value={newEvent.label} onChange={(e) => set({ label: e.target.value })} placeholder="e.g. Linear Algebra Review" className={field} />
+            <input autoFocus value={newEvent.label} onChange={(e) => set({ label: e.target.value })} placeholder="Add title" className={`${field} !text-sm font-bold`} />
           </label>
 
-          {/* Type */}
+          {/* Type (maps to the Google Calendar event colour) */}
           <div className="flex flex-col gap-1.5">
-            <span className="text-[color:var(--t-mtx)] text-[10px] font-bold tracking-wider text-left uppercase">Type</span>
+            <span className={sectionLabel}>Type</span>
             <div className="grid grid-cols-3 gap-1.5">
               {EVENT_TYPES.map((t) => {
                 const active = newEvent.type === t.key;
@@ -1596,9 +1851,9 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
             </div>
           </div>
 
-          {/* Date + quick picks */}
-          <div className="flex flex-col gap-1.5">
-            <Label ok={checks[1]}>Date</Label>
+          {/* When: date, all-day, start/end, repeat */}
+          <div className="flex flex-col gap-2 p-3 border border-solid border-[color:var(--t-mbd)] bg-[color-mix(in_srgb,_var(--t-in0)_55%,_transparent)]">
+            <Label ok={checks[1]}>When</Label>
             <input type="date" value={newEvent.date} onChange={(e) => set({ date: e.target.value })} className={`${field} pz-date`} />
             <div className="flex items-center flex-wrap gap-1.5 min-h-[22px]">
               {[
@@ -1627,6 +1882,33 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
                 </span>
               )}
             </div>
+
+            <label className="flex items-center gap-2 text-[color:var(--t-tx1)] text-xs cursor-pointer select-none w-fit">
+              <input
+                type="checkbox"
+                checked={newEvent.allDay}
+                onChange={(e) => set({ allDay: e.target.checked })}
+                className="accent-[var(--t-ac)] w-3.5 h-3.5"
+              />
+              All day
+            </label>
+
+            {!newEvent.allDay && (
+              <div className="flex flex-col gap-1">
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                  <input type="time" aria-label="Start time" value={newEvent.startTime} onChange={(e) => changeStart(e.target.value)} className={`${field} pz-date`} />
+                  <span className="text-[color:var(--t-mtx)] text-xs">–</span>
+                  <input type="time" aria-label="End time" value={newEvent.endTime} onChange={(e) => set({ endTime: e.target.value })} className={`${field} pz-date`} />
+                </div>
+                {timeInvalid && <span className="text-[10px] font-bold text-[color:var(--t-err)]">End time must be after the start time.</span>}
+              </div>
+            )}
+
+            <select value={newEvent.repeat} onChange={(e) => set({ repeat: e.target.value })} aria-label="Repeat" className={field}>
+              {repeats.map((o) => (
+                <option key={o.key} value={o.key}>{o.label}</option>
+              ))}
+            </select>
           </div>
 
           {/* Subject */}
@@ -1640,17 +1922,113 @@ function NewEventModal({ newEvent, setNewEvent, onClose, onSubmit }) {
             )}
           </label>
 
-          {/* Details */}
-          <label className="flex flex-col gap-1.5">
+          {/* Google Calendar-style details */}
+          <div className="flex flex-col gap-3 p-3 border border-solid border-[color:var(--t-mbd)] bg-[color-mix(in_srgb,_var(--t-in0)_55%,_transparent)]">
             <Label ok={checks[3]} optional>Details</Label>
-            <input value={newEvent.meta} onChange={(e) => set({ meta: e.target.value })} placeholder="e.g. 15:00 • Room 3" className={field} />
+
+            <label className="flex flex-col gap-1">
+              <span className="text-[color:var(--t-mtx)] text-[11px]">📍 Location</span>
+              <input value={newEvent.location} onChange={(e) => set({ location: e.target.value })} placeholder="Add location" className={field} />
+            </label>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-[color:var(--t-mtx)] text-[11px]">👥 Guests</span>
+              <div className="flex gap-2">
+                <input
+                  value={guestInput}
+                  onChange={(e) => { setGuestInput(e.target.value); setGuestError(""); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === ",") {
+                      e.preventDefault();
+                      addGuest();
+                    }
+                  }}
+                  placeholder="Add guests (email)"
+                  className={field}
+                />
+                <button type="button" onClick={addGuest} className="shrink-0 text-[11px] font-bold px-3 border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-mtx)] hover:border-[color:var(--t-ac)] hover:text-[color:var(--t-ac)] transition-colors active:scale-95">
+                  Add
+                </button>
+              </div>
+              {guestError && <span className="text-[10px] font-bold text-[color:var(--t-err)]">{guestError}</span>}
+              {newEvent.guests.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {newEvent.guests.map((g) => (
+                    <span key={g} className="flex items-center gap-1.5 text-[10px] py-0.5 pl-2 pr-1 border border-solid border-[color:var(--t-mbd)] bg-[var(--t-in0)] text-[color:var(--t-tx1)]">
+                      {g}
+                      <button type="button" aria-label={`Remove ${g}`} onClick={() => set({ guests: newEvent.guests.filter((x) => x !== g) })} className="w-4 h-4 leading-none text-[color:var(--t-mtx)] hover:text-[color:var(--t-err)]">
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={newEvent.meet}
+              onClick={() => set({ meet: !newEvent.meet })}
+              className="flex items-center justify-between gap-3 text-left"
+            >
+              <span className="text-[color:var(--t-tx1)] text-xs">🎥 Add Google Meet video conferencing</span>
+              <span
+                className="relative w-9 h-5 shrink-0 border border-solid transition-colors duration-200"
+                style={{
+                  backgroundColor: newEvent.meet ? "var(--t-ac)" : "var(--t-in0)",
+                  borderColor: newEvent.meet ? "var(--t-ac)" : "var(--t-mbd2)",
+                }}
+              >
+                <span
+                  className="absolute top-0.5 w-3.5 h-3.5 transition-all duration-200"
+                  style={{ left: newEvent.meet ? "calc(100% - 1.125rem)" : "0.125rem", backgroundColor: newEvent.meet ? "var(--t-onac)" : "var(--t-mtx)" }}
+                />
+              </span>
+            </button>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-[color:var(--t-mtx)] text-[11px]">🔔 Notification</span>
+              <select value={newEvent.reminder} onChange={(e) => set({ reminder: e.target.value })} className={field}>
+                {REMINDER_OPTIONS.map((o) => (
+                  <option key={o.v} value={o.v}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-[color:var(--t-mtx)] text-[11px]">📝 Description</span>
+              <textarea value={newEvent.description} onChange={(e) => set({ description: e.target.value })} rows={3} placeholder="Add description" className={`${field} resize-none`} />
+            </label>
+          </div>
+
+          {/* Google Calendar link */}
+          <label
+            className="flex items-start gap-2.5 p-3 border border-solid cursor-pointer transition-colors"
+            style={{
+              borderColor: newEvent.addToGoogle ? "var(--t-ac)" : "var(--t-mbd)",
+              backgroundColor: newEvent.addToGoogle ? "color-mix(in srgb, var(--t-ac) 10%, transparent)" : "transparent",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={newEvent.addToGoogle}
+              onChange={(e) => set({ addToGoogle: e.target.checked })}
+              className="mt-0.5 accent-[var(--t-ac)] w-3.5 h-3.5"
+            />
+            <span className="flex flex-col gap-0.5 text-left">
+              <span className="text-[color:var(--t-tx0)] text-xs font-bold">Also add to Google Calendar</span>
+              <span className="text-[color:var(--t-mtx)] text-[10px] leading-snug">
+                Opens Google Calendar with these details pre-filled. Title, time, repeat, location, guests and description carry over; Meet links and custom notifications are not supported by Google&apos;s prefill link.
+              </span>
+            </span>
           </label>
 
-          <span className="text-[color:var(--t-mtx)] text-[10px] text-left">✓ This will also land in your Study Sprint Board backlog.</span>
+          <span className="text-[color:var(--t-mtx)] text-[10px] text-left">✓ This will also land in your Study Sprint Board backlog, due on the event date.</span>
 
           <button
             type="submit"
-            disabled={!newEvent.label.trim() || launching}
+            disabled={!newEvent.label.trim() || launching || timeInvalid}
             className="pz-anim relative overflow-hidden text-xs font-bold py-3 tracking-wider transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:brightness-110"
             style={{
               backgroundColor: complete ? "var(--t-ok)" : "var(--t-ac)",
@@ -1734,9 +2112,32 @@ function QuizForgePanel({
 
   const q = search.trim().toLowerCase();
   const current = folders.find((fo) => fo.id === activeFolder) || null;
-  const folderName = (id) => folders.find((fo) => fo.id === id)?.name || "My Library";
-  const countIn = (id) => files.filter((f) => f.folderId === id).length;
-  const totalChunks = files.reduce((sum, f) => sum + f.chunks, 0);
+
+  // Folders can hold other folders: walk up the parents to get a folder's full path.
+  const pathOf = (id) => {
+    const out = [];
+    const seen = new Set();
+    let cur = folders.find((fo) => fo.id === id);
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      out.unshift(cur);
+      cur = folders.find((fo) => fo.id === cur.parentId);
+    }
+    return out;
+  };
+  const pathLabel = (id) => (id ? pathOf(id).map((fo) => fo.name).join(" / ") : "My Library");
+  const crumbs = current ? pathOf(current.id) : [];
+  const fileCount = (id) => files.filter((f) => f.folderId === id).length;
+  const subCount = (id) => folders.filter((fo) => fo.parentId === id).length;
+  const folderSummary = (id) => {
+    const s = subCount(id);
+    const f = fileCount(id);
+    if (!s && !f) return "Empty";
+    const parts = [];
+    if (s) parts.push(`${s} ${s === 1 ? "folder" : "folders"}`);
+    if (f) parts.push(`${f} ${f === 1 ? "file" : "files"}`);
+    return parts.join(" \u2022 ");
+  };
 
   // Drive-style scope: root shows folders + loose files, a folder shows only its own files,
   // and searching looks through everything.
@@ -1744,7 +2145,9 @@ function QuizForgePanel({
     const inScope = q ? true : current ? f.folderId === current.id : !f.folderId;
     return inScope && f.name.toLowerCase().includes(q);
   });
-  const showFolders = !current && !q;
+  const visibleFolders = folders.filter((fo) => (fo.parentId || null) === (current ? current.id : null));
+  const showFolders = !q;
+  const atRootView = !current && !q;
 
   const isFileDrag = (e) => e.dataTransfer.types.includes("Files");
   const isMoveDrag = (e) => e.dataTransfer.types.includes("text/forge-file");
@@ -1785,29 +2188,6 @@ function QuizForgePanel({
 
   return (
     <div className="flex flex-col self-stretch gap-5">
-      {/* Summary strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)]">
-        {QUIZ_FORGE_STATS.map((stat, i) => {
-          const isTomes = stat.label === "INGESTED TOMES";
-          return (
-            <div
-              key={stat.label}
-              title={stat.explain}
-              className={`flex flex-col gap-1 p-4 cursor-help ${i > 0 ? "lg:border-l border-solid border-[color:var(--t-bd0)]" : ""} ${i % 2 === 1 ? "border-l lg:border-l" : ""} ${i > 1 ? "border-t lg:border-t-0 border-solid border-[color:var(--t-bd0)]" : ""}`}
-            >
-              <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider">{stat.label}</span>
-              <span className="text-sm font-bold truncate" style={{ color: stat.titleColor }}>
-                {isTomes ? `${files.length} ${files.length === 1 ? "Shard" : "Shards"}` : stat.title}
-                {stat.note && <span className="text-[color:var(--t-tx1)] text-[10px] font-normal ml-1.5">{stat.note}</span>}
-              </span>
-              <span className="text-[color:var(--t-tx2)] text-[11px] truncate">
-                {isTomes ? `${totalChunks} chunks \u2022 ready to forge` : stat.sub}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
       {/* Library */}
       <div
         className="relative flex flex-col self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)]"
@@ -1828,27 +2208,44 @@ function QuizForgePanel({
 
         {/* Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-solid border-[color:var(--t-bd0)]">
-          <nav aria-label="Folder path" className="flex items-center gap-1.5 text-sm min-w-0">
-            <button
-              type="button"
-              onClick={() => { setActiveFolder(null); setSearch(""); }}
-              {...moveTarget("root", null)}
-              className={`py-1 px-2 font-bold transition-colors ${dropTarget === "root"
-                  ? "bg-[color-mix(in_srgb,_var(--t-ac)_20%,_transparent)] text-[color:var(--t-ac)]"
-                  : current
-                    ? "text-[color:var(--t-tx1)] hover:text-[color:var(--t-ac)]"
-                    : "text-[color:var(--t-tx0)]"
-                }`}
-            >
-              My Library
-            </button>
+          <div className="flex items-center gap-2 min-w-0">
             {current && (
-              <>
-                <span className="text-[color:var(--t-tx2)]" aria-hidden="true">/</span>
-                <span className="py-1 px-2 font-bold text-[color:var(--t-tx0)] truncate">{current.name}</span>
-              </>
+              <button
+                type="button"
+                onClick={() => { setActiveFolder(current.parentId || null); setSearch(""); }}
+                className="flex items-center gap-1.5 shrink-0 py-1.5 px-2.5 text-xs font-bold text-[color:var(--t-ac)] border border-solid border-[color:var(--t-ac)] hover:bg-[var(--t-ac)] hover:text-[color:var(--t-onac)] transition-colors active:scale-95"
+              >
+                <span aria-hidden="true">{"\u2190"}</span> Back
+              </button>
             )}
-          </nav>
+            <nav aria-label="Folder path" className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm min-w-0">
+              {[{ id: null, name: "My Library" }, ...crumbs].map((c, i, arr) => {
+                const isLast = i === arr.length - 1;
+                const key = `crumb-${c.id ?? "root"}`;
+                return (
+                  <React.Fragment key={key}>
+                    {i > 0 && <span className="text-[color:var(--t-tx2)]" aria-hidden="true">/</span>}
+                    {isLast ? (
+                      <span className="py-1 px-2 font-bold text-[color:var(--t-tx0)] truncate">{c.name}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        title={`Go to ${c.name}`}
+                        onClick={() => { setActiveFolder(c.id); setSearch(""); }}
+                        {...moveTarget(key, c.id)}
+                        className={`py-1 px-2 font-bold underline underline-offset-4 decoration-dotted transition-colors ${dropTarget === key
+                          ? "bg-[color-mix(in_srgb,_var(--t-ac)_20%,_transparent)] text-[color:var(--t-ac)]"
+                          : "text-[color:var(--t-ac)] hover:bg-[color-mix(in_srgb,_var(--t-ac)_12%,_transparent)]"
+                          }`}
+                      >
+                        {c.name}
+                      </button>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </nav>
+          </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -1858,11 +2255,9 @@ function QuizForgePanel({
               aria-label="Search files"
               className={`${inputCls} !flex-none w-36`}
             />
-            {!current && (
-              <button type="button" onClick={() => setNewFolderOpen(true)} className={ghostBtnCls}>
-                <span className="text-[color:var(--t-ac)] text-sm leading-none">+</span> New folder
-              </button>
-            )}
+            <button type="button" onClick={() => setNewFolderOpen(true)} className={ghostBtnCls}>
+              <span className="text-[color:var(--t-ac)] text-sm leading-none">+</span> New folder
+            </button>
             <button type="button" onClick={onSyncDrive} className={ghostBtnCls}>
               {driveSyncing ? <Spinner color="var(--t-tx0)" /> : <img src={IMG.qfDrive} className="w-[14px] h-[14px] object-fill" />}
               {driveSyncing ? "Syncing\u2026" : "Sync Drive"}
@@ -1880,9 +2275,9 @@ function QuizForgePanel({
 
         <div className="flex flex-col gap-5 p-4 min-h-[260px]">
           {/* Folders */}
-          {showFolders && (folders.length > 0 || newFolderOpen) && (
+          {showFolders && (visibleFolders.length > 0 || newFolderOpen) && (
             <section aria-label="Folders" className="flex flex-col gap-2">
-              <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider">FOLDERS</span>
+              <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider">{current ? "FOLDERS IN THIS FOLDER" : "FOLDERS"}</span>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {newFolderOpen && (
                   <form onSubmit={submitNewFolder} className="flex items-center gap-2 p-3 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-ac)]">
@@ -1893,13 +2288,13 @@ function QuizForgePanel({
                       onChange={(e) => setNewFolderName(e.target.value)}
                       onKeyDown={(e) => e.key === "Escape" && (setNewFolderOpen(false), setNewFolderName(""))}
                       onBlur={() => { if (!newFolderName.trim()) setNewFolderOpen(false); }}
-                      placeholder="Untitled folder"
+                      placeholder={current ? "Untitled subfolder" : "Untitled folder"}
                       maxLength={40}
                       className={inputCls}
                     />
                   </form>
                 )}
-                {folders.map((fo) => (
+                {visibleFolders.map((fo) => (
                   <div key={fo.id} className="relative" {...moveTarget(fo.id, fo.id)}>
                     {renamingId === fo.id ? (
                       <form onSubmit={submitRename} className="flex items-center gap-2 p-3 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-ac)]">
@@ -1920,14 +2315,14 @@ function QuizForgePanel({
                           type="button"
                           onClick={() => setActiveFolder(fo.id)}
                           className={`w-full flex items-center gap-3 p-3 pr-9 text-left border border-solid transition-all duration-150 ${dropTarget === fo.id
-                              ? "bg-[color-mix(in_srgb,_var(--t-ac)_16%,_transparent)] border-[color:var(--t-ac)] scale-[1.02]"
-                              : "bg-[var(--t-bg2)] border-[color:var(--t-bd0)] hover:border-[color:var(--t-bd1)]"
+                            ? "bg-[color-mix(in_srgb,_var(--t-ac)_16%,_transparent)] border-[color:var(--t-ac)] scale-[1.02]"
+                            : "bg-[var(--t-bg2)] border-[color:var(--t-bd0)] hover:border-[color:var(--t-bd1)]"
                             }`}
                         >
                           <FolderIcon className="w-6 h-6 shrink-0 text-[color:var(--t-ac)]" />
                           <span className="flex flex-col min-w-0">
                             <span className="text-[color:var(--t-tx0)] text-sm font-bold truncate">{fo.name}</span>
-                            <span className="text-[color:var(--t-tx2)] text-[11px]">{countIn(fo.id)} {countIn(fo.id) === 1 ? "file" : "files"}</span>
+                            <span className="text-[color:var(--t-tx2)] text-[11px] truncate">{folderSummary(fo.id)}</span>
                           </span>
                         </button>
                         <button
@@ -1960,13 +2355,13 @@ function QuizForgePanel({
 
           {/* Files */}
           <section aria-label="Files" className="flex flex-col gap-2">
-            {(shown.length > 0 || showFolders) && (
+            {(shown.length > 0 || atRootView) && (
               <span className="text-[color:var(--t-tx2)] text-[10px] font-bold tracking-wider">
                 {q ? "SEARCH RESULTS" : "FILES"}
               </span>
             )}
 
-            {shown.length === 0 && (
+            {shown.length === 0 && (q || !current || (visibleFolders.length === 0 && !newFolderOpen)) && (
               <div className="flex flex-col items-center justify-center gap-1 py-10 text-center border border-dashed border-[color:var(--t-bd1)]">
                 <span className="text-[color:var(--t-tx0)] text-sm font-bold">
                   {q ? "No files match your search" : current ? "This folder is empty" : "No loose files"}
@@ -1975,7 +2370,7 @@ function QuizForgePanel({
                   {q
                     ? "Try a different name."
                     : current
-                      ? "Drag files here from My Library, or upload while this folder is open."
+                      ? "Drag files here, upload while this folder is open, or create a folder inside it."
                       : "Drop files anywhere in this panel, or press Upload."}
                 </span>
               </div>
@@ -1986,7 +2381,7 @@ function QuizForgePanel({
               const indexing = file.status !== "Indexed";
               const moveOptions = [
                 ...(file.folderId ? [{ id: null, name: "My Library" }] : []),
-                ...folders.filter((fo) => fo.id !== file.folderId),
+                ...folders.filter((fo) => fo.id !== file.folderId).map((fo) => ({ id: fo.id, name: pathLabel(fo.id) })),
               ];
               return (
                 <div
@@ -2002,7 +2397,7 @@ function QuizForgePanel({
                       <span className="text-[color:var(--t-tx2)] text-[11px] truncate">
                         {file.size} {"\u2022"} {file.chunks} chunks {"\u2022"}{" "}
                         <span className={indexing ? "text-[color:var(--t-warn)]" : ""}>{indexing ? "Indexing\u2026" : "Ready"}</span>
-                        {q && file.folderId && <> {"\u2022"} in {folderName(file.folderId)}</>}
+                        {q && file.folderId && <> {"\u2022"} in {pathLabel(file.folderId)}</>}
                       </span>
                     </div>
                   </div>
@@ -2043,13 +2438,13 @@ function QuizForgePanel({
               );
             })}
 
-            {showFolders && folders.length > 0 && shown.length > 0 && (
+            {showFolders && visibleFolders.length > 0 && shown.length > 0 && (
               <p className="text-[color:var(--t-tx2)] text-[11px] pt-1">Tip: drag a file onto a folder to file it away.</p>
             )}
           </section>
 
           {/* Linked sources */}
-          {(repoLinks.length > 0 || showFolders) && (
+          {(repoLinks.length > 0 || atRootView) && (
             <section aria-label="Linked sources" className="flex flex-col gap-2 pt-1 border-t border-solid border-[color:var(--t-bd0)]">
               {repoLinks.map((link, i) => (
                 <div key={i} className="flex items-center gap-2.5 py-1.5">
@@ -2096,7 +2491,8 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
   const [editBadge, setEditBadge] = useState(card.subject || "");
 
   const badgeColor = BADGE_COLOR_BY_COLUMN[colId] || "var(--t-tx1)";
-  const urgent = !isDone && colId !== "review" && isQuestUrgent(card.due || card.meta);
+  const dueText = card.dueDate ? dueTextFor(card.dueDate) : card.due || card.meta;
+  const urgent = !isDone && isQuestUrgent(dueText);
 
   function saveEdit() {
     onEdit(colId, card.id, { title: editTitle.trim() || card.title, subject: editBadge.trim().toUpperCase() });
@@ -2219,7 +2615,7 @@ function SprintCard({ card, colId, index, isDone, isDragged, isDropTarget, onDra
       </div>
       <div className="flex items-center justify-between gap-2 self-stretch">
         <span className="text-[10px] font-bold shrink-0" style={{ color: urgent ? "var(--t-err)" : card.metaColor || "var(--t-tx2)" }}>
-          {card.due || card.meta}
+          {dueText}
         </span>
         {editing ? (
           <div className="flex items-center gap-2 shrink-0">
@@ -2285,7 +2681,13 @@ function SprintBoardPanel({
   quickTaskBadge,
   setQuickTaskBadge,
   onSubmitQuickTask,
+  addingDue,
+  setAddingDue,
+  quickTaskDue,
+  setQuickTaskDue,
+  onClearAll,
 }) {
+  const [confirmClear, setConfirmClear] = useState(false);
   const [flatEditingId, setFlatEditingId] = useState(null);
   const [flatEditText, setFlatEditText] = useState("");
   const subjects = ["ALL SUBJECTS", ...new Set(columns.flatMap((c) => c.cards.map((cd) => cd.subject).filter(Boolean)))];
@@ -2374,16 +2776,31 @@ function SprintBoardPanel({
           )}
         </div>
 
-        <button
-          onClick={() => setView((v) => (v === "kanban" ? "list" : "kanban"))}
-          className="flex shrink-0 items-center bg-[var(--t-bg3)] py-1.5 px-2 hover:opacity-90 transition-all duration-150 active:scale-95"
-        >
-          <img src={IMG.sbGroupIcon} className="w-3 h-3 mr-[7px] object-fill" />
-          <span className="text-[color:var(--t-tx2)] text-[10px] font-bold mr-[9px]">GROUP BY:</span>
-          <span className="text-[color:var(--t-tx0)] text-[10px] font-bold">
-            {view === "kanban" ? "STATUS (KANBAN)" : "FLAT LIST"}
-          </span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setView((v) => (v === "kanban" ? "list" : "kanban"))}
+            className="flex shrink-0 items-center bg-[var(--t-bg3)] py-1.5 px-2 hover:opacity-90 transition-all duration-150 active:scale-95"
+          >
+            <img src={IMG.sbGroupIcon} className="w-3 h-3 mr-[7px] object-fill" />
+            <span className="text-[color:var(--t-tx2)] text-[10px] font-bold mr-[9px]">GROUP BY:</span>
+            <span className="text-[color:var(--t-tx0)] text-[10px] font-bold">
+              {view === "kanban" ? "STATUS (KANBAN)" : "FLAT LIST"}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmClear(true)}
+            disabled={totalCards === 0}
+            className="flex shrink-0 items-center gap-1.5 py-1.5 px-3 text-[10px] font-bold tracking-wider border border-solid border-[color:var(--t-err)] text-[color:var(--t-err)] hover:bg-[var(--t-err)] hover:text-[color:var(--t-onerr)] disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[color:var(--t-err)] transition-colors duration-150 active:scale-95"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+            </svg>
+            CLEAR ALL
+          </button>
+        </div>
       </div>
 
       {/* Board */}
@@ -2444,6 +2861,19 @@ function SprintBoardPanel({
                         placeholder="Badge / subject (e.g. CS240)"
                         className="bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-2 outline-none focus:border-[color:var(--t-ac2)]"
                       />
+                      <label className="flex flex-col gap-1">
+                        <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">DUE DATE</span>
+                        <input
+                          type="date"
+                          required
+                          value={addingDue}
+                          onChange={(e) => setAddingDue(e.target.value)}
+                          className="pz-date bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-2 outline-none focus:border-[color:var(--t-ac2)]"
+                        />
+                      </label>
+                      <span className="text-[color:var(--t-tx2)] text-[10px]">
+                        Also added to your Study Calendar on this date.
+                      </span>
                       <span className="text-[color:var(--t-tx2)] text-[10px]">
                         Badge color is set by this column — {col.title}.
                       </span>
@@ -2469,6 +2899,7 @@ function SprintBoardPanel({
                         setAddingColumnId(col.id);
                         setAddingText("");
                         setAddingBadge("");
+                        setAddingDue(formatDateForInput(TODAY));
                       }}
                       className="flex justify-center items-center self-stretch bg-[var(--t-bg0)] py-2 gap-1.5 hover:opacity-90 transition-all duration-150 active:scale-[0.98]"
                     >
@@ -2511,6 +2942,14 @@ function SprintBoardPanel({
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    {card.dueDate && (
+                      <span
+                        className="text-[10px] font-bold shrink-0"
+                        style={{ color: isQuestUrgent(dueTextFor(card.dueDate)) ? "var(--t-err)" : "var(--t-tx2)" }}
+                      >
+                        {dueTextFor(card.dueDate)}
+                      </span>
+                    )}
                     <span className="text-[color:var(--t-ok2)] text-[10px] font-bold shrink-0">
                       {card.xp ? `+${card.xp} XP` : card.subject}
                     </span>
@@ -2583,7 +3022,7 @@ function SprintBoardPanel({
         </div>
         <div className="flex shrink-0 items-center gap-[9px]">
           <button
-            onClick={() => setShowQuickTask(true)}
+            onClick={() => { setQuickTaskDue(formatDateForInput(TODAY)); setShowQuickTask(true); }}
             className="flex flex-col shrink-0 items-start bg-[var(--t-bg3)] py-1 px-2 hover:opacity-90 transition-all duration-150 active:scale-95"
           >
             <span className="text-[color:var(--t-tx0)] text-[10px] font-bold">+ Quick Task</span>
@@ -2599,6 +3038,35 @@ function SprintBoardPanel({
           </button>
         </div>
       </div>
+
+      {/* Clear-all confirmation */}
+      {confirmClear && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setConfirmClear(false)} />
+          <div className="relative bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] border-t-[3px] border-t-[color:var(--t-err)] p-5 w-full max-w-sm flex flex-col gap-3">
+            <span className="text-[color:var(--t-tx0)] text-sm font-bold">Clear all quests?</span>
+            <p className="text-[color:var(--t-tx1)] text-xs leading-relaxed">
+              This removes all {totalCards} {totalCards === 1 ? "quest" : "quests"} from every column, including completed ones, and any due dates they added to your Study Calendar. This can&apos;t be undone.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmClear(false)}
+                className="flex-1 text-xs font-bold py-2 bg-[var(--t-bg3)] text-[color:var(--t-tx0)] hover:opacity-90 transition-all duration-150 active:scale-95"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { onClearAll(); setConfirmClear(false); }}
+                className="flex-1 text-xs font-bold py-2 bg-[var(--t-err)] text-[color:var(--t-onerr)] hover:opacity-90 transition-all duration-150 active:scale-95"
+              >
+                Clear all
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sprint logs modal */}
       {showSprintLogs && (
@@ -2649,11 +3117,22 @@ function SprintBoardPanel({
               placeholder="Badge / subject (optional, e.g. CS240)"
               className="bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac2)]"
             />
+            <label className="flex flex-col gap-1">
+              <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">DUE DATE</span>
+              <input
+                type="date"
+                required
+                value={quickTaskDue}
+                onChange={(e) => setQuickTaskDue(e.target.value)}
+                className="pz-date bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac2)]"
+              />
+            </label>
+            <span className="text-[color:var(--t-tx2)] text-[10px]">Also added to your Study Calendar on this date.</span>
             <button
               type="submit"
               className="bg-[var(--t-ac2)] text-[color:var(--t-onac)] text-xs font-bold py-2 hover:opacity-90 transition-all duration-150 active:scale-95"
             >
-              Add to Backlog
+              Add to Backlog &amp; Calendar
             </button>
           </form>
         </div>

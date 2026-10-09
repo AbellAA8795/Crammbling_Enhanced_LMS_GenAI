@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useHubClasses, syncClassGroups, requestOpenClassroom, TASK_TYPE_LABEL } from "./Classhub";
 import Dashboard from "./Dashboard";
 import Chatbot from "./chatbot";
 import Personalized from "./personalized";
@@ -101,6 +102,7 @@ const INITIAL_GROUPS = [
     },
     {
         id: "g2",
+        classId: "cls_cs240",
         name: "CS240 — Study Group",
         type: "classroom",
         color: "var(--t-ok)",
@@ -161,6 +163,7 @@ const INITIAL_GROUPS = [
     },
     {
         id: "g5",
+        classId: "cls_math210",
         name: "MATH210 — Study Group",
         type: "classroom",
         color: "var(--t-ok2)",
@@ -192,28 +195,101 @@ const FILTERS = [
     { key: "squad", label: "Squads" },
 ];
 
-function Panel({ title, count, children, action }) {
+/* ---------------------------------------------------------
+   Dashboard-style design kit (theme-aware, flat + pixel-sharp):
+   hard pixel shadows, micro-caps labels, tinted tags, panels with
+   a glyph header bar, pixel avatars and segmented "pip" meters.
+--------------------------------------------------------- */
+const PIXEL_SHADOW = "3px 3px 0px var(--t-shadow)";
+const LABEL = "text-[10px] font-bold uppercase tracking-wider text-[color:var(--t-tx2)]";
+const PRIMARY_BTN =
+    "bg-[var(--t-ac)] text-[color:var(--t-onac)] font-bold uppercase tracking-wider border-2 border-solid border-[color:var(--t-ac2)] border-b-4 border-b-[color:color-mix(in_srgb,_var(--t-ac)_55%,_#000)] hover:brightness-110 active:translate-y-[2px] active:border-b-2 transition-all duration-150";
+const ACTION_BTN =
+    "text-[10px] font-bold uppercase tracking-wider py-1 px-2 border border-solid border-[color:var(--t-ac)] text-[color:var(--t-ac)] hover:bg-[var(--t-ac)] hover:text-[color:var(--t-onac)] transition-colors duration-150";
+const SEGMENTS = "repeating-linear-gradient(90deg, transparent 0 9px, rgba(0,0,0,0.3) 9px 10px)";
+
+/* Header bar shared by every panel: glyph + title + optional right slot. */
+function PanelHeader({ icon = "◆", title, right, tone = "page" }) {
     return (
-        <div className="flex flex-col self-stretch gap-3">
-            <div className="flex justify-between items-center">
-                <span className="text-[color:var(--t-tx0)] text-xs font-bold tracking-wide">
-                    {title} {typeof count === "number" && <span className="text-[color:var(--t-tx2)] font-normal">({count})</span>}
-                </span>
-                {action}
-            </div>
-            {children}
+        <div
+            className="flex items-center justify-between gap-2 px-3 py-2 border-b border-solid bg-[color-mix(in_srgb,_var(--t-ac)_7%,_transparent)]"
+            style={{ borderColor: tone === "modal" ? "var(--t-mbd)" : "var(--t-bd0)" }}
+        >
+            <span className="flex items-center gap-2 min-w-0">
+                <span className="text-[color:var(--t-ac)] text-[13px] leading-none">{icon}</span>
+                <span className="text-[color:var(--t-tx0)] text-xs font-bold uppercase tracking-wider truncate">{title}</span>
+            </span>
+            {right}
         </div>
     );
 }
 
-function Badge({ color, children }) {
+/* Panel used inside the pop-up card (tasks / files / materials / members). */
+function Panel({ title, count, children, action, icon = "◆" }) {
+    return (
+        <div className="flex flex-col self-stretch border border-solid border-[color:var(--t-mbd)]">
+            <PanelHeader
+                tone="modal"
+                icon={icon}
+                title={title}
+                right={
+                    <span className="flex items-center gap-2 shrink-0">
+                        {typeof count === "number" && <Badge color="var(--t-warn)">{count}</Badge>}
+                        {action}
+                    </span>
+                }
+            />
+            <div className="p-2.5">{children}</div>
+        </div>
+    );
+}
+
+/* Tinted tag chip (same idea as the Dashboard's tag-lime / tag-gold / tag-cyan). */
+function Badge({ color, children, className = "" }) {
     return (
         <span
-            className="text-[10px] font-bold py-0.5 px-2 border border-solid shrink-0"
-            style={{ backgroundColor: withAlpha(color, "33"), borderColor: withAlpha(color, "4D"), color }}
+            className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider py-0.5 px-2 border border-solid shrink-0 ${className}`}
+            style={{ backgroundColor: withAlpha(color, "26"), borderColor: withAlpha(color, "66"), color }}
         >
             {children}
         </span>
+    );
+}
+
+/* Square avatar with a pixel "hair" strip, like the Dashboard player avatar. */
+function GroupAvatar({ color, name, className = "w-8 h-8 text-[10px]" }) {
+    return (
+        <div
+            className={`relative shrink-0 flex items-center justify-center font-bold border-2 border-solid ${className}`}
+            style={{ backgroundColor: withAlpha(color, "26"), borderColor: color, color }}
+        >
+            <span className="absolute top-0 left-0 w-full h-[3px]" style={{ backgroundColor: color }} />
+            {initialsFor(name)}
+        </div>
+    );
+}
+
+/* Segmented meter — same idea as the HP / focus meter on the Dashboard player card. */
+function Pips({ value, max = 10, color = "var(--t-ok)" }) {
+    return (
+        <span className="flex gap-0.5" aria-hidden="true">
+            {Array.from({ length: max }).map((_, i) => (
+                <span key={i} className="w-2 h-2" style={{ backgroundColor: i < value ? color : "var(--t-bd0)" }} />
+            ))}
+        </span>
+    );
+}
+
+/* Pixel-art chat bubble avatar for the page banner (built from plain divs). */
+function HubAvatar() {
+    return (
+        <div className="relative w-16 h-16 shrink-0 overflow-hidden border-2 border-solid border-[color:var(--t-bd1)] bg-[color-mix(in_srgb,_var(--t-ac)_22%,_var(--t-bg2))]">
+            <div className="absolute top-0 left-0 w-full h-3 bg-[var(--t-ac)]" />
+            <div className="absolute top-7 left-3 w-2 h-2 bg-[var(--t-tx0)]" />
+            <div className="absolute top-7 left-7 w-2 h-2 bg-[var(--t-tx0)]" />
+            <div className="absolute top-7 left-[44px] w-2 h-2 bg-[var(--t-tx0)]" />
+            <div className="absolute bottom-0 left-0 w-full h-3 bg-[var(--t-ok)]" />
+        </div>
     );
 }
 
@@ -291,7 +367,7 @@ function FilterDropdown({ value, onChange }) {
                 onClick={() => setOpen((v) => !v)}
                 aria-haspopup="listbox"
                 aria-expanded={open}
-                className="flex items-center justify-between w-full bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] py-1.5 pl-2.5 pr-2 text-[11px] font-bold text-[color:var(--t-tx1)] hover:border-[color:var(--t-ac)] hover:text-[color:var(--t-tx0)] transition-all duration-150 active:scale-[0.99]"
+                className="flex items-center justify-between w-full bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] py-1.5 pl-2.5 pr-2 text-[10px] font-bold uppercase tracking-wider text-[color:var(--t-ac)] hover:border-[color:var(--t-ac)] transition-colors duration-150"
             >
                 <span className="flex items-center gap-1.5 min-w-0">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-70">
@@ -376,11 +452,11 @@ function AddMemberModal({ onClose, onAdd }) {
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
             <form
                 onSubmit={submit}
-                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_90%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-5 w-full max-w-sm flex flex-col gap-3"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
+                className="relative bg-[var(--t-mbg)] border border-solid border-[color:var(--t-mbd2)] border-t-[3px] border-t-[color:var(--t-ac)] p-5 w-full max-w-sm flex flex-col gap-3"
+                style={{ boxShadow: "6px 6px 0px var(--t-shadow), 0 0 40px color-mix(in srgb, var(--t-glow) 18%, transparent)" }}
             >
                 <div className="flex justify-between items-center mb-1">
-                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">ADD MEMBER</span>
+                    <span className="flex items-center gap-2 text-[color:var(--t-tx0)] text-sm font-bold uppercase tracking-wider"><span className="text-[color:var(--t-ac)]">⛆</span>ADD MEMBER</span>
                     <button type="button" onClick={onClose} className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors">
                         ×
                     </button>
@@ -416,7 +492,7 @@ function AddMemberModal({ onClose, onAdd }) {
 
                 <button
                     type="submit"
-                    className="mt-1 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2 hover:opacity-90 hover:shadow-[0_0_16px_color-mix(in_srgb,_var(--t-ac)_40%,_transparent)] transition-all duration-150 active:scale-[0.98]"
+                    className={`mt-1 text-xs py-2 ${PRIMARY_BTN}`}
                 >
                     ADD TO GROUP
                 </button>
@@ -449,11 +525,11 @@ function CreateGroupModal({ onClose, onCreate }) {
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
             <form
                 onSubmit={submit}
-                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_90%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] p-5 w-full max-w-sm flex flex-col gap-3"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
+                className="relative bg-[var(--t-mbg)] border border-solid border-[color:var(--t-mbd2)] border-t-[3px] border-t-[color:var(--t-ac)] p-5 w-full max-w-sm flex flex-col gap-3"
+                style={{ boxShadow: "6px 6px 0px var(--t-shadow), 0 0 40px color-mix(in srgb, var(--t-glow) 18%, transparent)" }}
             >
                 <div className="flex justify-between items-center mb-1">
-                    <span className="text-[color:var(--t-tx0)] text-sm font-bold">NEW MESSAGE</span>
+                    <span className="flex items-center gap-2 text-[color:var(--t-tx0)] text-sm font-bold uppercase tracking-wider"><span className="text-[color:var(--t-ac)]">✉</span>NEW MESSAGE</span>
                     <button type="button" onClick={onClose} className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors">
                         ×
                     </button>
@@ -496,7 +572,7 @@ function CreateGroupModal({ onClose, onCreate }) {
 
                 <button
                     type="submit"
-                    className="mt-1 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2 hover:opacity-90 hover:shadow-[0_0_16px_color-mix(in_srgb,_var(--t-ac)_40%,_transparent)] transition-all duration-150 active:scale-[0.98]"
+                    className={`mt-1 text-xs py-2 ${PRIMARY_BTN}`}
                 >
                     CREATE
                 </button>
@@ -635,7 +711,7 @@ function NewTaskModal({ isClassroom, onCreate }) {
 
                 {/* progress bar */}
                 <div className="px-5 pb-4">
-                    <div className="relative h-1.5 bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] overflow-hidden">
+                    <div className="relative h-3 bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] overflow-hidden">
                         <div
                             className="absolute inset-y-0 left-0 transition-all duration-500 ease-out overflow-hidden"
                             style={{ width: `${pct}%`, backgroundColor: barColor, boxShadow: `0 0 10px ${withAlpha(barColor, "99")}` }}
@@ -647,9 +723,10 @@ function NewTaskModal({ isClassroom, onCreate }) {
                                 />
                             )}
                         </div>
+                        <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: SEGMENTS }} />
                     </div>
                     <div className="flex justify-between mt-1.5 text-[10px] text-[color:var(--t-ph)]">
-                        <span>Progress</span>
+                        <span className="uppercase tracking-wider font-bold">Progress</span>
                         <span className="font-bold transition-colors duration-500" style={{ color: barColor }}>
                             {Math.round(pct)}%
                         </span>
@@ -806,13 +883,16 @@ function GroupDetailModal({
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
             <div
-                className="relative bg-[color-mix(in_srgb,_var(--t-mbg)_90%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] w-full max-w-lg max-h-[85vh] flex flex-col"
-                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 50px color-mix(in srgb, var(--t-glow) 30%, transparent)" }}
+                className="relative bg-[var(--t-mbg)] border border-solid border-[color:var(--t-mbd2)] border-t-[3px] border-t-[color:var(--t-ac)] w-full max-w-lg max-h-[85vh] flex flex-col"
+                style={{ boxShadow: "6px 6px 0px var(--t-shadow), 0 0 40px color-mix(in srgb, var(--t-glow) 18%, transparent)" }}
             >
                 <div className="flex justify-between items-center p-4 border-b border-solid border-[color:var(--t-mbd)] shrink-0">
-                    <div className="min-w-0">
-                        <span className="text-[color:var(--t-tx0)] text-sm font-bold block truncate">{group.name}</span>
-                        <span className="text-[color:var(--t-mtx)] text-[11px]">{isDm ? "Direct message" : isClassroom ? "Classroom details" : "Squad details"}</span>
+                    <div className="flex items-center gap-3 min-w-0">
+                        <GroupAvatar color={group.color} name={group.name} className="w-10 h-10 text-xs" />
+                        <div className="min-w-0">
+                            <span className="text-[color:var(--t-tx0)] text-sm font-bold uppercase tracking-wide block truncate">{group.name}</span>
+                            <span className="text-[color:var(--t-mtx)] text-[11px]">{isDm ? "Direct message" : isClassroom ? "Classroom details" : "Squad details"}</span>
+                        </div>
                     </div>
                     <button onClick={onClose} className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors" aria-label="Close">
                         ×
@@ -826,7 +906,7 @@ function GroupDetailModal({
                             <button
                                 key={t.key}
                                 onClick={() => onTabChange(t.key)}
-                                className={`flex items-center gap-1.2 pb-2.5 -mb-px border-b-2 text-[5px] font-bold whitespace-nowrap flex-1 min-w-0 justify-center transition-all duration-150 active:scale-95 ${active
+                                className={`flex items-center gap-1.5 pb-2.5 -mb-px border-b-2 text-[10px] uppercase tracking-wider font-bold whitespace-nowrap flex-1 min-w-0 justify-center transition-all duration-150 active:scale-95 ${active
                                     ? "border-[color:var(--t-ac)] text-[color:var(--t-ac)]"
                                     : "border-transparent text-[color:var(--t-mtx)] hover:text-[color:var(--t-tx1)] hover:border-[color:var(--t-mbd2)]"
                                     }`}
@@ -842,11 +922,12 @@ function GroupDetailModal({
                 <div className="flex-1 overflow-y-auto p-4">
                     {tab === "tasks" && (
                         <Panel
+                            icon="⚑"
                             title={isClassroom ? "ASSIGNMENTS" : "TASKS"}
                             count={group.tasks?.length || 0}
                             action={
                                 canCreateTask && (
-                                    <button onClick={onNewTask} className="text-[color:var(--t-ac)] text-[10px] font-bold hover:text-[color:var(--t-ac2)] hover:underline underline-offset-2 transition-colors">
+                                    <button onClick={onNewTask} className={ACTION_BTN}>
                                         + {isClassroom ? "New Assignment" : "New Task"}
                                     </button>
                                 )
@@ -864,7 +945,7 @@ function GroupDetailModal({
                                         <div className="flex justify-between items-start gap-2">
                                             <span className="text-[color:var(--t-tx0)] text-sm font-bold">{t.title}</span>
                                             {isClassroom ? (
-                                                <Badge color="var(--t-warn)">{t.points} PTS</Badge>
+                                                t.points != null ? <Badge color="var(--t-warn)">{t.points} PTS</Badge> : null
                                             ) : (
                                                 <Badge color={colorForString(t.badge)}>{t.badge}</Badge>
                                             )}
@@ -881,13 +962,13 @@ function GroupDetailModal({
                                                 <button
                                                     onClick={() => onSubmitTask(t.id)}
                                                     disabled={!!mySubmission}
-                                                    className={`group/md relative overflow-hidden flex items-center gap-1 text-[9px] font-bold tracking-wide py-1 pl-1.5 pr-2 rounded-full border border-solid transition-all duration-200 active:scale-95 ${mySubmission
+                                                    className={`group/md relative overflow-hidden flex items-center gap-1 text-[9px] font-bold tracking-wide py-1 pl-1.5 pr-2 border border-solid transition-all duration-200 active:scale-95 ${mySubmission
                                                         ? "bg-[color-mix(in_srgb,_var(--t-ok)_14%,_transparent)] border-[color:color-mix(in_srgb,_var(--t-ok)_40%,_transparent)] text-[color:var(--t-ok2)] cursor-default"
                                                         : "bg-[color-mix(in_srgb,_var(--t-ac2)_16%,_transparent)] border-[color:color-mix(in_srgb,_var(--t-ac2)_45%,_transparent)] text-[color:var(--t-ac2)] hover:bg-[var(--t-ac2)] hover:text-[color:var(--t-onac)] hover:border-[color:var(--t-ac2)] hover:shadow-[0_0_12px_color-mix(in_srgb,_var(--t-ac2)_50%,_transparent)]"
                                                         }`}
                                                 >
                                                     <span
-                                                        className={`flex items-center justify-center w-3 h-3 rounded-full border border-solid transition-all duration-200 ${mySubmission
+                                                        className={`flex items-center justify-center w-3 h-3 border border-solid transition-all duration-200 ${mySubmission
                                                             ? "bg-[var(--t-ok2)] border-[color:var(--t-ok2)] text-[color:var(--t-onac)]"
                                                             : "bg-transparent border-[color:var(--t-ac2)] text-[color:var(--t-ac2)] group-hover/md:bg-[var(--t-onac)] group-hover/md:border-[color:var(--t-onac)] group-hover/md:text-[color:var(--t-ac2)]"
                                                             }`}
@@ -923,7 +1004,7 @@ function GroupDetailModal({
                     )}
 
                     {tab === "files" && !isClassroom && !isDm && (
-                        <Panel title="SHARED FILES" count={group.files?.length || 0}>
+                        <Panel icon="▤" title="SHARED FILES" count={group.files?.length || 0}>
                             {(group.files || []).length === 0 && (
                                 <p className="text-[color:var(--t-mtx)] text-xs py-2">No files shared yet — attach one from the composer below.</p>
                             )}
@@ -942,7 +1023,7 @@ function GroupDetailModal({
                     )}
 
                     {tab === "materials" && isClassroom && (
-                        <Panel title="LESSON MATERIALS" count={group.materials?.length || 0}>
+                        <Panel icon="◆" title="LESSON MATERIALS" count={group.materials?.length || 0}>
                             {(group.materials || []).length === 0 && <p className="text-[color:var(--t-mtx)] text-xs py-2">No materials posted yet.</p>}
                             {(group.materials || []).map((m) => (
                                 <div
@@ -961,11 +1042,12 @@ function GroupDetailModal({
 
                     {tab === "members" && (
                         <Panel
+                            icon="⛆"
                             title="MEMBERS"
                             count={group.members.length}
                             action={
                                 canAddMembers && (
-                                    <button onClick={onAddMember} className="text-[color:var(--t-ac)] text-[10px] font-bold hover:text-[color:var(--t-ac2)] hover:underline underline-offset-2 transition-colors">
+                                    <button onClick={onAddMember} className={ACTION_BTN}>
                                         + Add Member
                                     </button>
                                 )
@@ -1010,8 +1092,8 @@ function GroupContextMenu({ x, y, group, onClose, onOpenMessages, onOpenTab }) {
         <>
             <div className="fixed inset-0 z-[70]" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
             <div
-                className="fixed z-[80] bg-[color-mix(in_srgb,_var(--t-mbg)_90%,_transparent)] backdrop-blur-md border border-solid border-[color:var(--t-mbd)] py-1 min-w-[172px]"
-                style={{ top: Math.max(8, clampedY), left: Math.max(8, clampedX), boxShadow: "0 12px 32px rgba(0,0,0,0.6), 0 0 24px color-mix(in srgb, var(--t-glow) 25%, transparent)" }}
+                className="fixed z-[80] bg-[var(--t-mbg)] border border-solid border-[color:var(--t-mbd2)] border-t-[3px] border-t-[color:var(--t-ac)] py-1 min-w-[172px]"
+                style={{ top: Math.max(8, clampedY), left: Math.max(8, clampedX), boxShadow: "4px 4px 0px var(--t-shadow), 0 0 24px color-mix(in srgb, var(--t-glow) 18%, transparent)" }}
             >
                 <div className="px-3 py-1.5 border-b border-solid border-[color:var(--t-mbd)]">
                     <span className="text-[color:var(--t-mtx)] text-[10px] font-bold truncate block">{group.name}</span>
@@ -1062,8 +1144,13 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
     const [notifOpen, setNotifOpen] = useState(false);
     const searchRef = useRef(null);
 
-    const [groups, setGroups] = useState(INITIAL_GROUPS);
-    const [activeGroupId, setActiveGroupId] = useState(INITIAL_GROUPS[0]?.id || null);
+    // Every class in Classroom has a chat here: its members become chat members and every
+    // task posted in the class shows up as a clickable message (see classHub.js).
+    const [hubClasses] = useHubClasses();
+    const firstGroups = useRef(null);
+    if (firstGroups.current === null) firstGroups.current = syncClassGroups(INITIAL_GROUPS, hubClasses);
+    const [groups, setGroups] = useState(firstGroups.current);
+    const [activeGroupId, setActiveGroupId] = useState(firstGroups.current[0]?.id || null);
     const [openPanel, setOpenPanel] = useState(null); // which tab is open in the pop-up modal, or null
     const [messageText, setMessageText] = useState("");
     const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -1081,6 +1168,10 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
     // Classrooms have no teacher/student split — everyone can add members and post.
     const canAddMembers = activeGroup ? !isDm : false;
     const canCreateTask = !!isSquad; // only squads can create tasks now
+
+    useEffect(() => {
+        setGroups((prev) => syncClassGroups(prev, hubClasses));
+    }, [hubClasses]);
 
     const visibleGroups = useMemo(() => groups.filter((g) => filter === "all" || g.type === filter), [groups, filter]);
 
@@ -1228,6 +1319,11 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
         }
     }
 
+    function openTaskInClassroom(link) {
+        requestOpenClassroom({ classId: link.classId, classworkId: link.classworkId, tab: "classwork" });
+        handleNavClick("classroom");
+    }
+
     function handleConfirmLogout() {
         setShowLogoutConfirm(false);
         // TODO: clear auth/session state here once real auth is wired up
@@ -1265,6 +1361,13 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
     }
 
     const activeNavKey = showQuiz ? "quiz" : "group";
+
+    // Display-only numbers for the banner (derived from the existing chats, nothing new is stored)
+    const chatMix = [
+        { key: "classroom", label: "Classrooms", glyph: "⚑", color: "var(--t-ok)", n: groups.filter((g) => g.type === "classroom").length },
+        { key: "squad", label: "Squads", glyph: "▲", color: "var(--t-ac)", n: groups.filter((g) => g.type === "squad").length },
+        { key: "dm", label: "1v1", glyph: "◆", color: "var(--t-ac2)", n: groups.filter((g) => g.type === "dm").length },
+    ];
 
     return (
         <div style={rootThemeStyle} className="flex flex-col bg-[var(--t-bg0)] min-h-screen">
@@ -1387,13 +1490,13 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                             </div>
 
                             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                                <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:var(--t-bd0)]">
+                                <div className="flex shrink-0 items-center bg-[color-mix(in_srgb,_var(--t-warn)_14%,_transparent)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:color-mix(in_srgb,_var(--t-warn)_45%,_transparent)]">
                                     <img src={IMG.streak} className="w-3 h-3.5 object-fill" />
-                                    <span className="text-[color:var(--t-warn)] text-[11px] font-bold hidden xs:inline">14 STREAK</span>
+                                    <span className="text-[color:var(--t-warn)] text-[11px] font-bold tracking-wider hidden xs:inline">▲ 14 STREAK</span>
                                 </div>
-                                <div className="flex shrink-0 items-center bg-[var(--t-bg3)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:var(--t-bd0)]">
+                                <div className="flex shrink-0 items-center bg-[color-mix(in_srgb,_var(--t-ac)_14%,_transparent)] py-[5px] px-[13px] gap-[5px] border border-solid border-[color:color-mix(in_srgb,_var(--t-ac)_45%,_transparent)]">
                                     <img src={IMG.xp} className="w-[15px] h-[13px] object-fill" />
-                                    <span className="text-[color:var(--t-ac)] text-[11px] font-bold hidden xs:inline">3,420 XP</span>
+                                    <span className="text-[color:var(--t-ac)] text-[11px] font-bold tracking-wider hidden xs:inline">3,420 XP</span>
                                 </div>
 
                                 <button className="relative shrink-0" onClick={() => setNotifOpen((v) => !v)} aria-label="Notifications">
@@ -1421,75 +1524,107 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                         {showQuiz && <QuizArena where="Group Collab" onBack={() => setShowQuiz(false)} />}
 
                         {/* Content (hidden, not unmounted, while Quiz Arena is open so chats are kept) */}
-                        <div className={`${showQuiz ? "hidden" : "flex"} flex-col self-stretch px-4 sm:px-6 lg:px-10 py-4 gap-4`}>
-                            <div className="flex flex-col sm:flex-row items-start self-stretch gap-4">
+                        <div className={`${showQuiz ? "hidden" : "flex"} flex-col self-stretch px-4 sm:px-6 py-6 gap-6`}>
+                            {/* Banner — same "player card" idea as the Dashboard, built from the chats you already have */}
+                            <section className="border border-solid border-[color:var(--t-bd0)] bg-[var(--t-bg1)] p-4 sm:p-5" style={{ boxShadow: PIXEL_SHADOW }}>
+                                <div className="flex flex-wrap items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4 min-w-0">
+                                        <HubAvatar />
+                                        <div className="min-w-0">
+                                            <p className={LABEL}>Squad HQ</p>
+                                            <div className="flex flex-wrap items-center gap-2.5 mt-1">
+                                                <h1 className="text-[22px] sm:text-[26px] leading-none font-bold uppercase tracking-wide text-[color:var(--t-tx0)]">Group Collab</h1>
+                                                <Badge color="var(--t-ok)">[{groups.length} {groups.length === 1 ? "CHAT" : "CHATS"}]</Badge>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {chatMix.map((m) => (
+                                            <Badge key={m.key} color={m.color}>
+                                                {m.glyph} {m.n} {m.label}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="mt-4">
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <span className={LABEL}>Chat mix</span>
+                                        <span className="text-[11px] font-bold text-[color:var(--t-ac)]">{groups.length} TOTAL</span>
+                                    </div>
+                                    <div className="relative flex w-full h-3.5 bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)]">
+                                        {chatMix
+                                            .filter((m) => m.n > 0)
+                                            .map((m) => (
+                                                <div key={m.key} className="h-full" style={{ width: `${(m.n / groups.length) * 100}%`, backgroundColor: m.color }} />
+                                            ))}
+                                        <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: SEGMENTS }} />
+                                    </div>
+                                </div>
+                            </section>
+
+                            <div className="flex flex-col sm:flex-row items-start self-stretch gap-6">
                                 {/* Messages list with dropdown filter */}
                                 <div
-                                    className="flex flex-col w-full sm:w-64 shrink-0 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-3 gap-2"
-                                    style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
+                                    className="flex flex-col w-full sm:w-72 shrink-0 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)]"
+                                    style={{ boxShadow: PIXEL_SHADOW }}
                                 >
-                                    <div className="flex justify-between items-center pb-1">
-                                        <span className="text-[color:var(--t-tx0)] text-xs font-bold">MY MESSAGES</span>
-                                        <span className="text-[color:var(--t-tx2)] text-[10px]">{visibleGroups.length}</span>
-                                    </div>
-                                    <button
-                                        onClick={() => setShowCreateGroup(true)}
-                                        className="flex justify-center items-center bg-[var(--t-bg3)] py-2 gap-1.5 border border-solid border-[color:var(--t-bd0)] hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-[0.98]"
-                                    >
-                                        <span className="text-[color:var(--t-ac)] text-xs font-bold">+ NEW MESSAGE</span>
-                                    </button>
+                                    <PanelHeader icon="✉" title="MY MESSAGES" right={<Badge color="var(--t-warn)">{visibleGroups.length}</Badge>} />
+                                    <div className="flex flex-col gap-2 p-3">
+                                        <button
+                                            onClick={() => setShowCreateGroup(true)}
+                                            className={`flex justify-center items-center py-2 gap-1.5 ${PRIMARY_BTN}`}
+                                        >
+                                            <span className="text-xs">+ NEW MESSAGE</span>
+                                        </button>
 
-                                    {/* Dropdown filter */}
-                                    <FilterDropdown value={filter} onChange={setFilter} />
+                                        {/* Dropdown filter */}
+                                        <FilterDropdown value={filter} onChange={setFilter} />
 
-                                    <p className="text-[color:var(--t-bd1)] text-[10px] italic px-0.5">Right-click a message for quick access.</p>
+                                        <p className="text-[color:var(--t-tx2)] text-[10px] italic px-0.5 opacity-80">Right-click a message for quick access.</p>
 
-                                    <div className="flex flex-col gap-1.5 max-h-[460px] overflow-y-auto pr-0.5">
-                                        {visibleGroups.length === 0 && (
-                                            <p className="text-[color:var(--t-tx2)] text-xs py-6 text-center">Nothing here yet.</p>
-                                        )}
-                                        {visibleGroups.map((g) => {
-                                            const active = g.id === activeGroupId;
-                                            const lastMsg = g.messages[g.messages.length - 1];
-                                            const myRole = g.members.find((m) => m.id === "you")?.role;
-                                            const showRole = g.type === "squad" && myRole;
-                                            return (
-                                                <button
-                                                    key={g.id}
-                                                    onClick={() => {
-                                                        setActiveGroupId(g.id);
-                                                        setOpenPanel(null);
-                                                    }}
-                                                    onContextMenu={(e) => {
-                                                        e.preventDefault();
-                                                        setContextMenu({ x: e.clientX, y: e.clientY, groupId: g.id });
-                                                    }}
-                                                    className={`flex items-center gap-2.5 p-2 text-left border border-solid transition-all duration-150 ${active ? "bg-[var(--t-bg3)] border-[#00000000]" : "border-[#00000000] hover:bg-[var(--t-bg2)]"}`}
-                                                    style={active ? { boxShadow: `0px 0px 12px ${withAlpha(g.color, "33")}` } : undefined}
-                                                >
-                                                    <div
-                                                        className="w-8 h-8 shrink-0 flex items-center justify-center text-[10px] font-bold"
-                                                        style={{ backgroundColor: withAlpha(g.color, "33"), color: g.color, border: `1px solid ${withAlpha(g.color, "4D")}` }}
+                                        <div className="flex flex-col gap-1.5 max-h-[460px] overflow-y-auto pr-0.5">
+                                            {visibleGroups.length === 0 && (
+                                                <p className="text-[color:var(--t-tx2)] text-xs py-6 text-center">Nothing here yet.</p>
+                                            )}
+                                            {visibleGroups.map((g) => {
+                                                const active = g.id === activeGroupId;
+                                                const lastMsg = g.messages[g.messages.length - 1];
+                                                const myRole = g.members.find((m) => m.id === "you")?.role;
+                                                const showRole = g.type === "squad" && myRole;
+                                                return (
+                                                    <button
+                                                        key={g.id}
+                                                        onClick={() => {
+                                                            setActiveGroupId(g.id);
+                                                            setOpenPanel(null);
+                                                        }}
+                                                        onContextMenu={(e) => {
+                                                            e.preventDefault();
+                                                            setContextMenu({ x: e.clientX, y: e.clientY, groupId: g.id });
+                                                        }}
+                                                        className={`flex items-center gap-2.5 p-2 text-left border border-solid border-l-[3px] transition-all duration-150 ${active ? "bg-[var(--t-bg3)]" : "bg-[var(--t-bg0)] hover:bg-[var(--t-bg2)]"}`}
+                                                        style={{
+                                                            borderColor: active ? withAlpha(g.color, "99") : "var(--t-bd0)",
+                                                            borderLeftColor: g.color,
+                                                            boxShadow: active ? `0px 0px 12px ${withAlpha(g.color, "33")}` : undefined,
+                                                        }}
                                                     >
-                                                        {initialsFor(g.name)}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-[color:var(--t-tx0)] text-xs font-bold truncate">{g.name}</span>
-                                                            {showRole && (
-                                                                <span
-                                                                    className="text-[9px] font-bold shrink-0"
-                                                                    style={{ color: myRole === "admin" ? "var(--t-ac)" : "var(--t-tx2)" }}
-                                                                >
-                                                                    · {myRole.toUpperCase()}
-                                                                </span>
-                                                            )}
+                                                        <GroupAvatar color={g.color} name={g.name} />
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-[color:var(--t-tx0)] text-xs font-bold truncate">{g.name}</span>
+                                                                {showRole && (
+                                                                    <Badge color={myRole === "admin" ? "var(--t-ac)" : "var(--t-tx2)"} className="!text-[8px] !py-0 !px-1">
+                                                                        {myRole.toUpperCase()}
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                            <span className="text-[color:var(--t-tx2)] text-[10px] truncate block">{lastMsg ? lastMsg.text : "No messages yet"}</span>
                                                         </div>
-                                                        <span className="text-[color:var(--t-tx2)] text-[10px] truncate block">{lastMsg ? lastMsg.text : "No messages yet"}</span>
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1498,31 +1633,28 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                     {!activeGroup ? (
                                         <div
                                             className="flex flex-col items-center justify-center self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-10 gap-2"
-                                            style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
+                                            style={{ boxShadow: PIXEL_SHADOW }}
                                         >
-                                            <span className="text-[color:var(--t-tx0)] text-sm font-bold">No message selected</span>
+                                            <span className="text-[color:var(--t-ac)] text-2xl leading-none">✉</span>
+                                            <span className="text-[color:var(--t-tx0)] text-sm font-bold uppercase tracking-wider">No message selected</span>
                                             <p className="text-[color:var(--t-tx2)] text-xs">Create or pick a conversation from the list on the left.</p>
                                         </div>
                                     ) : (
                                         <>
                                             {/* Header */}
                                             <div
-                                                className="flex flex-wrap justify-between items-center gap-3 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-3 sm:p-4"
-                                                style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
+                                                className="flex flex-wrap justify-between items-center gap-3 bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] border-t-[3px] p-3 sm:p-4"
+                                                style={{ boxShadow: PIXEL_SHADOW, borderTopColor: activeGroup.color }}
                                             >
                                                 <div className="flex items-center gap-3 min-w-0">
-                                                    <div
-                                                        className="w-10 h-10 shrink-0 flex items-center justify-center text-xs font-bold"
-                                                        style={{ backgroundColor: withAlpha(activeGroup.color, "33"), color: activeGroup.color, border: `1px solid ${withAlpha(activeGroup.color, "4D")}` }}
-                                                    >
-                                                        {initialsFor(activeGroup.name)}
-                                                    </div>
+                                                    <GroupAvatar color={activeGroup.color} name={activeGroup.name} className="w-12 h-12 text-sm" />
                                                     <div className="min-w-0">
-                                                        <span className="text-[color:var(--t-tx0)] text-base font-bold truncate block">{activeGroup.name}</span>
-                                                        <div className="flex items-center gap-1.5">
+                                                        <span className="text-[color:var(--t-tx0)] text-base font-bold uppercase tracking-wide truncate block">{activeGroup.name}</span>
+                                                        <div className="flex flex-wrap items-center gap-2 mt-1">
                                                             <Badge color={isClassroom ? "var(--t-ok)" : isDm ? "var(--t-ac2)" : "var(--t-ac)"}>
                                                                 {isClassroom ? "CLASSROOM" : isDm ? "1v1" : "SQUAD"}
                                                             </Badge>
+                                                            <Pips value={activeGroup.members.length} color={activeGroup.color} />
                                                             <span className="text-[color:var(--t-tx2)] text-[11px]">
                                                                 {activeGroup.members.length} member{activeGroup.members.length === 1 ? "" : "s"}
                                                             </span>
@@ -1533,7 +1665,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                                 {/* Single entry point into the tabbed pop-up card */}
                                                 <button
                                                     onClick={() => setOpenPanel(tabDefs[0]?.key || "members")}
-                                                    className="flex items-center gap-1.5 py-1.5 px-3 border border-solid border-[color:var(--t-bd0)] bg-[var(--t-bg0)] text-[color:var(--t-tx1)] text-[10px] font-bold hover:border-[color:var(--t-ac)] hover:text-[color:var(--t-ac)] transition-all duration-150 active:scale-95"
+                                                    className="flex items-center justify-center w-10 h-10 border-2 border-solid border-[color:var(--t-bd0)] bg-[var(--t-bg0)] text-[color:var(--t-tx1)] text-base font-bold hover:bg-[var(--t-ac)] hover:border-[color:var(--t-ac)] hover:text-[color:var(--t-onac)] transition-all duration-150 active:scale-95"
                                                 >
                                                     <span>☰</span>
                                                 </button>
@@ -1541,56 +1673,103 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
 
                                             {/* Chat stream */}
                                             <div
-                                                className="flex flex-col self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] p-3 sm:p-4 gap-3 h-[600px]"
-                                                style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
+                                                className="flex flex-col self-stretch bg-[var(--t-bg1)] border border-solid border-[color:var(--t-bd0)] h-[600px]"
+                                                style={{ boxShadow: PIXEL_SHADOW }}
                                             >
-                                                <div className="flex-1 flex flex-col gap-3 max-h-[380px] overflow-y-auto pr-1">
-                                                    {activeGroup.messages.length === 0 && <p className="text-[color:var(--t-tx2)] text-xs py-6 text-center">No messages yet — say hi!</p>}
-                                                    {activeGroup.messages.map((m) => {
-                                                        const mine = m.senderId === "you";
-                                                        return (
-                                                            <div key={m.id} className={`flex flex-col gap-0.5 ${mine ? "items-end" : "items-start"}`}>
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="text-[color:var(--t-tx2)] text-[10px] font-bold">{m.senderName}</span>
-                                                                    <span className="text-[color:var(--t-bd1)] text-[10px]">{m.time}</span>
-                                                                </div>
-                                                                <div
-                                                                    className={`max-w-[80%] py-2 px-3 text-xs ${mine ? "bg-[var(--t-ac)] text-[color:var(--t-onac)]" : "bg-[var(--t-bg3)] text-[color:var(--t-tx0)] border border-solid border-[color:var(--t-bd0)]"
-                                                                        }`}
-                                                                >
-                                                                    {m.text}
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-
-                                                <form onSubmit={sendMessage} className="flex items-center gap-2 pt-2 border-t border-solid border-[color:var(--t-bd0)]">
-                                                    <input
-                                                        value={messageText}
-                                                        onChange={(e) => setMessageText(e.target.value)}
-                                                        placeholder={`Message ${activeGroup.name}...`}
-                                                        className="flex-1 min-w-0 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac)]"
-                                                    />
-                                                    {isSquad && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                updateActiveGroup((g) => ({
-                                                                    ...g,
-                                                                    files: [...(g.files || []), { id: `f${Date.now()}`, name: "Shared_File.pdf", uploadedBy: "You", size: "0.9 MB" }],
-                                                                }))
+                                                <PanelHeader icon="▤" title="CHAT LOG" right={<Badge color="var(--t-ac)">{activeGroup.messages.length} MSG</Badge>} />
+                                                <div className="flex flex-col flex-1 min-h-0 p-3 sm:p-4 gap-3">
+                                                    <div className="flex-1 flex flex-col gap-3 max-h-[380px] overflow-y-auto pr-1">
+                                                        {activeGroup.messages.length === 0 && <p className="text-[color:var(--t-tx2)] text-xs py-6 text-center">No messages yet — say hi!</p>}
+                                                        {activeGroup.messages.map((m) => {
+                                                            if (m.kind === "system") {
+                                                                return (
+                                                                    <div key={m.id} className="self-center flex items-center gap-2 py-1 px-3 border border-dashed border-[color:var(--t-bd1)] text-[color:var(--t-tx2)] text-[10px] font-bold uppercase tracking-wider">
+                                                                        <span className="text-[color:var(--t-ok)]">✦</span>
+                                                                        {m.text}
+                                                                        {m.time && <span className="opacity-70">· {m.time}</span>}
+                                                                    </div>
+                                                                );
                                                             }
-                                                            className="shrink-0 bg-[var(--t-bg3)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx1)] text-xs py-2 px-3 hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-95"
-                                                            aria-label="Attach a file"
-                                                        >
-                                                            📎
+                                                            if (m.kind === "task" && m.link) {
+                                                                const isMaterial = m.link.type === "material";
+                                                                return (
+                                                                    <div key={m.id} className="flex flex-col gap-0.5 items-start">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: colorForString(m.senderName) }}>{m.senderName}</span>
+                                                                            <span className="text-[color:var(--t-tx2)] text-[10px] opacity-70">{m.time}</span>
+                                                                        </div>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => openTaskInClassroom(m.link)}
+                                                                            title="Open this task in Classroom"
+                                                                            className="group w-full max-w-[85%] flex flex-col gap-2 text-left p-3 bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] border-l-[3px] border-l-[color:var(--t-ok)] hover:border-[color:var(--t-ok)] transition-all duration-150 active:scale-[0.99]"
+                                                                            style={{ boxShadow: "2px 2px 0px var(--t-shadow)" }}
+                                                                        >
+                                                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                                                <Badge color="var(--t-ok)">⚑ {TASK_TYPE_LABEL[m.link.type] || "Task"}</Badge>
+                                                                                <span className="text-[color:var(--t-tx2)] text-[10px] font-bold uppercase tracking-wider truncate">{m.link.className}</span>
+                                                                            </div>
+                                                                            <span className="text-[color:var(--t-tx0)] text-sm font-bold">{m.link.title}</span>
+                                                                            {(m.link.due || m.link.points != null) && (
+                                                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                                                    {m.link.due && !isMaterial && <Badge color="var(--t-warn)">▲ Due {m.link.due}</Badge>}
+                                                                                    {m.link.points != null && <Badge color="var(--t-ac)">{m.link.points} PTS</Badge>}
+                                                                                </div>
+                                                                            )}
+                                                                            <span className="text-[color:var(--t-ac)] text-[10px] font-bold uppercase tracking-wider group-hover:translate-x-0.5 transition-transform">
+                                                                                Open in Classroom →
+                                                                            </span>
+                                                                        </button>
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            const mine = m.senderId === "you";
+                                                            return (
+                                                                <div key={m.id} className={`flex flex-col gap-0.5 ${mine ? "items-end" : "items-start"}`}>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: mine ? "var(--t-ac)" : colorForString(m.senderName) }}>{m.senderName}</span>
+                                                                        <span className="text-[color:var(--t-tx2)] text-[10px] opacity-70">{m.time}</span>
+                                                                    </div>
+                                                                    <div
+                                                                        className={`max-w-[80%] py-2 px-3 text-xs ${mine ? "bg-[var(--t-ac)] text-[color:var(--t-onac)] border border-solid border-[color:var(--t-ac2)]" : "bg-[var(--t-bg0)] text-[color:var(--t-tx0)] border border-solid border-[color:var(--t-bd0)] border-l-[3px]"
+                                                                            }`}
+                                                                        style={mine ? { boxShadow: "2px 2px 0px var(--t-shadow)" } : { borderLeftColor: colorForString(m.senderName) }}
+                                                                    >
+                                                                        {m.text}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    <form onSubmit={sendMessage} className="flex items-center gap-2 pt-2 border-t border-solid border-[color:var(--t-bd0)]">
+                                                        <input
+                                                            value={messageText}
+                                                            onChange={(e) => setMessageText(e.target.value)}
+                                                            placeholder={`Message ${activeGroup.name}...`}
+                                                            className="flex-1 min-w-0 bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] placeholder-[color:var(--t-tx2)] text-xs py-2.5 px-3 outline-none focus:border-[color:var(--t-ac)]"
+                                                        />
+                                                        {isSquad && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    updateActiveGroup((g) => ({
+                                                                        ...g,
+                                                                        files: [...(g.files || []), { id: `f${Date.now()}`, name: "Shared_File.pdf", uploadedBy: "You", size: "0.9 MB" }],
+                                                                    }))
+                                                                }
+                                                                className="shrink-0 bg-[var(--t-bg0)] border-2 border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx1)] text-xs py-2 px-3 hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-95"
+                                                                aria-label="Attach a file"
+                                                            >
+                                                                📎
+                                                            </button>
+                                                        )}
+                                                        <button type="submit" className={`shrink-0 text-xs py-2 px-4 ${PRIMARY_BTN}`}>
+                                                            SEND 
+                                                            
                                                         </button>
-                                                    )}
-                                                    <button type="submit" className="shrink-0 bg-[var(--t-ac)] text-[color:var(--t-onac)] text-xs font-bold py-2 px-4 hover:opacity-90 transition-all duration-150 active:scale-95">
-                                                        SEND
-                                                    </button>
-                                                </form>
+                                                    </form>
+                                                </div>
                                             </div>
                                         </>
                                     )}

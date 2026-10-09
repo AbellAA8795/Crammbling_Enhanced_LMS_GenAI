@@ -1,0 +1,131 @@
+# Crammbling local development stack.
+#
+#   cp .env.example .env        # then fill in the secrets
+#   docker compose up --build   # db + redis + server + client
+#   docker compose --profile ai up --build   # ...plus Ollama for the chatbot
+#
+# See DOCKER.md for the full guide.
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: Crammbling_DB
+    volumes:
+      - db-data:/var/lib/postgresql
+      # Runs only the first time, when the db-data volume is empty.
+      - ./docker/db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      # Host port 5433 so it doesn't clash with a locally installed PostgreSQL.
+      - "${DB_HOST_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d Crammbling_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_HOST_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  server:
+    build: ./server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PORT: 5000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: Crammbling_DB
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:5173
+
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:?Set TOKEN_ENCRYPTION_KEY in .env}
+
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_CALLBACK_URL: http://localhost:5000/api/auth/google/callback
+      GOOGLE_CALENDAR_REDIRECT_URI: http://localhost:5000/api/personalization/google-calendar/callback
+
+      EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASS: ${EMAIL_PASS:-}
+      OTP_EXPIRY_MINUTES: 10
+
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      OLLAMA_MODEL_SMALL: ${OLLAMA_MODEL:-llama3.2}
+      OLLAMA_MODEL_LARGE: ${OLLAMA_MODEL:-llama3.2}
+      OLLAMA_JUDGE_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      OLLAMA_NUM_CTX: 4096
+      OLLAMA_CONCURRENCY: 2
+      OLLAMA_TIMEOUT_MS: 120000
+      PROMPT_CACHE_TTL_MS: 60000
+      SUMMARY_TRIGGER_MESSAGE_COUNT: 20
+      SUMMARY_KEEP_RECENT_COUNT: 10
+      EVAL_PASS_THRESHOLD: 0.8
+    volumes:
+      - ./server:/app
+      # Keep the container's Linux node_modules; don't use the host's.
+      - /app/node_modules
+    ports:
+      - "5000:5000"
+
+  client:
+    build: ./client/my-react-app
+    restart: unless-stopped
+    depends_on:
+      - server
+    environment:
+      # Used by the browser, so it points at the host-mapped port.
+      VITE_API_URL: http://localhost:5000
+      VITE_USE_POLLING: "true"
+    volumes:
+      - ./client/my-react-app:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+
+  # Optional: start with `docker compose --profile ai up`.
+  # The image and model are several GB, so it's off by default.
+  ollama:
+    image: ollama/ollama:0.12.6
+    profiles: ["ai"]
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "11434:11434"
+
+  # Downloads the model once into the ollama-data volume, then exits.
+  ollama-pull:
+    image: ollama/ollama:0.12.6
+    profiles: ["ai"]
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c", "sleep 3 && ollama pull ${OLLAMA_MODEL:-llama3.2}"]
+    restart: "no"
+
+volumes:
+  db-data:
+  ollama-data:

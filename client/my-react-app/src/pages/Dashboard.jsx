@@ -6,27 +6,7 @@ import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import Settings from "../components/Settings";
 import QuizArena from "./QuizArena";
 import { useTheme, CloseIcon } from "./Theme";
-
-import firstCramBadge from "../assets/first_cram_badge.svg";
-import quizRookieBadge from "../assets/quiz_rookie_badge.svg";
-import quizVeteranBadge from "../assets/quiz_veteran_badge.svg";
-import questionCrusherBadge from "../assets/question_crusher_badge.svg";
-import questionMachineBadge from "../assets/question_machine_badge.svg";
-import perfectCramBadge from "../assets/perfect_cram_badge.svg";
-import flawlessFiveBadge from "../assets/flawless_five_badge.svg";
-import accuracyAceBadge from "../assets/accuracy_ace_badge.svg";
-import comebackCrammerBadge from "../assets/comeback_crammer_badge.svg";
-import retakeWarriorBadge from "../assets/retake_warrior_badge.svg";
-import noHintsBadge from "../assets/no_hints_badge.svg";
-import hardModeHeroBadge from "../assets/hard_mode_hero_badge.svg";
-import speedRunBadge from "../assets/speed_run_badge.svg";
-import blitzMasterBadge from "../assets/blitz_master_badge.svg";
-import quizArchitectBadge from "../assets/quiz_architect_badge.svg";
-import promptToPassBadge from "../assets/prompt_to_pass_badge.svg";
-import adaptiveAceBadge from "../assets/adaptive_ace_badge.svg";
-import mistakeMinerBadge from "../assets/mistake_miner_badge.svg";
-import quizStreakBadge from "../assets/quiz_streak_badge.svg";
-import quizMarathonBadge from "../assets/quiz_marathon_badge.svg";
+import { ACHIEVEMENTS } from "./ProfileHub";
 
 // Same icon art, labels and layout as the Chatbot / Group Collab / Personalized sidebar.
 const NAV_ASSET = (id) => `https://storage.googleapis.com/tagjs-prod.appspot.com/v1/fUpAUSquvf/${id}_expires_30_days.png`;
@@ -36,7 +16,7 @@ const NAV_ASSET = (id) => `https://storage.googleapis.com/tagjs-prod.appspot.com
 const CLASSROOM_ICON =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='15' viewBox='0 0 24 24' fill='none' stroke='%232CD4D9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M22 10 12 5 2 10l10 5 10-5z'/><path d='M6 12v5c3 3 9 3 12 0v-5'/></svg>";
 
-const NAV_IMG = {
+export const NAV_IMG = {
   logo: NAV_ASSET("ec7p6crg"),
   dashboard: NAV_ASSET("5fuik1xz"),
   chatbot: NAV_ASSET("2ordxy0o"),
@@ -46,6 +26,7 @@ const NAV_IMG = {
   settings: NAV_ASSET("ojko43i5"),
   logout: NAV_ASSET("cxrmfyil"),
   avatar: NAV_ASSET("24khomt6"),
+  search: NAV_ASSET("l374rm3u"),
 };
 
 const NAV_ITEMS = [
@@ -90,30 +71,6 @@ const WEEKLY_ACTIVITY = [
   { day: "Fri", xp: 200 },
   { day: "Sat", xp: 350 },
   { day: "Sun", xp: 180 },
-];
-
-// `unlocked` is placeholder data. Replace with real stats from the backend later.
-const ACHIEVEMENTS = [
-  { id: "first-cram", name: "First Cram", mission: "Complete your first AI-generated quiz.", quote: "Every legend starts with one question.", badge: firstCramBadge, unlocked: true },
-  { id: "quiz-rookie", name: "Quiz Rookie", mission: "Complete 10 quizzes.", quote: "You\u2019re warming up. The questions are starting to fear you.", badge: quizRookieBadge, unlocked: true },
-  { id: "quiz-veteran", name: "Quiz Veteran", mission: "Complete 50 quizzes.", quote: "You\u2019ve seen it all: easy, hard, and weirdly specific.", badge: quizVeteranBadge, unlocked: false },
-  { id: "question-crusher", name: "Question Crusher", mission: "Answer 100 quiz questions correctly.", quote: "One hundred down. Your brain is getting swole.", badge: questionCrusherBadge, unlocked: true },
-  { id: "question-machine", name: "Question Machine", mission: "Answer 500 quiz questions correctly.", quote: "At this point, multiple choice feels like a conversation.", badge: questionMachineBadge, unlocked: false },
-  { id: "perfect-cram", name: "Perfect Cram", mission: "Score 100% on any quiz.", quote: "No misses. No mercy.", badge: perfectCramBadge, unlocked: true },
-  { id: "flawless-five", name: "Flawless Five", mission: "Score 100% on 5 different quizzes.", quote: "Perfection isn\u2019t a fluke. It\u2019s a habit.", badge: flawlessFiveBadge, unlocked: false },
-  { id: "accuracy-ace", name: "Accuracy Ace", mission: "Maintain a 95%+ average across 20 quizzes.", quote: "Consistently brilliant. Annoyingly good.", badge: accuracyAceBadge, unlocked: false },
-  { id: "comeback-crammer", name: "Comeback Crammer", mission: "Fail a quiz, then pass the same quiz within 24 hours.", quote: "You didn\u2019t just retake it. You redeemed it.", badge: comebackCrammerBadge, unlocked: true },
-  { id: "retake-warrior", name: "Retake Warrior", mission: "Retake a quiz 5 times until you pass.", quote: "Persistence beats talent when talent gives up.", badge: retakeWarriorBadge, unlocked: false },
-  { id: "no-hints", name: "No Hints Needed", mission: "Score 100% on a quiz without hints or AI help.", quote: "Just you, the question, and the truth.", badge: noHintsBadge, unlocked: false },
-  { id: "hard-mode-hero", name: "Hard Mode Hero", mission: "Score 90%+ on a hard-difficulty quiz.", quote: "You chose violence. And won.", badge: hardModeHeroBadge, unlocked: false },
-  { id: "speed-run", name: "Speed Run", mission: "Finish a timed quiz with 90%+ in under 2 minutes.", quote: "Fast fingers, faster brain.", badge: speedRunBadge, unlocked: false },
-  { id: "blitz-master", name: "Blitz Master", mission: "Complete 10 timed quizzes with 90%+ accuracy.", quote: "You don\u2019t just survive the clock. You own it.", badge: blitzMasterBadge, unlocked: false },
-  { id: "quiz-architect", name: "Quiz Architect", mission: "Generate 25 quizzes using the AI quiz generator.", quote: "You\u2019re not just taking quizzes. You\u2019re building them.", badge: quizArchitectBadge, unlocked: false },
-  { id: "prompt-to-pass", name: "Prompt to Pass", mission: "Generate a quiz from a custom prompt and score 100%.", quote: "You asked the right question and answered it perfectly.", badge: promptToPassBadge, unlocked: false },
-  { id: "adaptive-ace", name: "Adaptive Ace", mission: "Score 100% on an adaptive-difficulty quiz.", quote: "The AI tried to challenge you. You challenged it back.", badge: adaptiveAceBadge, unlocked: false },
-  { id: "mistake-miner", name: "Mistake Miner", mission: "Review every incorrect answer from 10 quizzes.", quote: "Mistakes are just clues. You followed them all.", badge: mistakeMinerBadge, unlocked: false },
-  { id: "quiz-streak", name: "Quiz Streak", mission: "Complete at least one quiz every day for 7 days.", quote: "Seven days. Seven quizzes. Zero excuses.", badge: quizStreakBadge, unlocked: true },
-  { id: "quiz-marathon", name: "Quiz Marathon", mission: "Complete 10 quizzes in one day.", quote: "Cramming? No. This is a full-on quiz endurance event.", badge: quizMarathonBadge, unlocked: false },
 ];
 
 const LEADERBOARD = [
@@ -246,7 +203,7 @@ function AchievementsSection() {
   );
 }
 
-function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings, onLogout }) {
+export function Sidebar({ activePage, onNavigate, onCloseMobile, onOpenSettings, onLogout }) {
   return (
     <div style={{ backgroundImage: "var(--t-grad-side)" }} className="flex flex-col h-full bg-[var(--t-bg0)] w-64 shrink-0">
       <div className="flex justify-end md:hidden px-3 pt-3">
@@ -421,9 +378,9 @@ function Dashboard() {
 
             <button
               type="button"
-              onClick={() => setShowSettings(true)}
+              onClick={() => navigate("/profile")}
               className="flex flex-col shrink-0 items-start px-1 sm:px-2"
-              aria-label="Profile / Settings"
+              aria-label="My profile"
             >
               <div
                 className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"

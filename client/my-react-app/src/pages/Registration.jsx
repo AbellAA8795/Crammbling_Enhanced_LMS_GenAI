@@ -176,23 +176,23 @@ function Registration() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5 items-start">
                 <div className="sm:col-span-2">
                   <Field
-                    {...field("email", {
-                      label: "Email",
-                      type: "email",
-                      placeholder: "you@example.com",
-                      tooltip: "We'll send a one-time code (OTP) to this email.",
-                      autoComplete: "email",
-                    })}
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <Field
                     {...field("username", {
                       label: "Username",
                       placeholder: "Username",
                       tooltip: "4-20 characters. Letters, numbers, and underscores only.",
                       icon: personIcon,
                       autoComplete: "username",
+                    })}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <Field
+                    {...field("email", {
+                      label: "Email",
+                      type: "email",
+                      placeholder: "you@example.com",
+                      tooltip: "We'll send a one-time code (OTP) to this email.",
+                      autoComplete: "email",
                     })}
                   />
                 </div>

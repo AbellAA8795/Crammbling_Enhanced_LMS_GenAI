@@ -602,7 +602,7 @@ export default function Chatbot({ onNavigate } = {}) {
                             )}
                         </button>
 
-                        <button onClick={() => setSettingsOpen(true)} className="flex flex-col shrink-0 items-start px-1 sm:px-2" aria-label="Profile / Settings">
+                        <button onClick={() => navigate("/profile")} className="flex flex-col shrink-0 items-start px-1 sm:px-2" aria-label="My profile">
                             <div
                                 className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"
                                 style={{ boxShadow: "0px 1px 2px #0000000D" }}

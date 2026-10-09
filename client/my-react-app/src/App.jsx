@@ -8,6 +8,7 @@ import Personalized from './pages/personalized.jsx';
 import GroupCollab from './pages/group_collab.jsx';
 import QuizArena from './pages/QuizArena.jsx';
 import Classroom from './pages/classroom.jsx';
+import Profile from './pages/Profile.jsx';
 // The chatbot / group collab / personalized pages call onNavigate(key) with
 // these keys from their sidebars. Each key maps to a route.
 const PATHS = {
@@ -65,6 +66,8 @@ function App() {
         <Route path="/group-collab" element={<GroupCollabPage />} />
         <Route path="/personalized" element={<PersonalizedPage />} />
         <Route path="/quiz-arena" element={<QuizArenaPage />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/:userId" element={<Profile />} />
       </Routes>
     </BrowserRouter>
   );

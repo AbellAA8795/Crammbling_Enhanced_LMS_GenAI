@@ -97,6 +97,12 @@ const SPRINT_STATUS_OPTIONS = [
   { id: "done", label: "Completed" },
 ];
 
+// Remember which column a quest came from when it's completed, so un-completing
+// it from the calendar's Upcoming list puts it back where it was.
+function withDoneOrigin(card, fromColId, toColId) {
+  return toColId === "done" && fromColId !== "done" ? { ...card, prevCol: fromColId } : card;
+}
+
 function isQuestUrgent(dueOrMeta) {
   if (!dueOrMeta) return false;
   const s = dueOrMeta.toLowerCase();
@@ -519,6 +525,34 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     return map;
   }, [events, weeks]);
 
+  // Calendar entry id -> the Sprint Board quest linked to it (and the column it sits in).
+  const cardByEventId = useMemo(() => {
+    const map = {};
+    sprintColumns.forEach((c) => c.cards.forEach((cd) => cd.eventId && (map[cd.eventId] = { colId: c.id, card: cd })));
+    return map;
+  }, [sprintColumns]);
+
+  /* One answer to "is this event finished?" for the calendar, the Upcoming list
+     and the Sprint Board. Events with a linked quest are done when the quest is in
+     Completed; events without one (e.g. made before the link existed) use `completed`. */
+  function isEventDone(id) {
+    const linked = cardByEventId[id];
+    return linked ? linked.colId === "done" : !!completed[id];
+  }
+
+  /* How an event shows on a given calendar day:
+     "done"   — its quest is Completed (or it was marked done), even before it's due
+     "passed" — the day is over and it was never finished
+     null     — still upcoming */
+  function calendarEventState(ev, cellDate) {
+    const repeats = ev.repeat && ev.repeat !== "none";
+    const finished = isEventDone(ev.id);
+    // A repeating event that's been finished only crosses out up to today, not its future dates.
+    if (finished && (!repeats || cellDate <= TODAY)) return "done";
+    if (cellDate < TODAY && !isSameDay(cellDate, TODAY)) return "passed";
+    return null;
+  }
+
   function goPrevMonth() {
     setViewDate(new Date(year, month - 1, 1));
   }
@@ -529,8 +563,16 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
     setViewDate(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1));
   }
 
+  // "Mark as done" in the Upcoming list moves the linked quest to Completed, and
+  // "Mark as not done" sends it back to the column it came from.
   function toggleComplete(id) {
-    setCompleted((prev) => ({ ...prev, [id]: !prev[id] }));
+    const linked = cardByEventId[id];
+    if (!linked) {
+      setCompleted((prev) => ({ ...prev, [id]: !prev[id] }));
+      return;
+    }
+    if (linked.colId === "done") moveCardToColumn(linked.card.id, "done", linked.card.prevCol || "backlog");
+    else moveCardToColumn(linked.card.id, linked.colId, "done");
   }
 
   function removeCalendarEntry(id) {
@@ -699,7 +741,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
       return withoutCard.map((c) => {
         if (c.id !== targetColId) return c;
         const newCards = [...c.cards];
-        newCards.splice(insertIndex, 0, card);
+        newCards.splice(insertIndex, 0, withDoneOrigin(card, draggedCard.colId, targetColId));
         return { ...c, cards: newCards };
       });
     });
@@ -816,7 +858,8 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
       const withoutCard = prev.map((c) =>
         c.id === fromColId ? { ...c, cards: c.cards.filter((cd) => cd.id !== cardId) } : c
       );
-      return withoutCard.map((c) => (c.id === toColId ? { ...c, cards: [...c.cards, card] } : c));
+      const moved = withDoneOrigin(card, fromColId, toColId);
+      return withoutCard.map((c) => (c.id === toColId ? { ...c, cards: [...c.cards, moved] } : c));
     });
   }
 
@@ -1105,9 +1148,9 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                 </button>
 
                 <button
-                  onClick={() => setSettingsOpen(true)}
+                  onClick={() => navigate("/profile")}
                   className="flex flex-col shrink-0 items-start px-1 sm:px-2"
-                  aria-label="Profile / Settings"
+                  aria-label="My profile"
                 >
                   <div
                     className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"
@@ -1360,17 +1403,26 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                                           <div className="flex flex-col items-start gap-1 mt-2 w-full">
                                             {dayEvents.map((ev) => {
                                               const st = TYPE_STYLES[ev.type];
+                                              const state = calendarEventState(ev, cell.date);
+                                              // Done keeps its colour, faded; passed-and-unfinished goes grey.
+                                              const look =
+                                                state === "done"
+                                                  ? { backgroundColor: withAlpha(st.bg, "40"), borderColor: withAlpha(st.bg, "80"), color: "var(--t-tx1)" }
+                                                  : state === "passed"
+                                                    ? { backgroundColor: "var(--t-bg3)", borderColor: "var(--t-bd0)", color: "var(--t-tx2)" }
+                                                    : { backgroundColor: st.bg, borderColor: st.bg, color: st.text };
                                               return (
                                                 <div
                                                   key={ev.id}
-                                                  title={`${ev.label}${!ev.allDay && ev.startTime ? ` \u2022 ${ev.startTime}\u2013${ev.endTime}` : ""}`}
-                                                  className="flex flex-col items-start py-1 px-1.5 w-full truncate"
-                                                  style={{ backgroundColor: st.bg }}
+                                                  title={`${ev.label}${!ev.allDay && ev.startTime ? ` \u2022 ${ev.startTime}\u2013${ev.endTime}` : ""}${state === "done" ? " \u2022 Completed" : state === "passed" ? " \u2022 Past" : ""}`}
+                                                  className="flex flex-col items-start py-1 px-1.5 w-full truncate border border-solid"
+                                                  style={{ backgroundColor: look.backgroundColor, borderColor: look.borderColor }}
                                                 >
                                                   <span
-                                                    className="text-[10px] sm:text-[11px] font-bold truncate w-full"
-                                                    style={{ color: st.text }}
+                                                    className={`text-[10px] sm:text-[11px] font-bold truncate w-full ${state ? "line-through decoration-2" : ""}`}
+                                                    style={{ color: look.color }}
                                                   >
+                                                    {state === "done" ? "\u2713 " : ""}
                                                     {!ev.allDay && ev.startTime ? `${ev.startTime} ` : ""}{ev.label}
                                                   </span>
                                                 </div>
@@ -1399,6 +1451,14 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                               <div className="bg-[var(--t-ok)] w-2.5 h-2.5" />
                               <span className="text-[color:var(--t-tx0)] text-[11px] font-bold">Group Session</span>
                             </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <span className="text-[color:var(--t-tx1)] text-[11px] font-bold line-through decoration-2">✓ Done</span>
+                              <span className="text-[color:var(--t-tx2)] text-[11px]">Completed</span>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <span className="text-[color:var(--t-tx2)] text-[11px] font-bold line-through decoration-2">Past</span>
+                              <span className="text-[color:var(--t-tx2)] text-[11px]">Day has passed</span>
+                            </div>
                           </div>
                         </div>
 
@@ -1422,7 +1482,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                               </div>
                             )}
                             {filteredUpcoming.map((u) => {
-                              const isDone = completed[u.id];
+                              const isDone = isEventDone(u.id);
                               return (
                                 <div
                                   key={u.id}

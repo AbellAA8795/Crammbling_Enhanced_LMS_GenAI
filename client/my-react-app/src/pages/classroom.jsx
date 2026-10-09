@@ -7,7 +7,7 @@ import GroupCollab from "./group_collab";
 import Personalized from "./personalized";
 import QuizArena from "./QuizArena";
 import { useTheme, themeStyle, withAlpha, CloseIcon, MenuIcon } from "./Theme";
-import { useHubClasses, useOpenRequest, clearOpenRequest, clockNow } from "./Classhub";
+import { useHubClasses, useOpenRequest, clearOpenRequest, clockNow, JOINABLE_CLASSES } from "./Classhub";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import Settings from "../components/Settings";
 
@@ -153,22 +153,6 @@ const NAV_ITEMS = [
 /* ------------------------------------------------------------------ */
 const CURRENT_USER = { id: "you", name: "You", email: "you@univ.edu" };
 
-/* Class colours are theme roles, not fixed hex values, so every class
-   automatically re-tints itself when the theme changes. */
-const CLASS_COLORS = [
-    "var(--t-ac)",
-    "var(--t-ok)",
-    "var(--t-warn)",
-    "var(--t-ac2)",
-    "var(--t-ok2)",
-];
-
-function colorForString(s) {
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-    return CLASS_COLORS[h % CLASS_COLORS.length];
-}
-
 function initialsFor(name) {
     return name
         .split(" ")
@@ -177,13 +161,6 @@ function initialsFor(name) {
         .join("")
         .slice(0, 2)
         .toUpperCase();
-}
-
-function makeClassCode() {
-    const alphabet = "abcdefghjkmnpqrstuvwxyz23456789";
-    let s = "";
-    for (let i = 0; i < 6; i++) s += alphabet[Math.floor(Math.random() * alphabet.length)];
-    return s;
 }
 
 function toISODate(d) {
@@ -472,70 +449,8 @@ function ClassCard({ cls, onOpen }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Create / Join class modals                                         */
+/*  Join class modal                                                   */
 /* ------------------------------------------------------------------ */
-function CreateClassModal({ onClose, onCreate }) {
-    const [name, setName] = useState("");
-    const [section, setSection] = useState("");
-    const [subject, setSubject] = useState("");
-    const [room, setRoom] = useState("");
-
-    function submit(e) {
-        e.preventDefault();
-        if (!name.trim()) return;
-        onCreate({
-            name: name.trim(),
-            section: section.trim() || "—",
-            subject: subject.trim() || "GENERAL",
-            room: room.trim() || "",
-        });
-    }
-
-    const field =
-        "w-full bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2.5 px-3 outline-none placeholder:text-[color:var(--t-ph)] focus:border-[color:var(--t-ac)] transition-colors";
-
-    return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
-            <div className="absolute inset-0 bg-black/70" onClick={onClose} />
-            <form
-                onSubmit={submit}
-                className="relative bg-[var(--t-mbg)] border border-solid border-[color:var(--t-mbd2)] border-t-[3px] border-t-[color:var(--t-ac)] p-5 w-full max-w-md flex flex-col gap-3"
-                style={{ boxShadow: MODAL_SHADOW }}
-            >
-                <ModalHeader icon="⚑" title="CREATE CLASS" onClose={onClose} />
-
-                <label className="flex flex-col gap-1">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Class name (required)</span>
-                    <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Linear Algebra" className={field} />
-                </label>
-
-                <label className="flex flex-col gap-1">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Section</span>
-                    <input value={section} onChange={(e) => setSection(e.target.value)} placeholder="e.g. Section A" className={field} />
-                </label>
-
-                <label className="flex flex-col gap-1">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Subject</span>
-                    <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. MATH210" className={field} />
-                </label>
-
-                <label className="flex flex-col gap-1">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Room</span>
-                    <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="e.g. Room 304" className={field} />
-                </label>
-
-                <button
-                    type="submit"
-                    disabled={!name.trim()}
-                    className={`mt-1 text-xs py-2.5 ${PRIMARY_BTN}`}
-                >
-                    CREATE
-                </button>
-            </form>
-        </div>
-    );
-}
-
 function JoinClassModal({ onClose, onJoin }) {
     const [code, setCode] = useState("");
     const [error, setError] = useState("");
@@ -1336,7 +1251,7 @@ function ClassDetail({
 /* ------------------------------------------------------------------ */
 /*  Class list (grid) + To-do panel                                    */
 /* ------------------------------------------------------------------ */
-function ClassList({ classes, onOpen, onCreateClass, onJoinClass }) {
+function ClassList({ classes, onOpen, onJoinClass }) {
     const todo = useMemo(() => {
         const items = [];
         classes.forEach((c) => {
@@ -1363,17 +1278,10 @@ function ClassList({ classes, onOpen, onCreateClass, onJoinClass }) {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={onJoinClass}
-                            className="flex items-center gap-1.5 bg-[var(--t-bg0)] border-2 border-solid border-[color:var(--t-bd0)] text-[color:var(--t-tx0)] text-xs font-bold uppercase tracking-wider py-2 px-3 hover:border-[color:var(--t-ac)] transition-all duration-150 active:scale-95"
+                            className={`flex items-center gap-1.5 text-xs py-2 px-3.5 ${PRIMARY_BTN}`}
                         >
                             <Icon.Link className="w-3.5 h-3.5" />
                             Join class
-                        </button>
-                        <button
-                            onClick={onCreateClass}
-                            className={`flex items-center gap-1.5 text-xs py-2 px-3.5 ${PRIMARY_BTN}`}
-                        >
-                            <Icon.Plus className="w-3.5 h-3.5" />
-                            Create class
                         </button>
                     </div>
                 </div>
@@ -1502,7 +1410,6 @@ function ClassroomPage({ onNavigate } = {}) {
     const [activeClassId, setActiveClassId] = useState(null);
     const [tab, setTab] = useState("stream");
 
-    const [showCreateClass, setShowCreateClass] = useState(false);
     const [showJoinClass, setShowJoinClass] = useState(false);
     const [showCreatePost, setShowCreatePost] = useState(false);
     const [turnInTarget, setTurnInTarget] = useState(null); // { classId, itemId }
@@ -1534,7 +1441,6 @@ function ClassroomPage({ onNavigate } = {}) {
         function onKeyDown(e) {
             if (e.key === "Escape") {
                 setNotifOpen(false);
-                setShowCreateClass(false);
                 setShowJoinClass(false);
                 setShowCreatePost(false);
                 setTurnInTarget(null);
@@ -1580,46 +1486,29 @@ function ClassroomPage({ onNavigate } = {}) {
         navigate("/");
     }
 
-    function createClass({ name, section, subject, room }) {
-        const id = `cls_${Date.now()}`;
-        const fresh = {
-            id,
-            name,
-            section,
-            subject,
-            room,
-            code: makeClassCode(),
-            color: colorForString(name),
-            owner: CURRENT_USER.name,
-            teachers: [{ id: CURRENT_USER.id, name: CURRENT_USER.name, email: CURRENT_USER.email }],
-            students: [],
-            topics: ["General"],
-            classwork: [],
-            stream: [],
-            createdClock: clockNow(),
-        };
-        setClasses((prev) => [fresh, ...prev]);
-        setShowCreateClass(false);
-        setActiveClassId(id);
-        setTab("stream");
-    }
-
+    /* Joining adds the student to the class; the shared hub then gives the class
+       a Group Collab chat with them in it (see syncClassGroups in Classhub). */
     function joinClass(code, setError) {
-        const found = classes.find((c) => c.code.toLowerCase() === code);
-        if (!found) {
+        const isMember = (c) => [...c.students, ...c.teachers].some((p) => p.id === CURRENT_USER.id);
+        const me = { id: CURRENT_USER.id, name: CURRENT_USER.name };
+
+        const enrolled = classes.find((c) => c.code.toLowerCase() === code);
+        const open = !enrolled && JOINABLE_CLASSES.find((c) => c.code.toLowerCase() === code);
+        if (!enrolled && !open) {
             setError("No class found with that code.");
             return;
         }
-        if (found.students.some((s) => s.id === CURRENT_USER.id)) {
-            setError("You're already in this class.");
-            return;
+        if (enrolled) {
+            if (isMember(enrolled)) {
+                setError("You're already in this class.");
+                return;
+            }
+            updateClass(enrolled.id, (c) => ({ ...c, students: [...c.students, me] }));
+        } else {
+            setClasses((prev) => [{ ...open, students: [...open.students, me], createdClock: clockNow() }, ...prev]);
         }
-        updateClass(found.id, (c) => ({
-            ...c,
-            students: [...c.students, { id: CURRENT_USER.id, name: CURRENT_USER.name }],
-        }));
         setShowJoinClass(false);
-        setActiveClassId(found.id);
+        setActiveClassId((enrolled || open).id);
         setTab("stream");
     }
 
@@ -1845,9 +1734,9 @@ function ClassroomPage({ onNavigate } = {}) {
                         </button>
 
                         <button
-                            onClick={() => setSettingsOpen(true)}
+                            onClick={() => navigate("/profile")}
                             className="flex flex-col shrink-0 items-start px-1 sm:px-2"
-                            aria-label="Profile / Settings"
+                            aria-label="My profile"
                         >
                             <div
                                 className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"
@@ -1888,7 +1777,6 @@ function ClassroomPage({ onNavigate } = {}) {
                                 setActiveClassId(id);
                                 setTab("stream");
                             }}
-                            onCreateClass={() => setShowCreateClass(true)}
                             onJoinClass={() => setShowJoinClass(true)}
                         />
                     )}
@@ -1906,7 +1794,6 @@ function ClassroomPage({ onNavigate } = {}) {
             )}
 
             {/* Modals */}
-            {showCreateClass && <CreateClassModal onClose={() => setShowCreateClass(false)} onCreate={createClass} />}
             {showJoinClass && <JoinClassModal onClose={() => setShowJoinClass(false)} onJoin={joinClass} />}
             {showCreatePost && activeClass && (
                 <CreatePostModal cls={activeClass} onClose={() => setShowCreatePost(false)} onCreate={createPost} />

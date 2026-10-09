@@ -308,8 +308,61 @@ export const INITIAL_CLASSES = [
     },
 ];
 
-/* Classes that ship with the app. Anything else was created/joined by the user. */
+/* Classes that ship with the app. Anything else was joined by the user. */
 export const SEED_CLASS_IDS = new Set(INITIAL_CLASSES.map((c) => c.id));
+
+/* Classes a teacher has opened that the student isn't in yet — joinable with
+   their code ("lin5ab", "web8kt"). Stand-in for a server lookup by class code.
+   Once joined, syncClassGroups() gives the class a Group Collab chat. */
+export const JOINABLE_CLASSES = [
+    {
+        id: "cls_math220",
+        name: "Linear Algebra",
+        section: "MATH220 — Section C",
+        subject: "MATH220",
+        room: "Room 112",
+        code: "lin5ab",
+        color: "var(--t-ok2)",
+        owner: "Dr. Marcus Lee",
+        teachers: [{ id: "t2", name: "Dr. Marcus Lee", email: "mlee@univ.edu" }],
+        students: [
+            { id: "s21", name: "Jess R." },
+            { id: "s22", name: "Kayden L." },
+        ],
+        topics: ["General", "Vectors"],
+        classwork: [],
+        stream: [
+            {
+                id: "p_la1",
+                type: "announcement",
+                authorId: "t2",
+                authorName: "Dr. Marcus Lee",
+                authorRole: "teacher",
+                text: "Welcome to Linear Algebra! Week 1 covers vectors and spans.",
+                time: "Mar 02",
+                comments: [],
+            },
+        ],
+    },
+    {
+        id: "cls_it150",
+        name: "Web Development Basics",
+        section: "IT150 — Section B",
+        subject: "IT150",
+        room: "Lab 2",
+        code: "web8kt",
+        color: "var(--t-warn)",
+        owner: "Ms. Hannah Cruz",
+        teachers: [{ id: "t3", name: "Ms. Hannah Cruz", email: "hcruz@univ.edu" }],
+        students: [
+            { id: "s31", name: "Riley P." },
+            { id: "s32", name: "Devon M." },
+        ],
+        topics: ["General"],
+        classwork: [],
+        stream: [],
+    },
+];
 
 /* ------------------------------------------------------------------ */
 /*  Store                                                               */

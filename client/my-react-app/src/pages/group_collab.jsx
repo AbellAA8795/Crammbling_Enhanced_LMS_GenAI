@@ -8,6 +8,7 @@ import { useTheme, withAlpha, CloseIcon, MenuIcon } from "./Theme";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import Settings from "../components/Settings";
 import QuizArena from "./QuizArena";
+import { PEOPLE, searchPeople, findPersonByName } from "./ProfileHub";
 
 
 const IMG = {
@@ -187,6 +188,18 @@ const INITIAL_GROUPS = [
         ],
     },
 ];
+
+/* Name that opens the person's profile when they're in the people directory
+   (see ProfileHub); plain text otherwise (e.g. "You", unknown members). */
+function PersonName({ name, onOpenProfile, className, style }) {
+    const person = findPersonByName(name);
+    if (!person || !onOpenProfile) return <span className={className} style={style}>{name}</span>;
+    return (
+        <button type="button" onClick={() => onOpenProfile(person.id)} title={`View ${name}'s profile`} className={`${className} hover:underline`} style={style}>
+            {name}
+        </button>
+    );
+}
 
 const FILTERS = [
     { key: "all", label: "All" },
@@ -501,24 +514,101 @@ function AddMemberModal({ onClose, onAdd }) {
     );
 }
 
-/* Compact type picker — no more big descriptive cards. */
-const CHAT_TYPES = [
-    { id: "classroom", label: "Classroom", color: "var(--t-ok)" },
-    { id: "dm", label: "1v1", color: "var(--t-ac2)" },
-    { id: "squad", label: "Squad", color: "var(--t-ac)" },
-];
+/* Tinted chip showing whether a person is a teacher or a student. */
+function RoleBadge({ role }) {
+    return (
+        <Badge color={role === "teacher" ? "var(--t-warn)" : "var(--t-ac2)"} className="!text-[8px] !py-0 !px-1">
+            {role === "teacher" ? "TEACHER" : "STUDENT"}
+        </Badge>
+    );
+}
 
-function CreateGroupModal({ onClose, onCreate }) {
+/* Search bar for finding students/teachers — picking one opens a 1v1 chat. */
+function PeopleSearch({ onSelect }) {
+    const [query, setQuery] = useState("");
+    const [open, setOpen] = useState(false);
+    const results = searchPeople(query);
+
+    function pick(person) {
+        onSelect(person);
+        setQuery("");
+        setOpen(false);
+    }
+
+    return (
+        <div className="relative">
+            <div className="flex items-center bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)] py-1.5 px-2.5 gap-2 focus-within:border-[color:var(--t-ac)] transition-colors duration-150">
+                <img src={IMG.search} className="w-[11px] h-[11px] object-fill shrink-0" />
+                <input
+                    value={query}
+                    onChange={(e) => {
+                        setQuery(e.target.value);
+                        setOpen(true);
+                    }}
+                    onFocus={() => setOpen(true)}
+                    onBlur={() => setOpen(false)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter" && results[0]) {
+                            e.preventDefault();
+                            pick(results[0]);
+                        }
+                        if (e.key === "Escape") e.currentTarget.blur();
+                    }}
+                    placeholder="Search students / teachers..."
+                    className="bg-transparent outline-none text-[color:var(--t-tx0)] placeholder-[color:var(--t-tx2)] text-[11px] w-full min-w-0"
+                />
+            </div>
+
+            {open && (
+                <div
+                    role="listbox"
+                    className="absolute top-full left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)]"
+                    style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.5), 0 0 20px color-mix(in srgb, var(--t-glow) 20%, transparent)" }}
+                >
+                    {results.length === 0 && <p className="text-[color:var(--t-tx2)] text-[11px] px-2.5 py-3 text-center">No one matches “{query.trim()}”.</p>}
+                    {results.map((p) => (
+                        <button
+                            key={p.id}
+                            type="button"
+                            role="option"
+                            // mousedown fires before the input's blur closes the list
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                pick(p);
+                            }}
+                            className="flex items-center gap-2 w-full text-left px-2.5 py-1.5 hover:bg-[var(--t-bg3)] transition-colors duration-100"
+                        >
+                            <GroupAvatar color={colorForString(p.name)} name={p.name} className="w-6 h-6 text-[8px]" />
+                            <div className="flex-1 min-w-0">
+                                <span className="text-[color:var(--t-tx0)] text-[11px] font-bold truncate block">{p.name}</span>
+                                <span className="text-[color:var(--t-tx2)] text-[10px] truncate block">@{p.username}</span>
+                            </div>
+                            <RoleBadge role={p.role} />
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* Create a squad group chat: a name plus the people to invite. */
+function CreateSquadModal({ onClose, onCreate }) {
     const [name, setName] = useState("");
-    const [type, setType] = useState("classroom");
+    const [query, setQuery] = useState("");
+    const [picked, setPicked] = useState([]); // person ids
+
+    function toggle(id) {
+        setPicked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    }
 
     function submit(e) {
         e.preventDefault();
         if (!name.trim()) return;
-        onCreate(name.trim(), type);
+        onCreate(name.trim(), PEOPLE.filter((p) => picked.includes(p.id)));
     }
 
-    const isDm = type === "dm";
+    const results = searchPeople(query);
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
@@ -529,58 +619,70 @@ function CreateGroupModal({ onClose, onCreate }) {
                 style={{ boxShadow: "6px 6px 0px var(--t-shadow), 0 0 40px color-mix(in srgb, var(--t-glow) 18%, transparent)" }}
             >
                 <div className="flex justify-between items-center mb-1">
-                    <span className="flex items-center gap-2 text-[color:var(--t-tx0)] text-sm font-bold uppercase tracking-wider"><span className="text-[color:var(--t-ac)]">✉</span>NEW MESSAGE</span>
+                    <span className="flex items-center gap-2 text-[color:var(--t-tx0)] text-sm font-bold uppercase tracking-wider"><span className="text-[color:var(--t-ac)]">▲</span>NEW SQUAD</span>
                     <button type="button" onClick={onClose} className="text-[color:var(--t-mtx)] text-lg leading-none hover:text-[color:var(--t-ac2)] transition-colors">
                         ×
                     </button>
                 </div>
 
+                <label className="flex flex-col gap-1">
+                    <span className="text-[color:var(--t-mtx)] text-[11px]">Squad name</span>
+                    <input
+                        autoFocus
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="e.g. Discrete Math Study Squad"
+                        className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac)] transition-colors"
+                    />
+                </label>
+
                 <div className="flex flex-col gap-1.5">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">Type</span>
-                    <div className="flex gap-1.5">
-                        {CHAT_TYPES.map((t) => {
-                            const active = type === t.id;
+                    <span className="flex items-center justify-between text-[color:var(--t-mtx)] text-[11px]">
+                        Add members
+                        {picked.length > 0 && <Badge color="var(--t-ac)">{picked.length} PICKED</Badge>}
+                    </span>
+                    <input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search students / teachers..."
+                        className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac)] transition-colors"
+                    />
+                    <div className="flex flex-col max-h-48 overflow-y-auto border border-solid border-[color:var(--t-mbd)]">
+                        {results.length === 0 && <p className="text-[color:var(--t-mtx)] text-[11px] px-2.5 py-3 text-center">No one matches.</p>}
+                        {results.map((p) => {
+                            const on = picked.includes(p.id);
                             return (
                                 <button
+                                    key={p.id}
                                     type="button"
-                                    key={t.id}
-                                    onClick={() => setType(t.id)}
-                                    className="flex-1 text-[11px] font-bold py-2 border border-solid transition-all duration-150 active:scale-95"
-                                    style={{
-                                        backgroundColor: active ? withAlpha(t.color, "22") : "var(--t-in0)",
-                                        borderColor: active ? t.color : "var(--t-mbd)",
-                                        color: active ? t.color : "var(--t-mtx)",
-                                    }}
+                                    onClick={() => toggle(p.id)}
+                                    className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 transition-colors duration-100 ${on ? "bg-[var(--t-in1)]" : "hover:bg-[var(--t-in1)]"}`}
                                 >
-                                    {t.label}
+                                    <span
+                                        className="flex items-center justify-center w-3.5 h-3.5 border border-solid shrink-0"
+                                        style={{ borderColor: on ? "var(--t-ac)" : "var(--t-mbd2)", backgroundColor: on ? "var(--t-ac)" : "transparent", color: "var(--t-onac)" }}
+                                    >
+                                        {on && (
+                                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="20 6 9 17 4 12" />
+                                            </svg>
+                                        )}
+                                    </span>
+                                    <span className="flex-1 min-w-0 text-[color:var(--t-tx0)] text-[11px] truncate">{p.name}</span>
+                                    <RoleBadge role={p.role} />
                                 </button>
                             );
                         })}
                     </div>
                 </div>
 
-                <label className="flex flex-col gap-1">
-                    <span className="text-[color:var(--t-mtx)] text-[11px]">{isDm ? "Person's name" : "Name"}</span>
-                    <input
-                        autoFocus
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder={isDm ? "e.g. Riley P." : "e.g. Discrete Math Study Group"}
-                        className="bg-[var(--t-in0)] border border-solid border-[color:var(--t-mbd)] text-[color:var(--t-tx0)] text-xs py-2 px-3 outline-none focus:border-[color:var(--t-ac)] transition-colors"
-                    />
-                </label>
-
-                <button
-                    type="submit"
-                    className={`mt-1 text-xs py-2 ${PRIMARY_BTN}`}
-                >
-                    CREATE
+                <button type="submit" disabled={!name.trim()} className={`mt-1 text-xs py-2 disabled:opacity-40 disabled:cursor-not-allowed ${PRIMARY_BTN}`}>
+                    CREATE SQUAD
                 </button>
             </form>
         </div>
     );
 }
-
 
 function toISODate(d) {
     const p = (n) => String(n).padStart(2, "0");
@@ -876,6 +978,7 @@ function GroupDetailModal({
     onAddMember,
     onSubmitTask,
     onPromote,
+    onOpenProfile,
     isAdmin,
 }) {
     if (!group) return null;
@@ -1058,7 +1161,7 @@ function GroupDetailModal({
                                     key={m.id}
                                     className="flex justify-between items-center bg-[var(--t-in0)] p-2.5 border border-solid border-[color:var(--t-mbd)] mb-1.5 transition-colors hover:border-[color:var(--t-mbd2)]"
                                 >
-                                    <span className="text-[color:var(--t-tx0)] text-xs">{m.name}</span>
+                                    <PersonName name={m.name} onOpenProfile={onOpenProfile} className="text-[color:var(--t-tx0)] text-xs text-left" />
                                     <div className="flex items-center gap-2">
                                         {!isClassroom && !isDm && (
                                             <Badge color={m.role === "admin" ? "var(--t-ac)" : "var(--t-mtx)"}>{m.role.toUpperCase()}</Badge>
@@ -1153,7 +1256,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
     const [activeGroupId, setActiveGroupId] = useState(firstGroups.current[0]?.id || null);
     const [openPanel, setOpenPanel] = useState(null); // which tab is open in the pop-up modal, or null
     const [messageText, setMessageText] = useState("");
-    const [showCreateGroup, setShowCreateGroup] = useState(false);
+    const [showCreateSquad, setShowCreateSquad] = useState(false);
     const [showAddMember, setShowAddMember] = useState(false);
     const [showNewTask, setShowNewTask] = useState(false);
     const [filter, setFilter] = useState("all"); // all | classroom | dm | squad
@@ -1199,32 +1302,47 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
         setGroups((prev) => prev.map((g) => (g.id === activeGroupId ? fn(g) : g)));
     }
 
-    function createGroup(name, type) {
+    function createSquad(name, people) {
         const id = `g${Date.now()}`;
-        const you = { id: "you", name: "You", role: type === "squad" ? "admin" : "member" };
-        const base = {
+        const fresh = {
             id,
             name,
-            type,
+            type: "squad",
             color: colorForString(name),
-            members: [you],
+            members: [{ id: "you", name: "You", role: "admin" }, ...people.map((p) => ({ id: p.id, name: p.name, role: "member" }))],
             messages: [],
+            files: [],
+            tasks: [],
         };
-        let fresh;
-        if (type === "classroom") {
-            fresh = { ...base, materials: [], tasks: [] };
-        } else if (type === "dm") {
-            fresh = {
-                ...base,
-                members: [you, { id: `m${Date.now()}`, name, role: "member" }],
-            };
-        } else {
-            fresh = { ...base, files: [], tasks: [] };
-        }
         setGroups((prev) => [fresh, ...prev]);
         setActiveGroupId(id);
         setFilter("all");
-        setShowCreateGroup(false);
+        setShowCreateSquad(false);
+        setOpenPanel(null);
+    }
+
+    /* Messenger-style: reuse the 1v1 chat with this person, or start a new one. */
+    function openDmWith(person) {
+        const existing = groups.find((g) => g.type === "dm" && g.members.some((m) => m.id === person.id || m.name === person.name));
+        let id = existing?.id;
+        if (!existing) {
+            id = `g${Date.now()}`;
+            const fresh = {
+                id,
+                name: person.name,
+                type: "dm",
+                color: colorForString(person.name),
+                members: [
+                    { id: "you", name: "You", role: "member" },
+                    { id: person.id, name: person.name, role: "member" },
+                ],
+                messages: [],
+            };
+            setGroups((prev) => [fresh, ...prev]);
+        }
+        setShowQuiz(false);
+        setActiveGroupId(id);
+        setFilter("all");
         setOpenPanel(null);
     }
 
@@ -1318,6 +1436,13 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
             setFallbackPage("dashboard");
         }
     }
+
+    function openProfile(personId) {
+
+        navigate(`/profile/${personId}`);
+
+    }
+
 
     function openTaskInClassroom(link) {
         requestOpenClassroom({ classId: link.classId, classworkId: link.classworkId, tab: "classwork" });
@@ -1509,7 +1634,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                     )}
                                 </button>
 
-                                <button onClick={() => setSettingsOpen(true)} className="flex flex-col shrink-0 items-start px-1 sm:px-2" aria-label="Profile / Settings">
+                                <button onClick={() => navigate("/profile")} className="flex flex-col shrink-0 items-start px-1 sm:px-2" aria-label="My profile">
                                     <div
                                         className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"
                                         style={{ boxShadow: "0px 1px 2px #0000000D" }}
@@ -1546,20 +1671,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                         ))}
                                     </div>
                                 </div>
-                                <div className="mt-4">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <span className={LABEL}>Chat mix</span>
-                                        <span className="text-[11px] font-bold text-[color:var(--t-ac)]">{groups.length} TOTAL</span>
-                                    </div>
-                                    <div className="relative flex w-full h-3.5 bg-[var(--t-bg0)] border border-solid border-[color:var(--t-bd0)]">
-                                        {chatMix
-                                            .filter((m) => m.n > 0)
-                                            .map((m) => (
-                                                <div key={m.key} className="h-full" style={{ width: `${(m.n / groups.length) * 100}%`, backgroundColor: m.color }} />
-                                            ))}
-                                        <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: SEGMENTS }} />
-                                    </div>
-                                </div>
+ 
                             </section>
 
                             <div className="flex flex-col sm:flex-row items-start self-stretch gap-6">
@@ -1570,15 +1682,23 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                 >
                                     <PanelHeader icon="✉" title="MY MESSAGES" right={<Badge color="var(--t-warn)">{visibleGroups.length}</Badge>} />
                                     <div className="flex flex-col gap-2 p-3">
-                                        <button
-                                            onClick={() => setShowCreateGroup(true)}
-                                            className={`flex justify-center items-center py-2 gap-1.5 ${PRIMARY_BTN}`}
-                                        >
-                                            <span className="text-xs">+ NEW MESSAGE</span>
-                                        </button>
+                                        {/* Find a student / teacher and chat with them 1v1 */}
+                                        <PeopleSearch onSelect={openDmWith} />
 
-                                        {/* Dropdown filter */}
-                                        <FilterDropdown value={filter} onChange={setFilter} />
+                                        {/* Dropdown filter + create squad */}
+                                        <div className="flex items-stretch gap-1.5">
+                                            <div className="flex-1 min-w-0">
+                                                <FilterDropdown value={filter} onChange={setFilter} />
+                                            </div>
+                                            <button
+                                                onClick={() => setShowCreateSquad(true)}
+                                                aria-label="Create a squad group chat"
+                                                title="Create a squad group chat"
+                                                className={`flex items-center justify-center w-8 shrink-0 text-base leading-none ${PRIMARY_BTN}`}
+                                            >
+                                                +
+                                            </button>
+                                        </div>
 
                                         <p className="text-[color:var(--t-tx2)] text-[10px] italic px-0.5 opacity-80">Right-click a message for quick access.</p>
 
@@ -1695,7 +1815,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                                                 return (
                                                                     <div key={m.id} className="flex flex-col gap-0.5 items-start">
                                                                         <div className="flex items-center gap-1.5">
-                                                                            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: colorForString(m.senderName) }}>{m.senderName}</span>
+                                                                            <PersonName name={m.senderName} onOpenProfile={openProfile} className="text-[10px] font-bold uppercase tracking-wider" style={{ color: colorForString(m.senderName) }} />
                                                                             <span className="text-[color:var(--t-tx2)] text-[10px] opacity-70">{m.time}</span>
                                                                         </div>
                                                                         <button
@@ -1727,7 +1847,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                                             return (
                                                                 <div key={m.id} className={`flex flex-col gap-0.5 ${mine ? "items-end" : "items-start"}`}>
                                                                     <div className="flex items-center gap-1.5">
-                                                                        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: mine ? "var(--t-ac)" : colorForString(m.senderName) }}>{m.senderName}</span>
+                                                                        <PersonName name={m.senderName} onOpenProfile={openProfile} className="text-[10px] font-bold uppercase tracking-wider" style={{ color: mine ? "var(--t-ac)" : colorForString(m.senderName) }} />
                                                                         <span className="text-[color:var(--t-tx2)] text-[10px] opacity-70">{m.time}</span>
                                                                     </div>
                                                                     <div
@@ -1799,6 +1919,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                     onAddMember={() => setShowAddMember(true)}
                     onSubmitTask={submitTask}
                     onPromote={promoteToAdmin}
+                    onOpenProfile={openProfile}
                 />
             )}
 
@@ -1818,7 +1939,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                     );
                 })()}
 
-            {showCreateGroup && <CreateGroupModal onClose={() => setShowCreateGroup(false)} onCreate={createGroup} />}
+            {showCreateSquad && <CreateSquadModal onClose={() => setShowCreateSquad(false)} onCreate={createSquad} />}
             {showAddMember && <AddMemberModal onClose={() => setShowAddMember(false)} onAdd={addMember} />}
             {showNewTask && <NewTaskModal onClose={() => setShowNewTask(false)} onCreate={createTask} />}
 

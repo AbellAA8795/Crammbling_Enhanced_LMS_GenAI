@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import personIcon from "../assets/person.svg";
 import googleIcon from "../assets/google-icon.svg";
 import { AuthCard, Field, primaryButton } from "../components/AuthShared";
+import { startPagePath } from "../components/Settings";
 
 function Login() {
   const navigate = useNavigate();
@@ -49,7 +50,7 @@ function Login() {
     }
 
     setErrors({ username: "", password: "" });
-    navigate("/dashboard");
+    navigate(startPagePath());
   };
 
   return (
@@ -104,7 +105,7 @@ function Login() {
 
       <button
         type="button"
-        onClick={() => navigate("/dashboard")}
+        onClick={() => navigate(startPagePath())}
         className="btn w-full py-2.5 border border-lime/50 text-lime hover:bg-lime/10"
       >
         <img src={googleIcon} alt="" className="w-3.5 h-3.5" />

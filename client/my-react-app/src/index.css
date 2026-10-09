@@ -370,3 +370,12 @@ button {
     border-color: var(--t-tx2, #9b9086);
   }
 }
+/* Settings → Preferences → Reduce motion (class set by components/Settings.jsx) */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}

@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import passport from "./config/passport.js";
 import googleAuthRoutes from "./routes/Authentication/googleAuth.route.js";
+import pool from "./config/database.js";
+import { isRedisReady } from "./config/redis.js";
 
 const app = express();
 app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:5173", credentials: true }));
@@ -23,6 +25,19 @@ import personalizationRoutes from "./routes/Personalization_services/personaliza
 
 app.get("/", (req, res) => {
     res.send("Crammbling backend is running!");
+});
+
+// Used by Docker's healthcheck and the API tests. 503 when the database is
+// unreachable; Redis is only a cache, so it being down is reported but not fatal.
+app.get("/api/health", async (req, res) => {
+    let db = "up";
+    try {
+        await pool.query("SELECT 1");
+    } catch {
+        db = "down";
+    }
+    const redis = isRedisReady() ? "up" : "down";
+    res.status(db === "up" ? 200 : 503).json({ status: db === "up" ? "ok" : "error", db, redis });
 });
 
 // middleware

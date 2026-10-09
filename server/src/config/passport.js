@@ -2,7 +2,14 @@ import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { findOrCreateGoogleUser } from "../models/Authentication/googleAuth.model.js";
 
-passport.use(new GoogleStrategy(
+// Google sign-in is optional for local development: without credentials the
+// strategy can't be created (it throws and would crash the whole API), so
+// skip it and let the /api/auth/google routes answer 503 instead.
+export const googleAuthEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+
+if (!googleAuthEnabled) {
+    console.warn("Google sign-in disabled: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable it.");
+} else passport.use(new GoogleStrategy(
     {
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,

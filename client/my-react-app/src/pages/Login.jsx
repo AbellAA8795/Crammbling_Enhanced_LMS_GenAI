@@ -130,7 +130,7 @@ function Login() {
         >
           Create account
         </button>
-      </p>
+      </div>
     </AuthCard>
   );
 }

@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Panel } from "../components/Panel";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import Settings, { useSettings } from "../components/Settings";
+import NotificationBell from "../components/NotificationBell";
 import { Sidebar, NAV_IMG } from "./Dashboard";
 import { useTheme, withAlpha } from "./Theme";
 import {
@@ -561,15 +562,7 @@ export default function Profile() {
                         <PeopleSearchBar inputRef={searchRef} onOpenProfile={openProfile} friends={myFriends} />
                     </div>
                     <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                        <button type="button" className="relative shrink-0" onClick={() => setNotifOpen((v) => !v)} aria-label="Notifications">
-                            <img src={NAV_IMG.avatar} alt="" className="w-8 h-8 object-fill" />
-                            {notifOpen && (
-                                <div className="absolute right-0 top-10 z-50 w-56 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-3 text-left shadow-lg">
-                                    <span className="text-[color:var(--t-tx0)] text-xs font-bold block mb-2">Notifications</span>
-                                    <span className="text-[color:var(--t-tx2)] text-[11px] block">Jess R. earned the Speed Run badge.</span>
-                                </div>
-                            )}
-                        </button>
+                        <NotificationBell icon={NAV_IMG.avatar} />
                         <button type="button" onClick={() => openProfile("you")} className="flex flex-col shrink-0 items-start px-1 sm:px-2" aria-label="My profile">
                             <div
                                 className="flex flex-col items-center bg-[var(--t-ac)] py-[5px] px-[7px] border border-solid border-[color:var(--t-bd0)]"

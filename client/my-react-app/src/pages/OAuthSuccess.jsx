@@ -11,7 +11,7 @@ function OAuthSuccess() {
             localStorage.setItem("token", token);
             navigate("/dashboard");
         } else {
-            navigate("/login");
+            navigate("/");
         }
     }, []);
 

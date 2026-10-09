@@ -7,7 +7,7 @@ export async function createUser(
     phonenumber
 ) {
     const query = `
-        CALL create_user_procedure($1, $2, $3, $4)
+        CALL auth.create_user_procedure($1, $2, $3, $4)
     `;
 
     const values = [

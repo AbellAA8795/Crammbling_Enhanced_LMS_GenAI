@@ -248,7 +248,8 @@ function Registration() {
           </>
         ) : (
           <EmailVerifyForm
-            email={values.email.trim()}
+            initialEmail={values.email.trim()}
+            lockEmail
             submitLabel="Verify & Create Account"
             onVerified={handleVerified}
             footer={

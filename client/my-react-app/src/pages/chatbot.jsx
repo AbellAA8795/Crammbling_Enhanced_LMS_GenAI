@@ -4,7 +4,10 @@ import Dashboard from "./Dashboard";
 import Personalized from "./personalized";
 import GroupCollab from "./group_collab";
 import { ThemePicker, useTheme, CloseIcon } from "./Theme";
-import { useNavigate } from "react-router-dom";
+import LogoutConfirmModal from "../components/LogoutConfirmModal";
+import Settings from "../components/Settings";
+import NotificationBell from "../components/NotificationBell";
+import QuizArena from "./QuizArena";
 import { listChats, getChatMessages, uploadChatFile } from "../api/chat";
 import { streamChatMessage } from "../api/chatStream";
 
@@ -298,6 +301,9 @@ function Message({ msg }) {
     return new Date(isoString).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+// sessionStorage key for the chat that was open last (per browser tab).
+const ACTIVE_CHAT_KEY = "crammbling-active-chat";
+
 function makeDraftConversation() {
     return {
         id: `draft_${Date.now()}`,
@@ -325,6 +331,9 @@ export default function Chatbot({ onNavigate } = {}) {
     const [isThinking, setIsThinking] = useState(false);
     const [queuePosition, setQueuePosition] = useState(null);
     const [sendError, setSendError] = useState("");
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+    const [showQuiz, setShowQuiz] = useState(false); // Quiz Arena placeholder shown inside the page
+    const [notifOpen, setNotifOpen] = useState(false);
 
     const fileInputRef = useRef(null);
     const imageInputRef = useRef(null);
@@ -337,16 +346,37 @@ export default function Chatbot({ onNavigate } = {}) {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }, [active?.messages, isThinking]);
 
+    // Remember the open chat so leaving the page (or refreshing) and coming back
+    // reopens it instead of a blank "New conversation".
+    const restoredRef = useRef(false);
+    useEffect(() => {
+        if (!restoredRef.current) return; // don't overwrite the saved chat before it's restored
+        try {
+            if (active?.backendId) sessionStorage.setItem(ACTIVE_CHAT_KEY, String(active.backendId));
+            else sessionStorage.removeItem(ACTIVE_CHAT_KEY);
+        } catch {
+            /* storage unavailable — the page just opens a new chat next time */
+        }
+    }, [active?.backendId]);
+
     useEffect(() => {
         const token = localStorage.getItem("token");
         if (!token) {
-            navigate("/login");
+            navigate("/");
             return;
         }
-        loadChatList();
+        loadChatList({ restore: true });
     }, []);
 
-    async function loadChatList() {
+    async function loadChatList({ restore = false } = {}) {
+        let savedId = null;
+        if (restore) {
+            try {
+                savedId = sessionStorage.getItem(ACTIVE_CHAT_KEY);
+            } catch {
+                /* storage unavailable */
+            }
+        }
         try {
             const data = await listChats();
             const loaded = data.data.map((c) => ({
@@ -357,12 +387,32 @@ export default function Chatbot({ onNavigate } = {}) {
                 messages: [],
                 messagesLoaded: false,
             }));
+            const reopen = savedId && loaded.some((c) => c.id === savedId) ? savedId : null;
             setConversations((prev) => {
-                const draft = prev.find((c) => c.backendId === null);
-                return draft ? [draft, ...loaded] : loaded.length ? loaded : [makeDraftConversation()];
+                // Keep messages that are already on screen; the list only refreshes titles/order.
+                const shown = new Map(prev.filter((c) => c.messagesLoaded).map((c) => [c.id, c]));
+                const merged = loaded.map((c) => (shown.has(c.id) ? { ...c, messages: shown.get(c.id).messages, messagesLoaded: true } : c));
+                const draft = reopen ? null : prev.find((c) => c.backendId === null);
+                return draft ? [draft, ...merged] : merged.length ? merged : [makeDraftConversation()];
             });
+            if (reopen) {
+                setActiveId(reopen);
+                loadMessages(reopen);
+            }
         } catch (err) {
             console.error("Failed to load chats:", err.message);
+        } finally {
+            if (restore) restoredRef.current = true;
+        }
+    }
+
+    async function loadMessages(id) {
+        try {
+            const data = await getChatMessages(Number(id));
+            const messages = data.data.map((m) => ({ role: m.role, text: m.content }));
+            setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, messages, messagesLoaded: true } : c)));
+        } catch (err) {
+            console.error("Failed to load chat history:", err.message);
         }
     }
 
@@ -378,16 +428,7 @@ export default function Chatbot({ onNavigate } = {}) {
 
         const convo = conversations.find((c) => c.id === id);
         if (!convo || convo.messagesLoaded || convo.backendId === null) return;
-
-        try {
-            const data = await getChatMessages(convo.backendId);
-            const messages = data.data.map((m) => ({ role: m.role, text: m.content }));
-            setConversations((prev) =>
-                prev.map((c) => (c.id === id ? { ...c, messages, messagesLoaded: true } : c))
-            );
-        } catch (err) {
-            console.error("Failed to load chat history:", err.message);
-        }
+        loadMessages(id);
     }
 
     function handleNewChat() {
@@ -690,15 +731,7 @@ export default function Chatbot({ onNavigate } = {}) {
                             <span className="text-[color:var(--t-ac)] text-[11px] font-bold hidden xs:inline">3,420 XP</span>
                         </div>
 
-                        <button className="relative shrink-0" onClick={() => setNotifOpen((v) => !v)} aria-label="Notifications">
-                            <img src={NAV_IMG.avatar} className="w-8 h-8 object-fill" />
-                            {notifOpen && (
-                                <div className="absolute right-0 top-10 z-50 w-56 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-3 text-left shadow-lg">
-                                    <span className="text-[color:var(--t-tx0)] text-xs font-bold block mb-2">Notifications</span>
-                                    <span className="text-[color:var(--t-tx2)] text-[11px] block">CS240 Midterm is coming up on Mar 20.</span>
-                                </div>
-                            )}
-                        </button>
+                        <NotificationBell icon={NAV_IMG.avatar} />
 
                         <button onClick={() => navigate("/profile")} className="flex flex-col shrink-0 items-start px-1 sm:px-2" aria-label="My profile">
                             <div

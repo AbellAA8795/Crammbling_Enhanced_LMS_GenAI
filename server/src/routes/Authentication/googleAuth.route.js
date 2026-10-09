@@ -1,8 +1,17 @@
 import express from "express";
-import passport from "../../config/passport.js";
+import passport, { googleAuthEnabled } from "../../config/passport.js";
 import { googleCallbackController } from "../../controllers/Authentication/googleAuth.controller.js";
 
 const router = express.Router();
+
+// No Google credentials configured (see config/passport.js).
+router.use((req, res, next) => {
+    if (googleAuthEnabled) return next();
+    return res.status(503).json({
+        success: false,
+        message: "Google sign-in isn't configured on this server. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET."
+    });
+});
 
 // Step 1: kick off the Google login
 router.get(

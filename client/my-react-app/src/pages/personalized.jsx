@@ -6,6 +6,7 @@ import GroupCollab from "./group_collab";
 import QuizArena from "./QuizArena";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import Settings from "../components/Settings";
+import NotificationBell from "../components/NotificationBell";
 import { useTheme, withAlpha, CloseIcon, MenuIcon } from "./Theme";
 /* ---------------------------------------------------------
    Static assets (kept identical to the original design)
@@ -1135,17 +1136,7 @@ export default function CrammblingDashboard({ onNavigateToChatbot, onNavigateToG
                   <span className="text-[color:var(--t-ac)] text-[11px] font-bold hidden xs:inline">3,420 XP</span>
                 </div>
 
-                <button className="relative shrink-0" onClick={() => setNotifOpen((v) => !v)} aria-label="Notifications">
-                  <img src={IMG.avatar} className="w-8 h-8 object-fill" />
-                  {notifOpen && (
-                    <div className="absolute right-0 top-10 z-50 w-56 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-3 text-left shadow-lg">
-                      <span className="text-[color:var(--t-tx0)] text-xs font-bold block mb-2">Notifications</span>
-                      <span className="text-[color:var(--t-tx2)] text-[11px] block">
-                        CS240 Midterm is coming up on Mar 20.
-                      </span>
-                    </div>
-                  )}
-                </button>
+                <NotificationBell icon={IMG.avatar} />
 
                 <button
                   onClick={() => navigate("/profile")}

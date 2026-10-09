@@ -1,5 +1,9 @@
+import fs from "fs";
 import multer from "multer";
 import path from "path";
+
+// uploads/ is git-ignored, so a fresh clone (or Docker container) doesn't have it.
+fs.mkdirSync("uploads", { recursive: true });
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB per file
 const ALLOWED_MIME_TYPES = [
@@ -11,7 +15,7 @@ const ALLOWED_MIME_TYPES = [
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, "uploads/"); // make sure this folder exists in your project root
+        cb(null, "uploads/"); // created above if missing
     },
     filename: (req, file, cb) => {
         const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;

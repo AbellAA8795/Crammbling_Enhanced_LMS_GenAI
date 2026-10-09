@@ -18,7 +18,7 @@ You do **not** need to install Node.js, PostgreSQL, Redis or Ollama. Docker runs
 8. [Working with the database](#8-working-with-the-database)
 9. [The AI chatbot (Ollama)](#9-the-ai-chatbot-ollama)
 10. [Google login, Google Calendar and email](#10-google-login-google-calendar-and-email)
-11. [Testing the API with Postman](#11-testing-the-api-with-postman)
+11. [Testing the API](#11-testing-the-api)
 12. [Troubleshooting](#12-troubleshooting)
 13. [Command cheat sheet](#13-command-cheat-sheet)
 
@@ -200,13 +200,24 @@ Go through this checklist once after your first start:
 
 | Check | How | Expected |
 |---|---|---|
-| All containers are up | `docker compose ps` | `client`, `server` Up; `db`, `redis` Up **(healthy)** |
+| All containers are up | `docker compose ps` | `client` Up; `server`, `db`, `redis` Up **(healthy)** |
 | API responds | Open http://localhost:5000 | `Crammbling backend is running!` |
+| API can reach the database and Redis | Open http://localhost:5000/api/health | `{"status":"ok","db":"up","redis":"up"}` |
+| The API tests pass | `docker compose exec server npm test` | `fail 0` at the end (see [section 11](#11-testing-the-api)) |
 | Web app loads | Open http://localhost:5173 | The Crammbling login page |
 | Database was created | `docker compose exec db psql -U postgres -d Crammbling_DB -c "\dn"` | Schemas `auth`, `chatbot`, `social`, `notification`, `personalization`, `audit` |
 | Live reload works | Save any file in `server/src/` | Server log shows `restarting due to changes...` |
 
-Your database starts **empty** (no users). Register a new account in the app to start testing. If you haven't set up email yet, see [section 10](#email-for-registration-otp) for how to verify the account without it.
+Your database starts with four **test accounts** (from `docker/db/init/03_test_accounts.sql`), so you can log in right away without setting up email. They all use the password `Password123!`:
+
+| Email | Username | Role |
+|---|---|---|
+| `student1@crammbling.test` | `test_student1` | student |
+| `student2@crammbling.test` | `test_student2` | student |
+| `teacher@crammbling.test` | `test_teacher` | teacher |
+| `admin@crammbling.test` | `test_admin` | super_admin |
+
+They exist only in your local Docker database. You can still register your own account too; if you haven't set up email, see [section 10](#email-for-registration-otp) for how to verify it without email.
 
 ---
 
@@ -300,7 +311,15 @@ To remove a package: `docker compose exec server npm uninstall <package-name>`.
 
 The containers must be running for pgAdmin to connect.
 
-**Without pgAdmin**, you can use the SQL shell in the container:
+**Without pgAdmin**, there's a database viewer that runs in your browser (Adminer). Start it with:
+
+```bash
+docker compose --profile tools up -d adminer
+```
+
+Open http://localhost:8080 and log in with **System** `PostgreSQL`, **Server** `db`, **Username** `postgres`, **Password** your `DB_PASSWORD` (default `postgres`), **Database** `Crammbling_DB`. Stop it with `docker compose stop adminer`.
+
+Or use the SQL shell in the container:
 
 ```bash
 docker compose exec db psql -U postgres -d Crammbling_DB
@@ -316,6 +335,7 @@ When the `db` container starts with an **empty** data volume, PostgreSQL runs th
 |---|---|
 | `01_schema.sql` | Every schema, type, table, index, constraint, procedure, function and trigger |
 | `02_seed.sql` | Starting data: the chatbot system prompts |
+| `03_test_accounts.sql` | Four fake test accounts for local development (see [section 5](#5-check-that-everything-works)) |
 
 These scripts run **only once**, the first time. After that, your data volume exists and they're skipped, which is why your data survives restarts.
 
@@ -428,6 +448,8 @@ Then restart the server: `docker compose up -d server`.
 
 ### Google login and Google Calendar
 
+These are **optional**. Without them the server still starts and everything else works; only "Sign in with Google" and Google Calendar sync are off (the `/api/auth/google` routes answer `503`, and the server log says `Google sign-in disabled`).
+
 1. Ask the team lead for the development `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, and put them in `.env`. **Never commit them or post them in public channels.**
 2. Restart the server: `docker compose up -d server`.
 
@@ -477,12 +499,46 @@ Use `'super_admin'` for an admin. Log out and back in so your new token includes
 
 ---
 
-## 11. Testing the API with Postman
+## 11. Testing the API
+
+### 11.1 Automated API tests
+
+`server/tests/api.test.js` checks the whole backend end to end: it calls the running API over HTTP, so every test goes through Express, the PostgreSQL procedures, functions and triggers, and Redis together. It covers:
+
+- **health**: the API can reach the database and Redis
+- **authentication**: login validation, wrong password, tokens, protected routes
+- **roles**: student vs teacher/super_admin access, the active chatbot prompt
+- **personalization**: study events (create, read, update, delete), the trigger that adds a sprint task for each study event, moving and deleting sprint tasks, ownership checks
+- **social**: user search, friend requests (send, duplicate, accept), both friends lists updating, removing a friend
+- **notifications**: list, unread count, mark all as read, and the notification sent when a friend request is accepted
+
+Run it with the containers up:
+
+```bash
+docker compose exec server npm test
+```
+
+The end of the output shows `pass` and `fail` counts. A failed test prints what it expected and what it got; check `docker compose logs --tail 50 server` for the matching error.
+
+Things to know:
+
+- It logs in with the [test accounts](#5-check-that-everything-works), so they must exist. If your database was created before `03_test_accounts.sql` was added, load them once:
+
+  ```bash
+  docker compose exec -T db psql -U postgres -d Crammbling_DB < docker/db/init/03_test_accounts.sql
+  ```
+
+- Everything the tests create is named `apitest-...` and deleted again, so you can re-run them on the same database.
+- The API's rate limits allow about **20 runs per hour** (friend requests are limited to 20 per hour). After that the social tests fail with status `429`; wait, or restart the server (`docker compose restart server`) to reset the limits.
+- The chatbot itself (Ollama) isn't tested here because it needs the AI model. Use Postman or the app for that.
+- **When you add an endpoint, add a test for it** in `server/tests/`. Any file ending in `.test.js` there is picked up by `npm test`.
+
+### 11.2 Testing by hand with Postman
 
 The API runs at `http://localhost:5000`, the same address as without Docker, so the team's Postman collections in `postman/` work unchanged.
 
-1. `POST http://localhost:5000/api/login` with your test account's email and password.
-2. Copy the token from the response.
+1. `POST http://localhost:5000/api/login` with a test account, for example `{ "email": "student1@crammbling.test", "password": "Password123!" }`.
+2. Copy the `token` from the response.
 3. On protected requests, add the header `Authorization: Bearer <token>`.
 
 ---
@@ -508,6 +564,8 @@ docker compose logs --tail 50 server
 | `relation "..." does not exist` | Same as above, or your code is missing the schema name (write `auth.users`, not `users`). |
 | Server keeps restarting (`[nodemon] app crashed`) | A code error. The lines above it in `docker compose logs server` show the file and line. Fix and save; it restarts on its own. |
 | Changes don't reload | Run `docker compose restart server` (or `client`). On Windows, file watching uses polling, so allow 1 to 3 seconds. |
+| `server` shows **(unhealthy)** in `docker compose ps` | The API is up but can't reach the database. Open http://localhost:5000/api/health to see which part is `down`, then check `docker compose logs --tail 50 db`. |
+| API tests fail at `login as student1@crammbling.test failed` | Your database has no test accounts. Load them with the command in [section 11.1](#111-automated-api-tests). |
 | pgAdmin can't connect | The containers must be running. Use port **5433**, not 5432. The password is `DB_PASSWORD` from `.env`. |
 | Chatbot replies with an error or times out | Ollama isn't running or the model isn't downloaded. See [section 9](#9-the-ai-chatbot-ollama). |
 | `no space left on device` | Docker's disk is full. Run `docker system prune` (removes stopped containers and unused images; your database volume is kept). |
@@ -530,7 +588,10 @@ Still stuck? Post in the team chat with the output of `docker compose ps` and `d
 | Restart one service | `docker compose restart server` |
 | Add a backend package | `docker compose exec server npm install <pkg>` |
 | Add a frontend package | `docker compose exec client npm install <pkg>` |
+| Run the API tests | `docker compose exec server npm test` |
+| Check API, database and Redis | open http://localhost:5000/api/health |
 | SQL shell | `docker compose exec db psql -U postgres -d Crammbling_DB` |
+| Database viewer in the browser | `docker compose --profile tools up -d adminer` → http://localhost:8080 |
 | Export schema after a DB change | see [section 8.3](#83-changing-the-database-tables-procedures-functions-triggers) |
 | Reset the database (**deletes data**) | `docker compose down -v` then `docker compose up -d` |
 | Shell inside the server | `docker compose exec server sh` |
@@ -541,4 +602,4 @@ Still stuck? Post in the team chat with the output of `docker compose ps` and `d
 - Don't commit `.env` or paste its contents anywhere public.
 - Don't run `npm install` on your computer for `server/` or `client/` while using Docker. Use `docker compose exec ...`.
 - Don't change the database without updating `docker/db/init/01_schema.sql`.
-- Don't put real user data into `02_seed.sql`.
+- Don't put real user data into `02_seed.sql` or `03_test_accounts.sql`.

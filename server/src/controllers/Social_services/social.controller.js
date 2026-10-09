@@ -115,9 +115,13 @@ export async function sendFriendRequestController(req, res) {
 
 export async function respondToFriendRequestController(req, res) {
   try {
-    console.log("req.user in respondToFriendRequestController:", req.user);
     const requestId = parseInt(req.params.requestId, 10);
     const { action } = req.body;
+
+    // The procedure only returns a status, so look up who sent the request
+    // first (it's one of the responder's incoming requests while still pending).
+    const incoming = await socialModel.getPendingRequests(req.user.id, "incoming");
+    const requesterId = incoming.find((r) => r.request_id === requestId)?.other_user_id;
 
     const { status } = await socialModel.respondToFriendRequest(
       requestId,
@@ -126,13 +130,16 @@ export async function respondToFriendRequestController(req, res) {
       getClientIp(req),
     );
 
-    if (status === "accepted") {
+    if (status === "accepted" && requesterId) {
+      // Both people's friend lists and profiles changed.
       await invalidateFriendsList(req.user.id);
+      await invalidateFriendsList(requesterId);
       await invalidateProfile(req.user.id);
+      await invalidateProfile(requesterId);
 
       // The DB trigger already wrote the notification row — this just
       // delivers it live to the original requester if they're connected.
-      pushNotificationToUser(requesterIdFromRequest, {
+      pushNotificationToUser(requesterId, {
         type: "friend_request_accepted",
         title: "Friend request accepted",
         message: `${req.user.username} accepted your friend request.`,

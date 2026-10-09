@@ -253,7 +253,7 @@ export function EmailVerifyForm({ submitLabel, onVerified, footer, initialEmail 
     return () => clearTimeout(t);
   }, [cooldown]);
 
-  const emailError = hasPreset ? "" : validateEmail(email);
+  const emailError = validateEmail(email);
 
   const codeError = !codeSent
     ? "Send a code to your email first."
@@ -344,7 +344,6 @@ export function EmailVerifyForm({ submitLabel, onVerified, footer, initialEmail 
       )}
 
       <Field
-        first={hasPreset}
         id="verify-code"
         label="Verification Code"
         placeholder="6-digit code"
@@ -360,18 +359,6 @@ export function EmailVerifyForm({ submitLabel, onVerified, footer, initialEmail 
         onBlur={() => touch("code")}
         error={touched.code ? codeError : ""}
         valid={touched.code && !codeError}
-        action={
-          hasPreset ? (
-            <button
-              type="button"
-              onClick={handleSendCode}
-              disabled={cooldown > 0}
-              className="btn btn-cyan whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {sendLabel}
-            </button>
-          ) : undefined
-        }
         hint={
           codeSent
             ? `We sent a 6-digit code to ${email}. Check your inbox.`

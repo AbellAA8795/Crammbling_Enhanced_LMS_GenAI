@@ -7,6 +7,7 @@ import Personalized from "./personalized";
 import { useTheme, withAlpha, CloseIcon, MenuIcon } from "./Theme";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import Settings from "../components/Settings";
+import NotificationBell from "../components/NotificationBell";
 import QuizArena from "./QuizArena";
 import { PEOPLE, searchPeople, findPersonByName } from "./ProfileHub";
 
@@ -684,6 +685,9 @@ function CreateSquadModal({ onClose, onCreate }) {
     );
 }
 
+// Quick-pick point values for a new classroom assignment.
+const POINT_PRESETS = [10, 25, 50, 100];
+
 function toISODate(d) {
     const p = (n) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
@@ -700,7 +704,7 @@ function daysUntil(iso) {
     return Math.round((new Date(`${iso}T00:00:00`) - today) / 86400000);
 }
 
-function NewTaskModal({ isClassroom, onCreate }) {
+function NewTaskModal({ isClassroom, onCreate, onClose }) {
     const [title, setTitle] = useState("");
     const [desc, setDesc] = useState("");
     const [due, setDue] = useState(""); // ISO yyyy-mm-dd from the date field
@@ -1624,15 +1628,7 @@ export default function GroupCollab({ onNavigate, onSyncTaskToSprintBoard }) {
                                     <span className="text-[color:var(--t-ac)] text-[11px] font-bold tracking-wider hidden xs:inline">3,420 XP</span>
                                 </div>
 
-                                <button className="relative shrink-0" onClick={() => setNotifOpen((v) => !v)} aria-label="Notifications">
-                                    <img src={IMG.avatar} className="w-8 h-8 object-fill" />
-                                    {notifOpen && (
-                                        <div className="absolute right-0 top-10 z-50 w-56 bg-[var(--t-bg2)] border border-solid border-[color:var(--t-bd0)] p-3 text-left shadow-lg">
-                                            <span className="text-[color:var(--t-tx0)] text-xs font-bold block mb-2">Notifications</span>
-                                            <span className="text-[color:var(--t-tx2)] text-[11px] block">Jess R. sent a new message in Algorithm Study Squad.</span>
-                                        </div>
-                                    )}
-                                </button>
+                                <NotificationBell icon={IMG.avatar} />
 
                                 <button onClick={() => navigate("/profile")} className="flex flex-col shrink-0 items-start px-1 sm:px-2" aria-label="My profile">
                                     <div

@@ -7,4 +7,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    // Inside Docker, file-change events from the host don't always reach
+    // the container, so docker-compose turns on polling.
+    watch: { usePolling: process.env.VITE_USE_POLLING === 'true' },
+  },
 });

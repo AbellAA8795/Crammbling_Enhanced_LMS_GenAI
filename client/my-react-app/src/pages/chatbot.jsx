@@ -3,10 +3,10 @@ import { useNavigate } from "react-router-dom";
 import Dashboard from "./Dashboard";
 import Personalized from "./personalized";
 import GroupCollab from "./group_collab";
-import { useTheme } from "./Theme";
-import LogoutConfirmModal from "../components/LogoutConfirmModal";
-import Settings from "../components/Settings";
-import QuizArena from "./QuizArena";
+import { ThemePicker, useTheme, CloseIcon } from "./Theme";
+import { useNavigate } from "react-router-dom";
+import { listChats, getChatMessages, uploadChatFile } from "../api/chat";
+import { streamChatMessage } from "../api/chatStream";
 
 /* ------------------------------------------------------------------ */
 /*  Tiny inline icon set (keeps this file dependency-free)             */
@@ -294,42 +294,37 @@ function Message({ msg }) {
 /* ------------------------------------------------------------------ */
 /*  Main chatbot page                                                   */
 /* ------------------------------------------------------------------ */
-const SEED_MESSAGES = [
-    { role: "user", text: "How does DFS detect cycles in a directed graph?" },
-    {
-        role: "assistant",
-        text: "Encountering a node currently active in your recursion stack (BACK-EDGE) confirms a directed cycle.\n\nDFS uses recursive backtracking and 3-color visited marking — O(V + E). Kahn's BFS approach tracks in-degrees; if the processed count doesn't equal V, a cycle exists — also O(V + E).",
-    },
-];
+    function formatTimestamp(isoString) {
+    return new Date(isoString).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
 
-function makeConversation(title, seed = []) {
+function makeDraftConversation() {
     return {
-        id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        title,
-        timestamp: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
-        messages: seed,
+        id: `draft_${Date.now()}`,
+        backendId: null,
+        title: "New conversation",
+        timestamp: formatTimestamp(new Date().toISOString()),
+        messages: [],
+        messagesLoaded: true,
     };
 }
 
 export default function Chatbot({ onNavigate } = {}) {
     const navigate = useNavigate();
-    const [theme, setTheme, rootThemeStyle] = useTheme(); // shared with personalized + group collab
+    const [theme, setTheme, rootThemeStyle] = useTheme();
     const [settingsOpen, setSettingsOpen] = useState(false);
-    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-    const [showQuiz, setShowQuiz] = useState(false); // Quiz Arena placeholder shown inside the page
-    const [notifOpen, setNotifOpen] = useState(false);
-    const [page, setPage] = useState("chatbot"); // "chatbot" | "personalized"
-    const [fallbackPage, setFallbackPage] = useState(null); // "personalized" | "group" | null — used only when no onNavigate prop is passed
-    const [conversations, setConversations] = useState(() => [
-        makeConversation("DFS cycle detection in graphs", SEED_MESSAGES),
-    ]);
+    const [page, setPage] = useState("chatbot");
+    const [fallbackPage, setFallbackPage] = useState(null);
+    const [conversations, setConversations] = useState([makeDraftConversation()]);
     const [activeId, setActiveId] = useState(() => conversations[0].id);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
-    const [navCollapsed, setNavCollapsed] = useState(false); // desktop drawer: pushed to the side
+    const [navCollapsed, setNavCollapsed] = useState(false);
     const [input, setInput] = useState("");
     const [pendingFiles, setPendingFiles] = useState([]);
     const [isThinking, setIsThinking] = useState(false);
+    const [queuePosition, setQueuePosition] = useState(null);
+    const [sendError, setSendError] = useState("");
 
     const fileInputRef = useRef(null);
     const imageInputRef = useRef(null);
@@ -342,14 +337,61 @@ export default function Chatbot({ onNavigate } = {}) {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }, [active?.messages, isThinking]);
 
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            navigate("/login");
+            return;
+        }
+        loadChatList();
+    }, []);
+
+    async function loadChatList() {
+        try {
+            const data = await listChats();
+            const loaded = data.data.map((c) => ({
+                id: String(c.chat_id),
+                backendId: c.chat_id,
+                title: c.title,
+                timestamp: formatTimestamp(c.updated_at),
+                messages: [],
+                messagesLoaded: false,
+            }));
+            setConversations((prev) => {
+                const draft = prev.find((c) => c.backendId === null);
+                return draft ? [draft, ...loaded] : loaded.length ? loaded : [makeDraftConversation()];
+            });
+        } catch (err) {
+            console.error("Failed to load chats:", err.message);
+        }
+    }
+
     function updateActiveMessages(updater) {
         setConversations((prev) =>
             prev.map((c) => (c.id === activeId ? { ...c, messages: updater(c.messages) } : c))
         );
     }
 
+    async function handleSelectConversation(id) {
+        setActiveId(id);
+        setDrawerOpen(false);
+
+        const convo = conversations.find((c) => c.id === id);
+        if (!convo || convo.messagesLoaded || convo.backendId === null) return;
+
+        try {
+            const data = await getChatMessages(convo.backendId);
+            const messages = data.data.map((m) => ({ role: m.role, text: m.content }));
+            setConversations((prev) =>
+                prev.map((c) => (c.id === id ? { ...c, messages, messagesLoaded: true } : c))
+            );
+        } catch (err) {
+            console.error("Failed to load chat history:", err.message);
+        }
+    }
+
     function handleNewChat() {
-        const fresh = makeConversation("New conversation", []);
+        const fresh = makeDraftConversation();
         setConversations((prev) => [fresh, ...prev]);
         setActiveId(fresh.id);
         setDrawerOpen(false);
@@ -361,7 +403,7 @@ export default function Chatbot({ onNavigate } = {}) {
             const next = prev.filter((c) => c.id !== id);
             if (id === activeId && next.length > 0) setActiveId(next[0].id);
             if (next.length === 0) {
-                const fresh = makeConversation("New conversation", []);
+                const fresh = makeDraftConversation();
                 setActiveId(fresh.id);
                 return [fresh];
             }
@@ -373,52 +415,111 @@ export default function Chatbot({ onNavigate } = {}) {
         updateActiveMessages(() => []);
     }
 
-    function handleFiles(fileList, kind) {
+    function handleFiles(fileList) {
         const files = Array.from(fileList || []);
         const mapped = files.map((f) => ({
+            file: f,
             name: f.name,
             type: f.type,
-            previewUrl: kind === "image" || f.type.startsWith("image/") ? URL.createObjectURL(f) : null,
+            previewUrl: f.type.startsWith("image/") ? URL.createObjectURL(f) : null,
         }));
         setPendingFiles((prev) => [...prev, ...mapped]);
     }
 
-    function simulateAssistantReply(userText) {
-        setIsThinking(true);
-        // NOTE: replace this with a real call to your AI backend / API.
-        setTimeout(() => {
-            updateActiveMessages((msgs) => [
-                ...msgs,
-                {
-                    role: "assistant",
-                    text: `Here's a starting point on "${userText.slice(0, 60)}${userText.length > 60 ? "…" : ""
-                        }" — reply coming soon with more details and references.`,
-                },
-            ]);
-            setIsThinking(false);
-        }, 700);
-    }
-
-    function handleSend() {
+    async function handleSend() {
         const trimmed = input.trim();
         if (!trimmed && pendingFiles.length === 0) return;
+        if (isThinking) return;
 
-        // first message in an empty/untitled conversation becomes its title
-        setConversations((prev) =>
-            prev.map((c) =>
-                c.id === activeId && c.messages.length === 0 && trimmed
-                    ? { ...c, title: trimmed.slice(0, 40), messages: [...c.messages] }
-                    : c
-            )
-        );
+        setSendError("");
+        setInput("");
+        const filesToSend = pendingFiles;
+        setPendingFiles([]);
 
         updateActiveMessages((msgs) => [
             ...msgs,
-            { role: "user", text: trimmed, attachments: pendingFiles },
+            {
+                role: "user",
+                text: trimmed,
+                attachments: filesToSend.map((f) => ({ name: f.name, previewUrl: f.previewUrl })),
+            },
         ]);
-        setInput("");
-        setPendingFiles([]);
-        simulateAssistantReply(trimmed || "shared attachment(s)");
+
+        let chatId = active.backendId;
+        setIsThinking(true);
+
+        try {
+            if (filesToSend.length > 0 && !chatId) {
+                chatId = await createChatFromFirstMessage(trimmed || "Shared attachment(s)");
+            }
+
+            if (filesToSend.length > 0) {
+                for (let i = 0; i < filesToSend.length; i++) {
+                    const caption = i === 0 ? trimmed || undefined : undefined;
+                    await uploadChatFile(chatId, filesToSend[i].file, caption);
+                }
+                const data = await getChatMessages(chatId);
+                updateActiveMessages(() => data.data.map((m) => ({ role: m.role, text: m.content })));
+            } else {
+                updateActiveMessages((msgs) => [...msgs, { role: "assistant", text: "" }]);
+
+                await streamChatMessage(chatId, trimmed, {
+                    onStart: (data) => {
+                        if (data.chatId && !chatId) {
+                            chatId = data.chatId;
+                            setConversations((prev) =>
+                                prev.map((c) =>
+                                    c.id === activeId
+                                        ? { ...c, id: String(data.chatId), backendId: data.chatId, title: data.title }
+                                        : c
+                                )
+                            );
+                            setActiveId(String(data.chatId));
+                        }
+                    },
+                    onQueued: (position) => setQueuePosition(position),
+                    onChunk: (chunk) => {
+                        setQueuePosition(null);
+                        setConversations((prev) =>
+                            prev.map((c) => {
+                                const targetId = chatId ? String(chatId) : c.id;
+                                if (c.id !== targetId && c.id !== activeId) return c;
+                                const msgs = [...c.messages];
+                                const lastIdx = msgs.length - 1;
+                                msgs[lastIdx] = { ...msgs[lastIdx], text: (msgs[lastIdx].text || "") + chunk };
+                                return { ...c, messages: msgs };
+                            })
+                        );
+                    },
+                    onDone: () => {
+                        setQueuePosition(null);
+                        loadChatList();
+                    },
+                    onError: (message) => setSendError(message),
+                });
+            }
+        } catch (err) {
+            setSendError(err.message || "Something went wrong sending your message.");
+        } finally {
+            setIsThinking(false);
+        }
+    }
+
+    async function createChatFromFirstMessage(message) {
+        let newChatId = null;
+        await streamChatMessage(null, message, {
+            onStart: (data) => { newChatId = data.chatId; },
+            onChunk: () => {},
+            onDone: () => {},
+            onError: (msg) => { throw new Error(msg); },
+        });
+        setConversations((prev) =>
+            prev.map((c) =>
+                c.id === activeId ? { ...c, id: String(newChatId), backendId: newChatId } : c
+            )
+        );
+        setActiveId(String(newChatId));
+        return newChatId;
     }
 
     function handleKeyDown(e) {
@@ -444,7 +545,7 @@ export default function Chatbot({ onNavigate } = {}) {
             // still swap pages in place when no onNavigate prop was passed).
             navigate("/classroom");
         } else {
-            setFallbackPage(key); // "dashboard" | "personalized" | "group"
+            setFallbackPage(key);
         }
     }
 
@@ -538,10 +639,7 @@ export default function Chatbot({ onNavigate } = {}) {
                 open={drawerOpen}
                 conversations={conversations}
                 activeId={activeId}
-                onSelect={(id) => {
-                    setActiveId(id);
-                    setDrawerOpen(false);
-                }}
+                onSelect={handleSelectConversation}
                 onDelete={handleDeleteConversation}
                 onNewChat={handleNewChat}
                 onClose={() => setDrawerOpen(false)}
@@ -681,29 +779,33 @@ export default function Chatbot({ onNavigate } = {}) {
                             </div>
                         </div>
 
-                        {/* composer */}
-                        <div className="px-4 sm:px-8 pb-4 sm:pb-6 pt-2">
-                            <div className="max-w-[900px] mx-auto">
-                                {pendingFiles.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 mb-2">
-                                        {pendingFiles.map((f, i) => (
-                                            <div key={i} className="relative flex items-center gap-1.5 bg-[var(--t-bg0)] px-2 py-1.5 border border-[color:var(--t-bg4)]">
-                                                {f.previewUrl ? (
-                                                    <img src={f.previewUrl} className="w-6 h-6 object-cover" />
-                                                ) : (
-                                                    <Icon.File className="w-3.5 h-3.5 text-[color:var(--t-tx2)]" />
-                                                )}
-                                                <span className="text-[color:var(--t-tx0)] text-[10px] font-bold max-w-[120px] truncate">{f.name}</span>
-                                                <button
-                                                    onClick={() => setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                                                    className="text-[color:var(--t-tx2)] hover:text-[color:var(--t-err)]"
-                                                >
-                                                    <Icon.Close className="w-3 h-3" />
-                                                </button>
-                                            </div>
-                                        ))}
+                {/* composer */}
+                <div className="px-4 sm:px-8 pb-4 sm:pb-6 pt-2">
+                    <div className="max-w-[900px] mx-auto">
+                        {sendError && <p className="text-[color:var(--t-err)] text-[11px] px-2 pb-1">{sendError}</p>}
+                            {queuePosition !== null && (
+                                <p className="text-[color:var(--t-tx2)] text-[11px] px-2 pb-1">Waiting in queue (position {queuePosition})...</p>
+                            )}
+                        {pendingFiles.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                {pendingFiles.map((f, i) => (
+                                    <div key={i} className="relative flex items-center gap-1.5 bg-[var(--t-bg0)] px-2 py-1.5 border border-[color:var(--t-bg4)]">
+                                        {f.previewUrl ? (
+                                            <img src={f.previewUrl} className="w-6 h-6 object-cover" />
+                                        ) : (
+                                            <Icon.File className="w-3.5 h-3.5 text-[color:var(--t-tx2)]" />
+                                        )}
+                                        <span className="text-[color:var(--t-tx0)] text-[10px] font-bold max-w-[120px] truncate">{f.name}</span>
+                                        <button
+                                            onClick={() => setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                                            className="text-[color:var(--t-tx2)] hover:text-[color:var(--t-err)]"
+                                        >
+                                            <Icon.Close className="w-3 h-3" />
+                                        </button>
                                     </div>
-                                )}
+                                ))}
+                            </div>
+                        )}
 
                                 <div className="flex items-end bg-[var(--t-bg0)] p-2" style={{ boxShadow: "0px 25px 50px #00000040" }}>
                                     <button
@@ -721,27 +823,27 @@ export default function Chatbot({ onNavigate } = {}) {
                                         <Icon.Image className="w-4 h-4" />
                                     </button>
 
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        multiple
-                                        className="hidden"
-                                        onChange={(e) => {
-                                            handleFiles(e.target.files, "file");
-                                            e.target.value = "";
-                                        }}
-                                    />
-                                    <input
-                                        ref={imageInputRef}
-                                        type="file"
-                                        accept="image/*"
-                                        multiple
-                                        className="hidden"
-                                        onChange={(e) => {
-                                            handleFiles(e.target.files, "image");
-                                            e.target.value = "";
-                                        }}
-                                    />
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                multiple
+                                className="hidden"
+                                onChange={(e) => {
+                                    handleFiles(e.target.files);
+                                    e.target.value = "";
+                                }}
+                            />
+                            <input
+                                ref={imageInputRef}
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                className="hidden"
+                                onChange={(e) => {
+                                    handleFiles(e.target.files);
+                                    e.target.value = "";
+                                }}
+                            />
 
                                     <textarea
                                         value={input}
@@ -777,3 +879,4 @@ export default function Chatbot({ onNavigate } = {}) {
         </div>
     );
 }
+

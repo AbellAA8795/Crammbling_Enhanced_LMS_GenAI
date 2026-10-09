@@ -37,7 +37,8 @@ export async function loginController(req, res) {
             {
                 id: user.user_id,
                 email: user.email,
-                username: user.username
+                username: user.username,
+                role: user.role
             },
             process.env.JWT_SECRET,
             { expiresIn: "7d" }
@@ -54,7 +55,8 @@ export async function loginController(req, res) {
                 phoneNumber: user.phone_number,
                 avatarUrl: user.avatar_url,
                 authProvider: user.auth_provider,
-                isVerified: user.is_verified
+                isVerified: user.is_verified,
+                role: user.role
             }
         });
 

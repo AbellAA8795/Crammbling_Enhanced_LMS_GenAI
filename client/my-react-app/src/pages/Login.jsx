@@ -3,24 +3,21 @@ import { useNavigate } from "react-router-dom";
 import personIcon from "../assets/person.svg";
 import googleIcon from "../assets/google-icon.svg";
 import { AuthCard, Field, primaryButton } from "../components/AuthShared";
-import { startPagePath } from "../components/Settings";
+import { apiRequest } from "../api/client.js";
 
 function Login() {
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState({ username: "", password: "" });
+  const [errors, setErrors] = useState({ email: "", password: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // TODO: need to replace this
-  const MOCK_USERNAME = "admin";
-  const MOCK_PASSWORD = "password123";
-
-  const handleUsernameChange = (e) => {
+  const handleEmailChange = (e) => {
     const value = e.target.value;
-    setUsername(value);
-    if (errors.username && value.trim()) {
-      setErrors((prev) => ({ ...prev, username: "" }));
+    setEmail(value);
+    if (errors.email && value.trim()) {
+      setErrors((prev) => ({ ...prev, email: "" }));
     }
   };
 
@@ -32,25 +29,37 @@ function Login() {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const usernameError = !username.trim() ? "Username is required." : "";
+    const emailError = !email.trim() ? "Email is required." : "";
     const passwordError = !password ? "Password is required." : "";
 
-    if (usernameError || passwordError) {
-      setErrors({ username: usernameError, password: passwordError });
+    if (emailError || passwordError) {
+      setErrors({ email: emailError, password: passwordError });
       return;
     }
 
-    // need to replace this for real API (this is just a hardcoded)
-    if (username !== MOCK_USERNAME || password !== MOCK_PASSWORD) {
-      setErrors({ username: "", password: "Incorrect username or password." });
-      return;
-    }
+    setErrors({ email: "", password: "" });
+    setIsSubmitting(true);
 
-    setErrors({ username: "", password: "" });
-    navigate(startPagePath());
+    try {
+      const data = await apiRequest("/api/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+
+      localStorage.setItem("token", data.token);
+      navigate("/dashboard");
+    } catch (err) {
+      setErrors({ email: "", password: err.message || "Incorrect email or password." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGoogleLogin = () => {
+    window.location.href = `${import.meta.env.VITE_API_URL}/api/auth/google`;
   };
 
   return (
@@ -58,14 +67,15 @@ function Login() {
       <form onSubmit={handleSubmit} noValidate>
         <Field
           first
-          id="username"
-          label="Username"
-          placeholder="Username"
+          id="email"
+          label="Email"
+          type="email"
+          placeholder="Email"
           icon={personIcon}
-          value={username}
-          onChange={handleUsernameChange}
-          error={errors.username}
-          autoComplete="username"
+          value={email}
+          onChange={handleEmailChange}
+          error={errors.email}
+          autoComplete="email"
         />
         <Field
           id="password"
@@ -92,8 +102,8 @@ function Login() {
           </button>
         </div>
 
-        <button type="submit" className={primaryButton}>
-          Login
+        <button type="submit" className={primaryButton} disabled={isSubmitting}>
+          {isSubmitting ? "Logging in..." : "Login"}
         </button>
       </form>
 
@@ -103,17 +113,16 @@ function Login() {
         <span className="flex-1 h-px bg-edge" />
       </div>
 
-      <button
-        type="button"
-        onClick={() => navigate(startPagePath())}
-        className="btn w-full py-2.5 border border-lime/50 text-lime hover:bg-lime/10"
-      >
-        <img src={googleIcon} alt="" className="w-3.5 h-3.5" />
-        Google
-      </button>
-
-      <p className="text-center text-mute text-[13px] tracking-wide mt-5">
-        Don't have an account?{" "}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          className="btn flex-1 py-2.5 border border-lime/50 text-lime hover:bg-lime/10"
+        >
+          <img src={googleIcon} alt="" className="w-3.5 h-3.5" />
+          Google
+        </button>
+        <span className="label">or</span>
         <button
           type="button"
           onClick={() => navigate("/register")}

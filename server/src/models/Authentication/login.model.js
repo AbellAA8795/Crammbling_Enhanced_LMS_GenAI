@@ -1,7 +1,10 @@
 import pool from "../../config/database.js";
 
 export async function verifyLogin(email, password) {
-    const query = `CALL verify_login_procedure($1, $2, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)`;
+    // Schema-qualified: this procedure now lives in `auth` after the
+    // schema-split migration. 9 NULL placeholders = 9 OUT params
+    // (including the new o_role), plus $1/$2 for the 2 IN params = 11 total.
+    const query = `CALL auth.verify_login_procedure($1, $2, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)`;
     const result = await pool.query(query, [email, password]);
 
     const row = result.rows[0];
@@ -20,5 +23,6 @@ export async function verifyLogin(email, password) {
         auth_provider: row.o_auth_provider,
         is_verified: row.o_is_verified,
         is_password_valid: row.o_is_password_valid,
+        role: row.o_role,
     };
 }
